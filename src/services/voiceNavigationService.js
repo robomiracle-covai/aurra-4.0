@@ -72,10 +72,16 @@ class VoiceNavigationService {
     });
   }
 
+  setNavigationHandler(fn) {
+    if (typeof fn === 'function') {
+      this.navigationHandler = fn;
+    }
+  }
+
   init({ onNavigate, onOpenAdmin, onToggleView, autoStart = false }) {
-    this.navigationHandler = onNavigate;
-    this.adminHandler = onOpenAdmin;
-    this.viewToggleHandler = onToggleView;
+    if (onNavigate) this.navigationHandler = onNavigate;
+    if (onOpenAdmin) this.adminHandler = onOpenAdmin;
+    if (onToggleView) this.viewToggleHandler = onToggleView;
 
     if (this.isInitialized) {
       // Handlers updated. Maintain existing listening / pause state across screen transitions.
@@ -250,10 +256,31 @@ class VoiceNavigationService {
     }
 
     // 2. System Navigation Intents
-    if (utterance.includes('home') || utterance.includes('main menu') || utterance.includes('go home') || utterance.includes('back to home')) {
+    const isHomeIntent =
+      utterance === 'home' ||
+      utterance.includes('go home') ||
+      utterance.includes('back home') ||
+      utterance.includes('back to home') ||
+      utterance.includes('main menu') ||
+      utterance === 'back' ||
+      utterance.includes('go back') ||
+      utterance === 'exit' ||
+      utterance.includes('exit hud') ||
+      utterance.includes('exit') ||
+      utterance === 'close' ||
+      utterance.includes('quit');
+
+    if (isHomeIntent) {
       this.setFeedback('Returning to Home screen');
-      this.speak('Returning to Home screen');
-      this.navigationHandler?.('/');
+      this.speak('Returning to Home screen', {
+        onEnd: () => {
+          this.navigationHandler?.('/');
+        },
+      });
+      // Safety timer so navigation completes even if speech synthesis is delayed
+      setTimeout(() => {
+        this.navigationHandler?.('/');
+      }, 700);
       return;
     }
 

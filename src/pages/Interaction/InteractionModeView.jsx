@@ -32,7 +32,14 @@ export default function InteractionModeView({ onNavigate }) {
   coreStatusRef.current = coreStatus;
 
   const lastGreetingTimeRef = useRef({});
+  const guestGreetedRef = useRef(false);
+  const noFaceTimerRef = useRef(null);
   const detectionLoopRef = useRef(null);
+
+  // Sync navigation handler with voice navigation service
+  useEffect(() => {
+    voiceNavigationService.setNavigationHandler(onNavigate);
+  }, [onNavigate]);
 
   // Initialize Camera hook with standard mobile resolution (640x480)
   const { videoRef, startCamera, stopCamera, isStreaming, error: cameraError } = useCamera({
@@ -151,7 +158,21 @@ export default function InteractionModeView({ onNavigate }) {
 
       if (!detections || detections.length === 0) {
         setRecognizedPerson(null);
+        // Start 15s departure timer: if no face seen for 15s, reset greeting so next visitor gets welcomed
+        if (!noFaceTimerRef.current) {
+          noFaceTimerRef.current = setTimeout(() => {
+            guestGreetedRef.current = false;
+            lastGreetingTimeRef.current = {};
+            noFaceTimerRef.current = null;
+          }, 15000);
+        }
         return;
+      }
+
+      // Face is active in frame: cancel departure reset timer
+      if (noFaceTimerRef.current) {
+        clearTimeout(noFaceTimerRef.current);
+        noFaceTimerRef.current = null;
       }
 
       // Draw Holographic Reticles
@@ -197,9 +218,6 @@ export default function InteractionModeView({ onNavigate }) {
           }
         }
 
-        const now = Date.now();
-        const cooldownMs = (cfg.faceGreetingCooldownSec || 15) * 1000;
-
         if (matchedFace) {
           setRecognizedPerson(matchedFace.name);
 
@@ -210,10 +228,10 @@ export default function InteractionModeView({ onNavigate }) {
           ctx.font = 'bold 12px sans-serif';
           ctx.fillText(`VIP: ${matchedFace.name.toUpperCase()}`, x + 6, Math.max(16, y - 12));
 
-          // Trigger Spoken Greeting if cooldown elapsed
-          const lastTime = lastGreetingTimeRef.current[matchedFace.id] || 0;
-          if (now - lastTime > cooldownMs) {
-            lastGreetingTimeRef.current[matchedFace.id] = now;
+          // Trigger VIP Greeting ONCE per arrival (do not interrupt ongoing speech/thinking)
+          const hasGreetedVip = lastGreetingTimeRef.current[matchedFace.id];
+          if (!hasGreetedVip && coreStatusRef.current !== 'SPEAKING' && coreStatusRef.current !== 'THINKING') {
+            lastGreetingTimeRef.current[matchedFace.id] = true;
             const template = cfg.faceGreetingTemplate || 'Hello {name}! Welcome to Robomiracle Technologies.';
             const greeting = template.replace(/{name}/g, matchedFace.name);
             setLastFeedback(greeting);
@@ -240,11 +258,11 @@ export default function InteractionModeView({ onNavigate }) {
           ctx.font = 'bold 11px sans-serif';
           ctx.fillText('VISITOR DETECTED', x + 6, Math.max(14, y - 10));
 
-          // Trigger Stranger Greeting if enabled
-          if (cfg.strangerGreetingEnabled) {
-            const lastGuestTime = lastGreetingTimeRef.current['guest'] || 0;
-            if (now - lastGuestTime > cooldownMs) {
-              lastGreetingTimeRef.current['guest'] = now;
+          // Trigger Stranger Greeting ONCE when a new visitor arrives
+          if (cfg.strangerGreetingEnabled && !guestGreetedRef.current) {
+            // Only greet if Aurra is not currently speaking or processing a query
+            if (coreStatusRef.current !== 'SPEAKING' && coreStatusRef.current !== 'THINKING') {
+              guestGreetedRef.current = true;
               const strangerMsg = cfg.strangerGreetingText || 'Hello guest! Welcome to Robomiracle Technologies.';
               setLastFeedback(strangerMsg);
               setCoreStatus('SPEAKING');
@@ -261,13 +279,14 @@ export default function InteractionModeView({ onNavigate }) {
     }
   }, [modelsLoaded, isStreaming, enrolledFaces]);
 
-  // Loop Execution
+  // Loop Execution & Cleanup
   useEffect(() => {
     const cfg = kioskConfigService.getConfig();
     const intervalMs = cfg.faceDetectionIntervalMs || 250;
 
     detectionLoopRef.current = setInterval(processDetection, intervalMs);
     return () => {
+      if (noFaceTimerRef.current) clearTimeout(noFaceTimerRef.current);
       if (detectionLoopRef.current) clearInterval(detectionLoopRef.current);
     };
   }, [processDetection]);

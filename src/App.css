@@ -1,0 +1,44 @@
+/* Global Application Layout & Persistent Floating Voice Bar */
+
+.aurra-app-root {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #06090e;
+}
+
+.aurra-view-container {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Globally Persistent Floating Voice Bar at bottom of screen */
+.global-floating-voice-bar {
+  position: fixed;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 96%;
+  max-width: 920px;
+  z-index: 1000;
+  pointer-events: none; /* Children handle pointer events so surrounding space is click-through */
+  animation: floatIn 0.3s ease-out;
+}
+
+.global-floating-voice-bar > * {
+  pointer-events: auto;
+}
+
+@keyframes floatIn {
+  from {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}

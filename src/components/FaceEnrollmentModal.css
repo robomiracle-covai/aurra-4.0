@@ -1,0 +1,306 @@
+.enrollment-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+.enrollment-card {
+  background: #0a192f;
+  border: 1.5px solid #00ffff;
+  border-radius: 16px;
+  box-shadow: 0 0 35px rgba(0, 255, 255, 0.4);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 22px;
+  color: #fff;
+  position: relative;
+  font-family: 'Outfit', sans-serif;
+}
+
+.enrollment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+  padding-bottom: 10px;
+}
+
+.enrollment-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #00ffff;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.close-btn:hover {
+  color: #00ffff;
+}
+
+/* Live Camera Box */
+.camera-preview-box {
+  width: 100%;
+  height: 240px;
+  border-radius: 12px;
+  border: 2px solid rgba(0, 255, 255, 0.5);
+  background: #030712;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.15);
+}
+
+.modal-live-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.modal-snapshot-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Face Alignment Guide Oval */
+.face-guide-oval {
+  position: absolute;
+  width: 140px;
+  height: 180px;
+  border: 2px dashed rgba(0, 255, 255, 0.6);
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+}
+
+.live-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(3, 7, 18, 0.8);
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.live-pulse {
+  width: 6px;
+  height: 6px;
+  background: #22c55e;
+  border-radius: 50%;
+  animation: pulse 1.2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.4); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.8; }
+}
+
+.camera-controls-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.snap-btn {
+  flex: 1.5;
+  background: #22c55e;
+  color: #030712;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
+  transition: all 0.2s;
+}
+
+.snap-btn:hover {
+  background: #16a34a;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.6);
+}
+
+.action-btn-secondary {
+  flex: 1;
+  background: rgba(0, 255, 255, 0.12);
+  border: 1px solid rgba(0, 255, 255, 0.35);
+  color: #00ffff;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.action-btn-secondary:hover {
+  background: rgba(0, 255, 255, 0.25);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(0, 255, 255, 0.85);
+  margin-bottom: 6px;
+}
+
+.form-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(3, 7, 18, 0.85);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus {
+  border-color: #00ffff;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.25);
+}
+
+/* Submission action buttons */
+.submit-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.submit-btn-primary {
+  flex: 1;
+  background: #00ffff;
+  color: #030712;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.submit-btn-primary:hover:not(:disabled) {
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+}
+
+.submit-btn-another {
+  flex: 1;
+  background: rgba(0, 255, 255, 0.15);
+  color: #00ffff;
+  border: 1.5px solid #00ffff;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.submit-btn-another:hover:not(:disabled) {
+  background: rgba(0, 255, 255, 0.3);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+}
+
+.submit-btn-primary:disabled,
+.submit-btn-another:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.feedback-toast {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feedback-toast.success {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+}
+
+.feedback-toast.error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}

@@ -1,0 +1,440 @@
+/**
+ * InteractionModeView.css - Full-Screen Cyber HUD Vision & Motion Cockpit
+ * Optimized for 90 FPS smooth execution on Android tablet WebView
+ */
+
+.hud-interaction-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: #030712;
+  color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Background Cyber Grid Vignette */
+.hud-grid-vignette {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 50% 50%, transparent 30%, rgba(3, 17, 39, 0.9) 90%),
+              linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Top-Right Floating Camera PiP Widget */
+.hud-video-wrapper {
+  position: absolute;
+  top: 80px;
+  right: 28px;
+  width: 220px;
+  height: 150px;
+  border-radius: 16px;
+  border: 2px solid rgba(0, 255, 255, 0.6);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 255, 255, 0.35);
+  z-index: 12;
+  overflow: hidden;
+  background: #031127;
+  backdrop-filter: blur(12px);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hud-video-wrapper.hidden {
+  opacity: 0;
+  transform: scale(0.8);
+  pointer-events: none;
+}
+
+.hud-video-wrapper.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.hud-video-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  filter: brightness(0.95) contrast(1.05);
+}
+
+.hud-canvas-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 13;
+  transform: scaleX(-1);
+}
+
+.hud-pip-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #00ffff;
+  background: rgba(3, 17, 39, 0.85);
+  border: 1px solid rgba(0, 255, 255, 0.4);
+  border-radius: 6px;
+  padding: 2px 6px;
+  z-index: 14;
+}
+
+/* Top Cyber HUD Bar */
+.hud-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 28px;
+  background: linear-gradient(180deg, rgba(3, 17, 39, 0.95) 0%, rgba(3, 17, 39, 0) 100%);
+  backdrop-filter: blur(12px);
+  z-index: 10;
+  box-sizing: border-box;
+}
+
+.hud-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e2e8f0;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hud-back-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: #00ffff;
+  color: #00ffff;
+}
+
+.hud-header-title {
+  text-align: center;
+}
+
+.hud-header-title h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #ffffff;
+  text-shadow: 0 0 16px rgba(0, 255, 255, 0.5);
+}
+
+.hud-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #00ffff;
+  letter-spacing: 0.1em;
+  padding: 2px 10px;
+  background: rgba(0, 255, 255, 0.12);
+  border-radius: 12px;
+  margin-top: 4px;
+}
+
+.pulse-icon {
+  animation: hudPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes hudPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.2); }
+}
+
+.hud-telemetry-group {
+  display: flex;
+  gap: 10px;
+}
+
+.hud-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+
+.hud-pill.active {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+.hud-pill.warn {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+}
+
+.hud-pill.cyan {
+  background: rgba(0, 255, 255, 0.12);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  color: #00ffff;
+}
+
+.hud-pill.camera-toggle {
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  transition: all 0.2s ease;
+}
+
+.hud-pill.camera-toggle.inactive {
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.hud-pill.camera-toggle.active {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+}
+
+.hud-pill.camera-toggle:hover {
+  transform: translateY(-1px);
+}
+
+.hud-pill.ai-only-toggle {
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  transition: all 0.2s ease;
+}
+
+.hud-pill.ai-only-toggle.inactive {
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.hud-pill.ai-only-toggle.active {
+  background: rgba(168, 85, 247, 0.25);
+  color: #c084fc;
+  border-color: rgba(168, 85, 247, 0.6);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.4);
+}
+
+.hud-pill.ai-only-toggle:hover {
+  transform: translateY(-1px);
+}
+
+/* Main Center Overlay */
+.hud-center-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  z-index: 5;
+  width: 90%;
+  max-width: 650px;
+  pointer-events: none;
+}
+
+/* Neural Core Animation */
+.hud-neural-core {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hud-ring {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+.hud-ring.outer {
+  width: 100%;
+  height: 100%;
+  border: 2px dashed rgba(0, 255, 255, 0.35);
+  animation: spinCw 10s linear infinite;
+}
+
+.hud-ring.middle {
+  width: 76%;
+  height: 76%;
+  border: 2px solid rgba(0, 255, 255, 0.25);
+  animation: spinCcw 6s linear infinite;
+}
+
+.hud-ring.inner {
+  width: 58px;
+  height: 58px;
+  background: radial-gradient(circle, #00ffff 0%, #0284c7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.6);
+}
+
+.hud-ring.inner.listening {
+  background: radial-gradient(circle, #10b981 0%, #047857 100%);
+  box-shadow: 0 0 35px rgba(16, 185, 129, 0.8);
+}
+
+.hud-ring.inner.thinking {
+  background: radial-gradient(circle, #c084fc 0%, #7e22ce 100%);
+  box-shadow: 0 0 35px rgba(192, 132, 252, 0.8);
+}
+
+.hud-ring.inner.speaking {
+  background: radial-gradient(circle, #f43f5e 0%, #be123c 100%);
+  box-shadow: 0 0 35px rgba(244, 63, 94, 0.8);
+}
+
+.hud-core-sparkle {
+  color: #ffffff;
+}
+
+@keyframes spinCw { 100% { transform: rotate(360deg); } }
+@keyframes spinCcw { 100% { transform: rotate(-360deg); } }
+
+/* Status Display Text */
+.hud-status-display {
+  text-align: center;
+  background: rgba(3, 17, 39, 0.75);
+  padding: 10px 24px;
+  border-radius: 30px;
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.hud-status-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  color: #94a3b8;
+}
+
+.hud-status-text {
+  margin: 4px 0 0 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #00ffff;
+  letter-spacing: 0.05em;
+}
+
+.hud-status-text.listening { color: #34d399; }
+.hud-status-text.thinking { color: #c084fc; }
+.hud-status-text.speaking { color: #fb7185; }
+
+/* Spoken Feedback Card */
+.hud-feedback-card {
+  width: 100%;
+  background: rgba(3, 17, 39, 0.85);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 16px;
+  padding: 14px 20px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+
+.feedback-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #00ffff;
+  margin-bottom: 6px;
+}
+
+.feedback-card-text {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #f1f5f9;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+/* Bottom Glassmorphic Actions */
+.hud-bottom-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding: 16px 28px;
+  background: linear-gradient(0deg, rgba(3, 17, 39, 0.95) 0%, rgba(3, 17, 39, 0) 100%);
+  backdrop-filter: blur(12px);
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.hud-quick-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.hud-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: rgba(0, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 12px;
+  color: #00ffff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hud-action-btn:hover {
+  background: rgba(0, 255, 255, 0.25);
+  border-color: #00ffff;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.hud-action-btn.speech-toggle-btn.active {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.6);
+  color: #34d399;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.4);
+}
+
+.hud-action-btn.speech-toggle-btn.muted {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #f87171;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.3);
+}

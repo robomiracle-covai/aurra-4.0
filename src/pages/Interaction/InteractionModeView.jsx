@@ -28,6 +28,9 @@ export default function InteractionModeView({ onNavigate }) {
   const [showCameraFeed, setShowCameraFeed] = useState(false); // Default hidden background video
   const [forceLlmMode, setForceLlmMode] = useState(false); // Direct Cloud AI Groq LLM Mode
 
+  const coreStatusRef = useRef(coreStatus);
+  coreStatusRef.current = coreStatus;
+
   const lastGreetingTimeRef = useRef({});
   const detectionLoopRef = useRef(null);
 
@@ -44,7 +47,7 @@ export default function InteractionModeView({ onNavigate }) {
       try {
         const loaded = await loadFaceApiModels();
         if (isMounted) setModelsLoaded(loaded);
-        const faces = await offlineFaceService.getFaces();
+        const faces = await offlineFaceService.getUsers();
         if (isMounted) setEnrolledFaces(faces);
         await startCamera();
       } catch (err) {
@@ -89,7 +92,7 @@ export default function InteractionModeView({ onNavigate }) {
 
       if (state.isThinking) {
         setCoreStatus('THINKING');
-      } else if (state.isListening && coreStatus === 'IDLE') {
+      } else if (state.isListening && coreStatusRef.current === 'IDLE') {
         setCoreStatus('LISTENING');
       }
     });
@@ -98,7 +101,7 @@ export default function InteractionModeView({ onNavigate }) {
       window.removeEventListener('aurra:qa-answered', handleQaAnswered);
       unsubscribe();
     };
-  }, [coreStatus]);
+  }, []);
 
   // Check Hardware Status
   useEffect(() => {
@@ -160,7 +163,7 @@ export default function InteractionModeView({ onNavigate }) {
         // Top-Left
         ctx.beginPath(); ctx.moveTo(x, y + cl); ctx.lineTo(x, y); ctx.lineTo(x + cl, y); ctx.stroke();
         // Top-Right
-        ctx.beginPath(); ctx.moveTo(x + bw - cl, y); ctx.lineTo(x + bw); ctx.lineTo(x + bw, y + cl); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + bw - cl, y); ctx.lineTo(x + bw, y); ctx.lineTo(x + bw, y + cl); ctx.stroke();
         // Bottom-Left
         ctx.beginPath(); ctx.moveTo(x, y + bh - cl); ctx.lineTo(x, y + bh); ctx.lineTo(x + cl, y + bh); ctx.stroke();
         // Bottom-Right
@@ -170,9 +173,10 @@ export default function InteractionModeView({ onNavigate }) {
         let matchedFace = null;
         if (enrolledFaces.length > 0 && det.descriptor) {
           for (const face of enrolledFaces) {
-            if (face.descriptor) {
+            const embedding = face.faceEmbedding || face.descriptor;
+            if (embedding && (embedding.length >= 128 || embedding.length)) {
               const descA = Array.from(det.descriptor);
-              const descB = Array.from(face.descriptor);
+              const descB = Array.from(embedding);
               const dist = Math.sqrt(descA.reduce((sum, val, i) => sum + Math.pow(val - descB[i], 2), 0));
               if (dist < 0.55) {
                 matchedFace = face;

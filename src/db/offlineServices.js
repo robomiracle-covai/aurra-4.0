@@ -15,6 +15,9 @@ export const offlineFaceService = {
   getUsers: async () => {
     return await db.userFaces.toArray();
   },
+  getFaces: async () => {
+    return await db.userFaces.toArray();
+  },
 
   uploadFace: async ({ name, faceEmbedding, imgUrl, info }) => {
     const id = await db.userFaces.add({

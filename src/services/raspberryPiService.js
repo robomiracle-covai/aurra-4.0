@@ -74,7 +74,7 @@ class RaspberryPiService {
   async ping(url, timeoutMs = 800) {
     if (hasNativeHttp()) {
       const native = nativeHttpGet(`${url}/health`);
-      if (native && native.ok) return true;
+      return !!(native && native.ok);
     }
     try {
       const controller = new AbortController();

@@ -96,8 +96,8 @@ function App() {
         />
       )}
 
-      {/* Globally Floating Persistent Voice Assistant Bar (hidden while in Admin for full screen control) */}
-      {!isAdminOpen && (
+      {/* Globally Floating Persistent Voice Assistant Bar (hidden while in Admin and Interaction Mode) */}
+      {!isAdminOpen && currentRoute !== '/interaction' && (
         <div className="global-floating-voice-bar">
           <VoiceAssistantBar
             onNavigate={handleNavigate}

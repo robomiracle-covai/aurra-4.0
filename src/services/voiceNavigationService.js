@@ -48,25 +48,24 @@ class VoiceNavigationService {
       }
     }
     const originalOnEnd = options.onEnd;
+    const resumeListening = () => {
+      setTimeout(() => {
+        this.isSpeakingTts = false;
+        if (!this.userPaused && !this.manualStop) {
+          this.startListening(true);
+        }
+      }, 600);
+    };
+
     speakWithVoice(text, {
       ...options,
       onEnd: () => {
         originalOnEnd?.();
-        setTimeout(() => {
-          this.isSpeakingTts = false;
-          if (!this.userPaused && !this.manualStop) {
-            this.startListening();
-          }
-        }, 1500);
+        resumeListening();
       },
       onError: (err) => {
         options.onError?.(err);
-        setTimeout(() => {
-          this.isSpeakingTts = false;
-          if (!this.userPaused && !this.manualStop) {
-            this.startListening();
-          }
-        }, 1500);
+        resumeListening();
       },
     });
   }
@@ -141,8 +140,15 @@ class VoiceNavigationService {
       };
 
       this.recognition.onend = () => {
+        // If currently speaking TTS or user stopped/paused, do NOT restart
+        if (this.isSpeakingTts || this.manualStop || this.userPaused) {
+          this.isListening = false;
+          this.notify({ isListening: false });
+          return;
+        }
+
         // Auto-restart if user did not manually stop listening
-        if (this.isListening && !this.manualStop) {
+        if (this.isListening) {
           try {
             this.recognition.start();
           } catch {
@@ -457,7 +463,12 @@ class VoiceNavigationService {
         this.isListening = true;
         this.notify({ isListening: true });
       } catch (err) {
-        logger.warn('VOICE', `Recognition start issue: ${err.message}`);
+        if (err.message && err.message.includes('already started')) {
+          this.isListening = true;
+          this.notify({ isListening: true });
+        } else {
+          logger.warn('VOICE', `Recognition start issue: ${err.message}`);
+        }
       }
     }
   }

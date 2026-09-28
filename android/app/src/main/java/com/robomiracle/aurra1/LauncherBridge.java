@@ -23,6 +23,7 @@ public class LauncherBridge {
     @JavascriptInterface
     public void speakWithGender(String text, String gender) {
         if (text == null || text.trim().isEmpty()) return;
+        activity.setNativeSpeakingFlag(true);
         mainHandler.post(() -> activity.speakNative(text, "male"));
     }
 
@@ -64,6 +65,11 @@ public class LauncherBridge {
     @JavascriptInterface
     public boolean isTtsReady() {
         return activity.isTtsEngineReady();
+    }
+
+    @JavascriptInterface
+    public boolean isSpeaking() {
+        return activity.isSpeaking();
     }
 
     @JavascriptInterface

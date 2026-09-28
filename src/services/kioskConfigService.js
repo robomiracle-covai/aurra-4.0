@@ -42,7 +42,15 @@ export const DEFAULT_KIOSK_CONFIG = {
   defaultHeadTiltAngle: 90,
   defaultHeadPanAngle: 90,
 
-  // 5. Security & Admin
+  // 5. Autonomous Guided Robot Tour
+  tourSpeed: 160,                      // 100 - 255 motor PWM
+  tourObstacleDistanceCm: 30,          // Distance in cm to auto-brake
+  tourAutoAnnounce: true,              // Speak narration automatically upon waypoint arrival
+  tourArrivalChime: true,              // Play chime / beep on stop arrival
+  tourLoopEnabled: false,              // Loop back to stop 1 upon completion
+  tourVoiceNavEnabled: true,           // Allow voice commands ("next stop", "pause tour")
+
+  // 6. Security & Admin
   adminPin: '1234',
   singleTapAdmin: false,
   bypassAdminPin: false,

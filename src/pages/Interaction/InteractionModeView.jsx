@@ -8,7 +8,7 @@ import { detectFacesInVideo, loadFaceApiModels } from '../../utils/faceApiHelper
 import { offlineFaceService, offlineQaService } from '../../db/offlineServices';
 import { voiceNavigationService } from '../../services/voiceNavigationService';
 import { esp32Service } from '../../services/esp32Service';
-import { speakWithVoice, cancelSpeech } from '../../utils/speechSynthesis';
+import { speakWithVoice, cancelSpeech, isAnySpeaking } from '../../utils/speechSynthesis';
 import { kioskConfigService } from '../../services/kioskConfigService';
 import InteractionAvatar from '../../components/InteractionAvatar';
 import './InteractionModeView.css';
@@ -35,10 +35,14 @@ export default function InteractionModeView({ onNavigate }) {
   const guestGreetedRef = useRef(false);
   const noFaceTimerRef = useRef(null);
   const detectionLoopRef = useRef(null);
+  const lastConversationTimeRef = useRef(0);
 
-  // Sync navigation handler with voice navigation service
+  // Sync navigation handler and ensure voice listening is active in Interaction Mode
   useEffect(() => {
     voiceNavigationService.setNavigationHandler(onNavigate);
+    if (!voiceNavigationService.isListening) {
+      voiceNavigationService.startListening(true);
+    }
   }, [onNavigate]);
 
   // Initialize Camera hook with standard mobile resolution (640x480)
@@ -82,6 +86,7 @@ export default function InteractionModeView({ onNavigate }) {
   // Subscribe to Voice Assistant Events & Status
   useEffect(() => {
     const handleQaAnswered = (e) => {
+      lastConversationTimeRef.current = Date.now();
       const { match } = e.detail || {};
       if (match?.answer) {
         setLastFeedback(match.answer);
@@ -92,7 +97,12 @@ export default function InteractionModeView({ onNavigate }) {
 
     const unsubscribe = voiceNavigationService.subscribe((state) => {
       setIsListening(state.isListening);
-      if (state.transcript !== undefined) setLastTranscript(state.transcript);
+      if (state.transcript !== undefined) {
+        setLastTranscript(state.transcript);
+        if (state.transcript) {
+          lastConversationTimeRef.current = Date.now();
+        }
+      }
       if (state.feedback) setLastFeedback(state.feedback);
 
       if (state.isSpeaking) {
@@ -112,6 +122,28 @@ export default function InteractionModeView({ onNavigate }) {
     };
   }, []);
 
+  // Safe UI Desync Recovery: ONLY heal if hardware is silent and stuck in SPEAKING for > 25 seconds
+  useEffect(() => {
+    if (coreStatus === 'SPEAKING') {
+      const failsafe = setTimeout(() => {
+        if (!isAnySpeaking() && !voiceNavigationService.isSpeakingTts) {
+          console.warn('[INTERACTION] UI desync recovery: resetting inactive state to LISTENING');
+          setCoreStatus('LISTENING');
+        }
+      }, 25000);
+      return () => clearTimeout(failsafe);
+    }
+  }, [coreStatus]);
+
+  // Tap-to-Interrupt handler: allows tapping avatar/screen to immediately stop speech
+  const handleInterruptSpeech = () => {
+    if (coreStatus === 'SPEAKING' || coreStatus === 'THINKING') {
+      voiceNavigationService.cancelSpeech();
+      setCoreStatus('LISTENING');
+      setLastFeedback('');
+    }
+  };
+
   // Auto-dismiss spoken feedback card after 8.5 seconds of idle
   useEffect(() => {
     if (!lastFeedback) return;
@@ -124,12 +156,19 @@ export default function InteractionModeView({ onNavigate }) {
   // Check Hardware Status
   useEffect(() => {
     const checkHw = async () => {
-      const status = await esp32Service.checkStatus();
-      setEspConnected(status.connected);
+      try {
+        const isOnline = await esp32Service.checkConnection();
+        setEspConnected(Boolean(isOnline));
+      } catch (err) {
+        setEspConnected(false);
+      }
     };
     checkHw();
     const interval = setInterval(checkHw, 5000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      voiceNavigationService.setForceLlmOnly(false);
+    };
   }, []);
 
   // Biometric Detection Loop (Non-blocking 250ms)
@@ -228,9 +267,17 @@ export default function InteractionModeView({ onNavigate }) {
           ctx.font = 'bold 12px sans-serif';
           ctx.fillText(`VIP: ${matchedFace.name.toUpperCase()}`, x + 6, Math.max(16, y - 12));
 
-          // Trigger VIP Greeting ONCE per arrival (do not interrupt ongoing speech/thinking)
+          // Trigger VIP Greeting ONCE per arrival (suppress if in active conversation or speaking)
           const hasGreetedVip = lastGreetingTimeRef.current[matchedFace.id];
-          if (!hasGreetedVip && coreStatusRef.current !== 'SPEAKING' && coreStatusRef.current !== 'THINKING') {
+          const inConversation = (Date.now() - lastConversationTimeRef.current < 40000) ||
+                                 (Date.now() - (voiceNavigationService.lastUserQueryTime || 0) < 40000);
+          const isBusy = coreStatusRef.current === 'SPEAKING' || 
+                         coreStatusRef.current === 'THINKING' || 
+                         voiceNavigationService.isSpeakingTts || 
+                         voiceNavigationService.isProcessing || 
+                         isAnySpeaking();
+
+          if (!hasGreetedVip && !inConversation && !isBusy) {
             lastGreetingTimeRef.current[matchedFace.id] = true;
             const template = cfg.faceGreetingTemplate || 'Hello {name}! Welcome to Robomiracle Technologies.';
             const greeting = template.replace(/{name}/g, matchedFace.name);
@@ -258,19 +305,24 @@ export default function InteractionModeView({ onNavigate }) {
           ctx.font = 'bold 11px sans-serif';
           ctx.fillText('VISITOR DETECTED', x + 6, Math.max(14, y - 10));
 
-          // Trigger Stranger Greeting ONCE when a new visitor arrives
-          if (cfg.strangerGreetingEnabled && !guestGreetedRef.current) {
-            // Only greet if Aurra is not currently speaking or processing a query
-            if (coreStatusRef.current !== 'SPEAKING' && coreStatusRef.current !== 'THINKING') {
-              guestGreetedRef.current = true;
-              const strangerMsg = cfg.strangerGreetingText || 'Hello guest! Welcome to Robomiracle Technologies.';
-              setLastFeedback(strangerMsg);
-              setCoreStatus('SPEAKING');
+          // Trigger Stranger Greeting ONCE when a new visitor arrives (suppress if in active conversation)
+          const inConversation = (Date.now() - lastConversationTimeRef.current < 40000) ||
+                                 (Date.now() - (voiceNavigationService.lastUserQueryTime || 0) < 40000);
+          const isBusy = coreStatusRef.current === 'SPEAKING' || 
+                         coreStatusRef.current === 'THINKING' || 
+                         voiceNavigationService.isSpeakingTts || 
+                         voiceNavigationService.isProcessing || 
+                         isAnySpeaking();
 
-              voiceNavigationService.speak(strangerMsg, {
-                onEnd: () => setCoreStatus('IDLE'),
-              });
-            }
+          if (cfg.strangerGreetingEnabled && !guestGreetedRef.current && !inConversation && !isBusy) {
+            guestGreetedRef.current = true;
+            const strangerMsg = cfg.strangerGreetingText || 'Hello guest! Welcome to Robomiracle Technologies.';
+            setLastFeedback(strangerMsg);
+            setCoreStatus('SPEAKING');
+
+            voiceNavigationService.speak(strangerMsg, {
+              onEnd: () => setCoreStatus('IDLE'),
+            });
           }
         }
       }
@@ -351,7 +403,7 @@ export default function InteractionModeView({ onNavigate }) {
       </header>
 
       {/* Main Center Overlay: Moving Cyber Avatar & Spoken Feedback Stream */}
-      <main className="hud-center-overlay">
+      <main className="hud-center-overlay" onClick={handleInterruptSpeech}>
         <InteractionAvatar
           status={coreStatus}
           isMuted={!isListening}
@@ -364,7 +416,7 @@ export default function InteractionModeView({ onNavigate }) {
             {!isListening && '🚫 MIC MUTED / AI PAUSED'}
             {isListening && coreStatus === 'LISTENING' && '🎤 LISTENING TO VISITOR...'}
             {isListening && coreStatus === 'THINKING' && '⚡ PROCESSING QUERY...'}
-            {isListening && coreStatus === 'SPEAKING' && '🔊 SPEAKING RESPONSE...'}
+            {isListening && coreStatus === 'SPEAKING' && '🔊 SPEAKING RESPONSE • TAP TO INTERRUPT'}
             {isListening && coreStatus === 'IDLE' && (recognizedPerson ? `✨ ENGAGED: ${recognizedPerson}` : '✨ STANDBY & MONITORING')}
           </h2>
 

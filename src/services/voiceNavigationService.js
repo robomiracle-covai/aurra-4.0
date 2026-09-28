@@ -9,9 +9,84 @@
 
 import { offlineCardService, offlineQaService } from '../db/offlineServices';
 import { hardwareDispatcher } from './hardwareDispatcher';
-import { speakWithVoice, cancelSpeech } from '../utils/speechSynthesis';
+import { speakWithVoice, cancelSpeech, isAnySpeaking } from '../utils/speechSynthesis';
 import { llmService } from './llmService';
 import { logger } from './logger';
+
+export function isAcousticEcho(heardText, lastSpokenText) {
+  if (!heardText) return false;
+
+  const normalize = (s) => (s || '').toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\baura\b/g, 'aurra')
+    .replace(/\brobot miracle\b/g, 'robomiracle')
+    .replace(/\brobo miracle\b/g, 'robomiracle')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const hNorm = normalize(heardText);
+  if (!hNorm || hNorm.length < 3) return false;
+
+  // 1. Fixed system phrases that are only ever spoken BY Aurra
+  const SYSTEM_PHRASES = [
+    'i am aurra',
+    'autonomous humanoid',
+    'receptionist robot',
+    'developed by robomiracle',
+    'assist visitors',
+    'manage registrations',
+    'welcome to robomiracle',
+    'returning to home screen',
+    'opening action cards',
+    'opening admin settings',
+    'displaying banner',
+    'opening check in form',
+    'opening robot cockpit',
+    'opening hardware setup',
+    'sorry i could not catch',
+    'sorry i could not catch that',
+    'could not catch that',
+    'didn t quite catch',
+    'you can ask me about',
+    'access denied voice navigation',
+    'could you please clarify',
+    'sure how can i assist',
+    'hello guest welcome',
+    'hello visitor welcome',
+    'what is your query',
+  ];
+
+  for (const phrase of SYSTEM_PHRASES) {
+    if (hNorm.includes(phrase) || phrase.includes(hNorm)) {
+      return true;
+    }
+  }
+
+  // 2. Check against last spoken response
+  if (lastSpokenText) {
+    const sNorm = normalize(lastSpokenText);
+    if (sNorm) {
+      if (sNorm.includes(hNorm) || hNorm.includes(sNorm)) {
+        return true;
+      }
+
+      // Check significant word overlap
+      const wordsH = hNorm.split(' ').filter(w => w.length > 2);
+      const wordsS = new Set(sNorm.split(' ').filter(w => w.length > 2));
+      if (wordsH.length >= 2) {
+        let matchCount = 0;
+        for (const w of wordsH) {
+          if (wordsS.has(w)) matchCount++;
+        }
+        if (matchCount / wordsH.length >= 0.5) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
 
 class VoiceNavigationService {
   constructor() {
@@ -30,6 +105,13 @@ class VoiceNavigationService {
     this.adminHandler = null;
     this.viewToggleHandler = null;
     this.isInitialized = false;
+    this.lastSpeechEndTime = 0;
+    this.isProcessingCommand = false;
+    this.isProcessing = false;
+    this.lastUserQueryTime = 0;
+    this.lastProcessedUtterance = '';
+    this.lastProcessedTime = 0;
+    this.lastSpokenText = '';
   }
 
   setForceLlmOnly(enabled) {
@@ -39,7 +121,15 @@ class VoiceNavigationService {
   }
 
   speak(text, options = {}) {
+    const isPriority = options.priority === true;
+    if (this.isSpeakingTts && !isPriority && isAnySpeaking()) {
+      logger.warn('VOICE', `Rejected overlapping speak request: "${text}"`);
+      return;
+    }
+
     this.isSpeakingTts = true;
+    this.isProcessing = false;
+    this.lastSpokenText = String(text || '');
     this.notify({ isSpeaking: true, isThinking: false });
     if (this.recognition && this.isListening) {
       try {
@@ -48,15 +138,48 @@ class VoiceNavigationService {
         /* ignore */
       }
     }
+    this.isListening = false;
+    this.currentTranscript = '';
+    this.notify({ isListening: false, transcript: '' });
+
     const originalOnEnd = options.onEnd;
+    let settled = false;
+
+    // Safety watchdog: ensure isSpeakingTts NEVER stays stuck true
+    const words = String(text).trim().split(/\s+/).length;
+    const maxTtsDurationMs = Math.max(7000, words * 700 + 4000);
+    const watchdogTimer = setTimeout(() => {
+      if (!settled && this.isSpeakingTts) {
+        if (isAnySpeaking()) {
+          // Android hardware is still actively playing audio! Wait for onEnd
+          return;
+        }
+        logger.warn('VOICE', `Speech watchdog auto-recovery after ${maxTtsDurationMs}ms`);
+        resumeListening();
+      }
+    }, maxTtsDurationMs);
+
     const resumeListening = () => {
+      if (settled) return;
+      // If hardware is still speaking, poll briefly until speech finishes
+      if (isAnySpeaking()) {
+        setTimeout(() => resumeListening(), 250);
+        return;
+      }
+      settled = true;
+      clearTimeout(watchdogTimer);
       this.isSpeakingTts = false;
+      this.lastSpeechEndTime = Date.now();
       this.notify({ isSpeaking: false });
+      
+      // Acoustic settling delay (750ms): keep mic quiet until speaker echo in the room fades
       setTimeout(() => {
-        if (!this.userPaused && !this.manualStop) {
+        if (!this.userPaused && !this.manualStop && !this.isSpeakingTts && !isAnySpeaking()) {
+          this.currentTranscript = '';
+          this.notify({ transcript: '' });
           this.startListening(true);
         }
-      }, 400);
+      }, 750);
     };
 
     speakWithVoice(text, {
@@ -70,6 +193,16 @@ class VoiceNavigationService {
         resumeListening();
       },
     });
+  }
+
+  cancelSpeech() {
+    this.isSpeakingTts = false;
+    this.isThinking = false;
+    this.lastSpeechEndTime = Date.now();
+    cancelSpeech();
+    this.currentTranscript = '';
+    this.notify({ isSpeaking: false, isThinking: false, transcript: '' });
+    this.startListening(true);
   }
 
   setNavigationHandler(fn) {
@@ -108,11 +241,6 @@ class VoiceNavigationService {
       };
 
       this.recognition.onresult = (event) => {
-        if (this.isSpeakingTts) {
-          // Mute mic processing while Aurra is speaking to prevent self-echo loops
-          return;
-        }
-
         let interim = '';
         let final = '';
 
@@ -126,11 +254,21 @@ class VoiceNavigationService {
           }
         }
 
+        const candidate = (final || interim).toLowerCase().trim();
+
+        // Allow immediate barge-in for urgent navigation/stop commands
+        const isUrgent = candidate.includes('home') || candidate === 'stop' || candidate.includes('cancel') || candidate.includes('exit');
+        const isBusy = this.isProcessing || this.isSpeakingTts || isAnySpeaking();
+        if (!isUrgent && (isBusy || (this.lastSpeechEndTime && Date.now() - this.lastSpeechEndTime < 850))) {
+          // Hard drop: mic input is completely muted while Aurra is processing, speaking, or settling
+          return;
+        }
+
         const displayText = (final || interim).trim();
         this.currentTranscript = displayText;
         this.notify({ transcript: displayText });
 
-        if (final) {
+        if (final && final.trim().length >= 3) {
           logger.speech('VOICE', `Heard utterance: "${final.trim()}"`);
           this.processVoiceCommand(final.trim().toLowerCase());
         }
@@ -148,25 +286,46 @@ class VoiceNavigationService {
       };
 
       this.recognition.onend = () => {
-        // If currently speaking TTS or user stopped/paused, do NOT restart
-        if (this.isSpeakingTts || this.manualStop || this.userPaused) {
+        // If user explicitly stopped or paused, do NOT restart
+        if (this.manualStop || this.userPaused) {
           this.isListening = false;
           this.notify({ isListening: false });
           return;
         }
 
-        // Auto-restart if user did not manually stop listening
-        if (this.isListening) {
-          try {
-            this.recognition.start();
-          } catch {
-            this.isListening = false;
-            this.notify({ isListening: false });
-          }
-        } else {
+        // If currently processing or speaking TTS, do NOT restart recognition
+        if (this.isProcessing || this.isSpeakingTts || isAnySpeaking()) {
           this.isListening = false;
           this.notify({ isListening: false });
+          return;
         }
+
+        // Auto-restart with debounce to avoid Android WebView InvalidStateError
+        this.isListening = false;
+        setTimeout(() => {
+          const isBusy = this.isProcessing || this.isSpeakingTts || isAnySpeaking();
+          if (!this.manualStop && !this.userPaused && !isBusy) {
+            try {
+              this.recognition.start();
+              this.isListening = true;
+              this.notify({ isListening: true, status: 'listening' });
+            } catch {
+              // Retry once after 500ms if Android threw already-started or busy error
+              setTimeout(() => {
+                const retryBusy = this.isProcessing || this.isSpeakingTts || isAnySpeaking();
+                if (!this.manualStop && !this.userPaused && !retryBusy) {
+                  try {
+                    this.recognition.start();
+                    this.isListening = true;
+                    this.notify({ isListening: true });
+                  } catch {
+                    /* ignore */
+                  }
+                }
+              }, 500);
+            }
+          }
+        }, 150);
       };
 
       this.isInitialized = true;
@@ -181,25 +340,110 @@ class VoiceNavigationService {
     if (!rawUtterance || typeof rawUtterance !== 'string') return;
     const utterance = rawUtterance.toLowerCase().trim();
 
-    // Echo Protection: Filter out self-hearing of TTS output or system prompts
-    const lastSpoken = (this.lastFeedback || '').toLowerCase().trim();
-    if (lastSpoken) {
-      const isSelfEcho = utterance.length >= 4 && (
-        lastSpoken.includes(utterance) ||
-        utterance.includes(lastSpoken.slice(0, 20)) ||
-        utterance.includes("didn't quite catch") ||
-        utterance.includes("you can ask me") ||
-        utterance.includes("visitor registration") ||
-        utterance.includes("welcome to robomiracle")
-      );
-      if (isSelfEcho) {
-        logger.speech('VOICE', `Dropped self-echo utterance: "${rawUtterance}"`);
+    // 1. High-Priority System Navigation & Interruption Intents (Never blocked by settling or echo)
+    const isHomeIntent =
+      utterance.includes('home') ||
+      utterance.includes('main menu') ||
+      utterance.includes('main screen') ||
+      utterance.includes('main page') ||
+      utterance === 'back' ||
+      utterance.includes('go back') ||
+      utterance.includes('exit') ||
+      utterance.includes('close') ||
+      utterance.includes('leave') ||
+      utterance.includes('quit');
+
+    if (isHomeIntent) {
+      this.cancelSpeech();
+      this.setFeedback('Returning to Home screen');
+      this.speak('Returning to Home screen');
+      setTimeout(() => {
+        this.navigationHandler?.('/');
+      }, 250);
+      return;
+    }
+
+    if (utterance === 'stop' || utterance === 'cancel' || utterance === 'shut up' || utterance === 'be quiet' || utterance === 'silence') {
+      this.cancelSpeech();
+      this.setFeedback('Speech paused');
+      return;
+    }
+
+    if (utterance.includes('admin') || utterance.includes('setting') || utterance.includes('open admin') || utterance.includes('dashboard')) {
+      this.cancelSpeech();
+      this.setFeedback('Opening Admin Settings');
+      this.speak('Opening Admin Settings');
+      this.adminHandler?.();
+      return;
+    }
+
+    if (utterance.includes('show card') || utterance.includes('show feature') || utterance.includes('action card') || utterance.includes('cards')) {
+      this.cancelSpeech();
+      this.setFeedback('Switching to Action Cards');
+      this.speak('Opening Action Cards');
+      this.navigationHandler?.('/?view=cards');
+      this.viewToggleHandler?.(false);
+      return;
+    }
+
+    if (utterance.includes('interaction') || utterance.includes('interactive') || utterance.includes('humanoid') || utterance.includes('hud') || utterance.includes('avatar')) {
+      this.cancelSpeech();
+      this.setFeedback('Opening Interaction Mode');
+      this.speak('Opening Interaction Mode');
+      setTimeout(() => {
+        this.navigationHandler?.('/interaction');
+      }, 250);
+      return;
+    }
+
+    if (utterance.includes('show slider') || utterance.includes('banner') || utterance.includes('slideshow')) {
+      this.cancelSpeech();
+      this.setFeedback('Switching to Slideshow Banner');
+      this.speak('Displaying banner');
+      this.navigationHandler?.('/?view=slider');
+      this.viewToggleHandler?.(true);
+      return;
+    }
+
+    // 2. Strict Concurrency Mutex & Hardware Busy Guard:
+    const isBusy = this.isProcessing || this.isSpeakingTts || isAnySpeaking();
+    if (isBusy) {
+      logger.speech('VOICE', `Rejected utterance while busy (processing=${this.isProcessing}, speaking=${this.isSpeakingTts}): "${rawUtterance}"`);
+      return;
+    }
+
+    // 3. Post-speech acoustic settling delay (850ms)
+    if (this.lastSpeechEndTime && (Date.now() - this.lastSpeechEndTime < 850)) {
+      logger.speech('VOICE', `Dropped utterance during acoustic settling: "${rawUtterance}"`);
+      return;
+    }
+
+    // 4. Acoustic Self-Echo & System Prompt Rejection
+    if (isAcousticEcho(rawUtterance, this.lastFeedback) || isAcousticEcho(rawUtterance, this.lastSpokenText)) {
+      logger.speech('VOICE', `Dropped acoustic self-echo utterance: "${rawUtterance}"`);
+      return;
+    }
+
+    // 5. Deduplicate identical/similar utterances within 4 seconds
+    const timeSinceLast = Date.now() - this.lastProcessedTime;
+    if (timeSinceLast < 4000) {
+      if (this.lastProcessedUtterance === utterance || utterance.includes(this.lastProcessedUtterance) || this.lastProcessedUtterance.includes(utterance)) {
+        logger.speech('VOICE', `Dropped duplicate utterance: "${rawUtterance}"`);
         return;
       }
     }
 
-    // Direct Cloud AI Mode Override (Sends all queries straight to Groq LLM API using Admin API key)
-    if (this.forceLlmOnly) {
+    this.lastProcessedUtterance = utterance;
+    this.lastProcessedTime = Date.now();
+    this.lastUserQueryTime = Date.now();
+
+    // ACQUIRE MUTEX LOCK
+    this.isProcessing = true;
+    this.notify({ isThinking: true });
+
+    try {
+      // 4. Direct Cloud AI Mode Override (Sends all queries straight to Groq LLM API using Admin API key)
+      if (this.forceLlmOnly) {
       if (!llmService.isConfigured()) {
         const noKeyMsg = "Cloud AI is not configured. Please enter your Groq API key in Admin Settings.";
         this.setFeedback(noKeyMsg);
@@ -246,7 +490,7 @@ class VoiceNavigationService {
       }
     }
 
-    // 1. Robot Hardware Commands (ESP32 / Motors / Servos / Eyes)
+    // 5. Robot Hardware Commands (ESP32 / Motors / Servos / Eyes)
     const hwResult = hardwareDispatcher.evaluate(utterance);
     if (hwResult.handled) {
       this.setFeedback(hwResult.message);
@@ -255,61 +499,8 @@ class VoiceNavigationService {
       return;
     }
 
-    // 2. System Navigation Intents
-    const isHomeIntent =
-      utterance === 'home' ||
-      utterance.includes('go home') ||
-      utterance.includes('back home') ||
-      utterance.includes('back to home') ||
-      utterance.includes('main menu') ||
-      utterance === 'back' ||
-      utterance.includes('go back') ||
-      utterance === 'exit' ||
-      utterance.includes('exit hud') ||
-      utterance.includes('exit') ||
-      utterance === 'close' ||
-      utterance.includes('quit');
-
-    if (isHomeIntent) {
-      this.setFeedback('Returning to Home screen');
-      this.speak('Returning to Home screen', {
-        onEnd: () => {
-          this.navigationHandler?.('/');
-        },
-      });
-      // Safety timer so navigation completes even if speech synthesis is delayed
-      setTimeout(() => {
-        this.navigationHandler?.('/');
-      }, 700);
-      return;
-    }
-
-    if (utterance.includes('admin') || utterance.includes('setting') || utterance.includes('open admin') || utterance.includes('dashboard')) {
-      this.setFeedback('Opening Admin Settings');
-      this.speak('Opening Admin Settings');
-      this.adminHandler?.();
-      return;
-    }
-
-    if (utterance.includes('show card') || utterance.includes('show feature') || utterance.includes('action card') || utterance.includes('cards')) {
-      this.setFeedback('Switching to Action Cards');
-      this.speak('Opening Action Cards');
-      this.navigationHandler?.('/?view=cards');
-      this.viewToggleHandler?.(false); // false = show cards
-      return;
-    }
-
-    if (utterance.includes('show slider') || utterance.includes('banner') || utterance.includes('slideshow')) {
-      this.setFeedback('Switching to Slideshow Banner');
-      this.speak('Displaying banner');
-      this.navigationHandler?.('/?view=slider');
-      this.viewToggleHandler?.(true); // true = show slider
-      return;
-    }
-
     // 3. Match against Action Cards in IndexedDB (Voice Access Gatekeeper)
-    try {
-      const cards = await offlineCardService.getCards();
+    const cards = await offlineCardService.getCards();
       
       let matchedCard = null;
 
@@ -357,6 +548,30 @@ class VoiceNavigationService {
             href: '/weblinks',
             voiceAccessEnabled: true,
           };
+        } else if (
+          utterance.includes('interaction') ||
+          utterance.includes('interactive') ||
+          utterance.includes('humanoid') ||
+          utterance.includes('hud') ||
+          utterance.includes('avatar')
+        ) {
+          matchedCard = cards.find((c) => c.href === '/interaction') || {
+            title: 'Interaction Mode',
+            href: '/interaction',
+            voiceAccessEnabled: true,
+          };
+        } else if (
+          utterance.includes('tour') ||
+          utterance.includes('show me around') ||
+          utterance.includes('guided tour') ||
+          utterance.includes('take a tour') ||
+          utterance.includes('robot tour')
+        ) {
+          matchedCard = cards.find((c) => c.href === '/guided-tour') || {
+            title: 'Guided Robot Tour',
+            href: '/guided-tour',
+            voiceAccessEnabled: true,
+          };
         }
       }
 
@@ -377,16 +592,19 @@ class VoiceNavigationService {
         this.setFeedback(grantedMsg);
         logger.speech('VOICE', `Voice access GRANTED for [${matchedCard.title}] -> ${matchedCard.href}`);
         
+        let navigated = false;
+        const doNavigate = () => {
+          if (navigated) return;
+          navigated = true;
+          this.navigationHandler?.(matchedCard.href, matchedCard);
+        };
+
         this.speak(grantedMsg, {
-          onEnd: () => {
-            this.navigationHandler?.(matchedCard.href, matchedCard);
-          },
+          onEnd: doNavigate,
         });
 
-        // Navigate immediately as fallback if TTS completes or is silent
-        setTimeout(() => {
-          this.navigationHandler?.(matchedCard.href, matchedCard);
-        }, 1200);
+        // Navigate promptly (350ms) so user experiences snappy screen transitions
+        setTimeout(doNavigate, 350);
 
         return;
       }
@@ -454,13 +672,16 @@ class VoiceNavigationService {
       // 6. Friendly intelligent fallback if LLM is disabled or fails
       this.isThinking = false;
       this.notify({ isThinking: false });
-      const fallbackMsg = "I didn't quite catch that. You can ask me about our company, working hours, visitor registration, say 'show cards', or command my robot hardware.";
+      const fallbackMsg = "Sorry, I could not catch that.";
       this.setFeedback(fallbackMsg);
       logger.info('VOICE', `Utterance "${utterance}" did not match any active cards or FAQs.`);
       this.speak(fallbackMsg);
 
     } catch (err) {
       logger.error('VOICE', `Voice command evaluation error: ${err.message}`);
+    } finally {
+      this.isProcessing = false;
+      this.notify({ isThinking: false });
     }
   }
 

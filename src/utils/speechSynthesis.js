@@ -130,8 +130,31 @@ const pickWebVoice = (voices, gender = 'male', selectedVoiceURI = '') => {
   return selected || maleVoices.find((v) => (v.lang || '').toLowerCase().includes('-in')) || maleVoices[0] || null;
 };
 
+export const isAnySpeaking = () => {
+  const launcher = getAndroidLauncher();
+  if (launcher && typeof launcher.isSpeaking === 'function') {
+    try {
+      if (launcher.isSpeaking()) return true;
+    } catch {
+      /* ignore */
+    }
+  }
+  if (typeof window !== 'undefined' && window.isNativeSpeaking) {
+    return true;
+  }
+  const synth = getSpeechSynthesis();
+  if (synth && (synth.speaking || synth.pending)) {
+    return true;
+  }
+  return false;
+};
+
 export const cancelSpeech = () => {
   stopSpeakingAnimatronics();
+  if (typeof window !== 'undefined') {
+    window.isNativeSpeaking = false;
+    window.onNativeSpeechEnd = null;
+  }
   const launcher = getAndroidLauncher();
   if (launcher) {
     try {
@@ -164,23 +187,67 @@ const speakViaNative = (launcher, text, selectedVoiceURI, onStart, onEnd) => {
         /* ignore */
       }
     }
+
+    let finished = false;
+    window.isNativeSpeaking = true;
     onStart?.();
     startSpeakingAnimatronics();
-    launcher.speakWithGender(String(text), 'male');
-    const duration = Math.max(1500, String(text).length * 50);
-    window.onNativeSpeechEnd = () => {
+
+    const finishNativeSpeech = () => {
+      if (finished) return;
+      finished = true;
+      window.isNativeSpeaking = false;
       window.onNativeSpeechEnd = null;
+      window.onNativeSpeechStart = null;
       stopSpeakingAnimatronics();
       onEnd?.();
     };
+
+    window.onNativeSpeechStart = () => {
+      window.isNativeSpeaking = true;
+      startSpeakingAnimatronics();
+    };
+
+    window.onNativeSpeechEnd = () => {
+      finishNativeSpeech();
+    };
+
+    launcher.speakWithGender(String(text), 'male');
+
+    // Robust safety watchdog: do NOT cut off speech prematurely
+    const words = String(text).trim().split(/\s+/).length;
+    const maxWatchdogMs = Math.max(6000, words * 650 + 3500);
+
     setTimeout(() => {
-      if (window.onNativeSpeechEnd) {
-        window.onNativeSpeechEnd();
+      if (finished) return;
+      // If hardware is STILL speaking, poll until hardware finishes
+      if (launcher && typeof launcher.isSpeaking === 'function') {
+        try {
+          if (launcher.isSpeaking()) {
+            const pollInterval = setInterval(() => {
+              try {
+                if (!launcher.isSpeaking() || finished) {
+                  clearInterval(pollInterval);
+                  finishNativeSpeech();
+                }
+              } catch {
+                clearInterval(pollInterval);
+                finishNativeSpeech();
+              }
+            }, 300);
+            return;
+          }
+        } catch {
+          /* ignore */
+        }
       }
-    }, duration);
+      finishNativeSpeech();
+    }, maxWatchdogMs);
+
     return true;
   } catch (err) {
     console.error('Native TTS error:', err);
+    window.isNativeSpeaking = false;
     stopSpeakingAnimatronics();
     return false;
   }

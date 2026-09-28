@@ -2,6 +2,7 @@ import { db } from './dexieDb';
 import { DEFAULT_REGISTRATION_CARDS, DEFAULT_SLIDES } from '../data/defaultCards';
 import { DEFAULT_QA_QUESTIONS } from '../data/defaultQuestions';
 import { OFFICIAL_WEBLINKS } from '../pages/WebLinks/weblinksData';
+import { DEFAULT_TOUR_STOPS } from '../data/defaultTourStops';
 
 const parseNumericId = (id) => {
   const n = Number(id);
@@ -364,6 +365,7 @@ export const offlineBackupService = {
       userFaces: await db.userFaces.toArray(),
       visitors: await db.visitors.toArray(),
       weblinks: await db.weblinks.toArray(),
+      tourStops: await db.tourStops.toArray(),
     };
     return data;
   },
@@ -406,6 +408,12 @@ export const offlineBackupService = {
         await db.weblinks.bulkAdd(backupData.weblinks);
       }
     }
+    if (Array.isArray(backupData.tourStops)) {
+      await db.tourStops.clear();
+      if (backupData.tourStops.length > 0) {
+        await db.tourStops.bulkAdd(backupData.tourStops);
+      }
+    }
     return { success: true };
   },
 
@@ -418,6 +426,8 @@ export const offlineBackupService = {
     await db.images.bulkAdd(DEFAULT_SLIDES);
     await db.qaQuestions.clear();
     await db.qaQuestions.bulkAdd(DEFAULT_QA_QUESTIONS);
+    await db.tourStops.clear();
+    await db.tourStops.bulkAdd(DEFAULT_TOUR_STOPS);
     await db.userFaces.clear();
     await db.visitors.clear();
     await db.weblinks.clear();
@@ -637,5 +647,95 @@ export const offlineWebLinksService = {
     return await db.weblinks.toArray();
   },
 };
+
+/**
+ * Offline Guided Robot Tour Services (IndexedDB)
+ * Complete management of tour waypoints, hardware sync, order, and narration
+ */
+export const offlineTourService = {
+  getStops: async () => {
+    let stops = await db.tourStops.orderBy('orderIndex').toArray();
+    if (!stops || stops.length === 0) {
+      await db.tourStops.bulkAdd(DEFAULT_TOUR_STOPS);
+      stops = await db.tourStops.orderBy('orderIndex').toArray();
+    }
+    return stops;
+  },
+
+  addStop: async (stopData) => {
+    const existing = await db.tourStops.toArray();
+    const nextOrder = existing.length > 0 
+      ? Math.max(...existing.map((s) => s.orderIndex ?? 0)) + 1 
+      : 0;
+
+    const newStop = {
+      name: (stopData.name || 'New Tour Waypoint').trim(),
+      area: (stopData.area || 'Facility Area').trim(),
+      orderIndex: nextOrder,
+      isEnabled: stopData.isEnabled !== false,
+      durationSec: Number(stopData.durationSec) || 12,
+      highlights: Array.isArray(stopData.highlights) 
+        ? stopData.highlights 
+        : (stopData.highlights || '').split(',').map((h) => h.trim()).filter(Boolean),
+      narration: (stopData.narration || '').trim(),
+      rgbColor: stopData.rgbColor || '#00FFFF',
+      servoTilt: Number(stopData.servoTilt) || 90,
+      servoPan: Number(stopData.servoPan) || 90,
+      mapX: Number(stopData.mapX) || 50,
+      mapY: Number(stopData.mapY) || 50,
+      createdAt: new Date().toISOString(),
+    };
+
+    const id = await db.tourStops.add(newStop);
+    return await db.tourStops.get(id);
+  },
+
+  updateStop: async (id, data) => {
+    const numId = parseNumericId(id);
+    const existing = await db.tourStops.get(numId);
+    if (!existing) {
+      throw new Error(`Tour stop not found with ID: ${id}`);
+    }
+
+    const updated = {
+      ...existing,
+      ...data,
+      highlights: Array.isArray(data.highlights) 
+        ? data.highlights 
+        : (data.highlights !== undefined ? data.highlights.split(',').map((h) => h.trim()).filter(Boolean) : existing.highlights),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await db.tourStops.put(updated);
+    return updated;
+  },
+
+  deleteStop: async (id) => {
+    const numId = parseNumericId(id);
+    await db.tourStops.delete(numId);
+    return { success: true };
+  },
+
+  toggleStopEnabled: async (id, isEnabled) => {
+    const numId = parseNumericId(id);
+    await db.tourStops.update(numId, { isEnabled });
+    return { success: true, isEnabled };
+  },
+
+  reorderStops: async (orderedIds) => {
+    for (let index = 0; index < orderedIds.length; index++) {
+      const numId = parseNumericId(orderedIds[index]);
+      await db.tourStops.update(numId, { orderIndex: index });
+    }
+    return await offlineTourService.getStops();
+  },
+
+  restoreDefaultStops: async () => {
+    await db.tourStops.clear();
+    await db.tourStops.bulkAdd(DEFAULT_TOUR_STOPS);
+    return await db.tourStops.orderBy('orderIndex').toArray();
+  },
+};
+
 
 

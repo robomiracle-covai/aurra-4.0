@@ -8,6 +8,7 @@ import VisitorRegistration from './pages/Registration/VisitorRegistration';
 import InteractionModeView from './pages/Interaction/InteractionModeView';
 import FeaturePlaceholder from './pages/FeatureView/FeaturePlaceholder';
 import WebLinks from './pages/WebLinks/WebLinks';
+import GuidedTourView from './pages/GuidedTour/GuidedTourView';
 import VoiceAssistantBar from './components/VoiceAssistantBar';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import './App.css';
@@ -65,6 +66,8 @@ function App() {
           <FaceRecognition onNavigate={handleNavigate} />
         ) : currentRoute === '/qa' ? (
           <QuestionAnswerView onNavigate={handleNavigate} />
+        ) : currentRoute === '/guided-tour' ? (
+          <GuidedTourView onNavigate={handleNavigate} />
         ) : currentRoute === '/control' ? (
           <Control onNavigate={handleNavigate} />
         ) : currentRoute === '/hardware' ? (

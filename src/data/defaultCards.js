@@ -68,7 +68,7 @@ export const DEFAULT_REGISTRATION_CARDS = [
     className: 'interaction-mode',
     isEnabled: true,
     voiceAccessEnabled: true,
-    voiceKeywords: ['interaction', 'hud', 'motion'],
+    voiceKeywords: ['interaction', 'interactive', 'humanoid', 'hud', 'motion', 'avatar'],
   },
   {
     id: 8,

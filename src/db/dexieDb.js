@@ -109,3 +109,22 @@ db.version(5).stores({
   }
 });
 
+// Version 6: Autonomous Guided Robot Tour Waypoints for /guided-tour
+db.version(6).stores({
+  userFaces: '++id, name',
+  cards: '++id, title, href, isEnabled, voiceAccessEnabled',
+  images: '++id, title, isSelected',
+  headers: '++id, headerName',
+  qaQuestions: '++id, question, category',
+  visitors: '++id, name, phone, email, company, purpose, host, badgeType, badgeNumber, checkInTime, checkOutTime, status',
+  weblinks: 'id, title, category, url, isEnabled, sortOrder',
+  tourStops: '++id, name, area, orderIndex, isEnabled',
+}).upgrade(async (tx) => {
+  const { DEFAULT_TOUR_STOPS } = await import('../data/defaultTourStops');
+  const stopCount = await tx.table('tourStops').count();
+  if (stopCount === 0) {
+    await tx.table('tourStops').bulkAdd(DEFAULT_TOUR_STOPS);
+  }
+});
+
+

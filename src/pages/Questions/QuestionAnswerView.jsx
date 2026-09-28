@@ -76,36 +76,39 @@ export default function QuestionAnswerView({ onNavigate }) {
       const { query, match } = e.detail;
       if (!match) return;
 
+      const userTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setConversations((prev) => [
         ...prev,
         {
-          id: `user-${Date.now()}`,
+          id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           sender: 'user',
           text: query,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: userTime,
         },
         {
-          id: `aurra-${Date.now()}`,
+          id: `aurra-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           sender: 'aurra',
           text: match.answer,
           actionRoute: match.actionRoute,
           category: match.category,
           source: e.detail?.source || 'groq-llm',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: userTime,
         }
       ]);
 
-      setCoreStatus('SPEAKING');
-      setTimeout(() => setCoreStatus('IDLE'), 4000);
     };
 
     window.addEventListener('aurra:qa-answered', handleQaAnswered);
 
     const unsubscribe = voiceNavigationService.subscribe((state) => {
       setIsListening(state.isListening);
-      if (state.isListening && coreStatus === 'IDLE') {
+      if (state.isSpeaking) {
+        setCoreStatus('SPEAKING');
+      } else if (state.isThinking) {
+        setCoreStatus('THINKING');
+      } else if (state.isListening) {
         setCoreStatus('LISTENING');
-      } else if (!state.isListening && coreStatus === 'LISTENING') {
+      } else {
         setCoreStatus('IDLE');
       }
     });
@@ -114,7 +117,7 @@ export default function QuestionAnswerView({ onNavigate }) {
       window.removeEventListener('aurra:qa-answered', handleQaAnswered);
       unsubscribe();
     };
-  }, [coreStatus]);
+  }, []);
 
   // Auto-scroll chat to latest message
   useEffect(() => {
@@ -127,7 +130,6 @@ export default function QuestionAnswerView({ onNavigate }) {
 
     setCoreStatus('THINKING');
     voiceNavigationService.processVoiceCommand(query);
-    setTimeout(() => setCoreStatus('IDLE'), 2500);
   };
 
   const handleReplaySpeech = (text) => {

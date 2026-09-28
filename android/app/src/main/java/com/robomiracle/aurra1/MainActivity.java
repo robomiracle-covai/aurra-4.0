@@ -222,11 +222,26 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         });
     }
 
+    private volatile boolean isSpeakingNow = false;
+
+    public void setNativeSpeakingFlag(boolean speaking) {
+        this.isSpeakingNow = speaking;
+        if (webView != null) {
+            webView.post(() -> webView.evaluateJavascript("window.isNativeSpeaking = " + speaking + ";", null));
+        }
+    }
+
+    public boolean isSpeaking() {
+        return isSpeakingNow || (ttsReady && tts != null && tts.isSpeaking());
+    }
+
     public void stopNativeSpeech() {
+        this.isSpeakingNow = false;
         runOnUiThread(() -> {
             if (tts != null) {
                 tts.stop();
             }
+            notifyNativeSpeechEnd();
         });
     }
 
@@ -352,6 +367,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     @Override
                     public void onStart(String utteranceId) {
                         Log.d(TAG, "TTS started: " + utteranceId);
+                        notifyNativeSpeechStart();
                     }
 
                     @Override
@@ -373,10 +389,18 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         }
     }
 
-    private void notifyNativeSpeechEnd() {
+    private void notifyNativeSpeechStart() {
         if (webView == null) return;
         webView.post(() -> webView.evaluateJavascript(
-                "if(window.onNativeSpeechEnd){window.onNativeSpeechEnd();}",
+                "window.isNativeSpeaking = true; if(window.onNativeSpeechStart){window.onNativeSpeechStart();}",
+                null));
+    }
+
+    private void notifyNativeSpeechEnd() {
+        this.isSpeakingNow = false;
+        if (webView == null) return;
+        webView.post(() -> webView.evaluateJavascript(
+                "window.isNativeSpeaking = false; if(window.onNativeSpeechEnd){window.onNativeSpeechEnd();}",
                 null));
     }
 

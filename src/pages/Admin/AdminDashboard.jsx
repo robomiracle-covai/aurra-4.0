@@ -47,7 +47,11 @@ import {
   AlertCircle,
   Palette,
   Gauge,
-  Compass
+  Compass,
+  ChevronUp,
+  ChevronDown,
+  MapPin,
+  Navigation
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { llmService } from '../../services/llmService';
@@ -59,6 +63,7 @@ import {
   offlineFaceService,
   offlineVisitorService,
   offlineWebLinksService,
+  offlineTourService,
   offlineBackupService
 } from '../../db/offlineServices';
 import { devSettingsService } from '../../services/devSettingsService';
@@ -159,6 +164,23 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   const [testAiResult, setTestAiResult] = useState(null);
   const [testAiCustomQuery, setTestAiCustomQuery] = useState('Who created you and what is your purpose?');
 
+  // Guided Robot Tour state
+  const [tourStops, setTourStops] = useState([]);
+  const [showTourModal, setShowTourModal] = useState(false);
+  const [tourModalMode, setTourModalMode] = useState('add'); // 'add' | 'edit'
+  const [tourFormId, setTourFormId] = useState('');
+  const [tourFormName, setTourFormName] = useState('');
+  const [tourFormArea, setTourFormArea] = useState('');
+  const [tourFormNarration, setTourFormNarration] = useState('');
+  const [tourFormDuration, setTourFormDuration] = useState(12);
+  const [tourFormHighlights, setTourFormHighlights] = useState('');
+  const [tourFormRgb, setTourFormRgb] = useState('#00FFFF');
+  const [tourFormTilt, setTourFormTilt] = useState(90);
+  const [tourFormPan, setTourFormPan] = useState(90);
+  const [tourFormMapX, setTourFormMapX] = useState(50);
+  const [tourFormMapY, setTourFormMapY] = useState(50);
+  const [tourTestingSpeechId, setTourTestingSpeechId] = useState(null);
+
   const showStatus = (msg) => {
     setStatusMsg(msg);
     setTimeout(() => setStatusMsg(''), 3000);
@@ -187,6 +209,9 @@ export default function AdminDashboard({ onNavigate, onClose }) {
 
       const linkList = await offlineWebLinksService.getWebLinks();
       setWeblinks(linkList || []);
+
+      const stopsList = await offlineTourService.getStops();
+      setTourStops(stopsList || []);
 
       setDevSettings(devSettingsService.getSettings());
     } catch (e) {
@@ -732,6 +757,144 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     logger.info('ADMIN', 'Reset QR portals to default');
   };
 
+  // ── Guided Robot Tour Handlers ──
+  const handleOpenAddTourStop = () => {
+    setTourModalMode('add');
+    setTourFormId('');
+    setTourFormName('');
+    setTourFormArea('');
+    setTourFormNarration('');
+    setTourFormDuration(12);
+    setTourFormHighlights('');
+    setTourFormRgb('#00FFFF');
+    setTourFormTilt(90);
+    setTourFormPan(90);
+    setTourFormMapX(50);
+    setTourFormMapY(50);
+    setShowTourModal(true);
+  };
+
+  const handleOpenEditTourStop = (stop) => {
+    setTourModalMode('edit');
+    setTourFormId(stop.id);
+    setTourFormName(stop.name || '');
+    setTourFormArea(stop.area || '');
+    setTourFormNarration(stop.narration || '');
+    setTourFormDuration(stop.durationSec || 12);
+    setTourFormHighlights(Array.isArray(stop.highlights) ? stop.highlights.join(', ') : (stop.highlights || ''));
+    setTourFormRgb(stop.rgbColor || '#00FFFF');
+    setTourFormTilt(stop.servoTilt ?? 90);
+    setTourFormPan(stop.servoPan ?? 90);
+    setTourFormMapX(stop.mapX ?? 50);
+    setTourFormMapY(stop.mapY ?? 50);
+    setShowTourModal(true);
+  };
+
+  const handleSaveTourStop = async (e) => {
+    e?.preventDefault();
+    if (!tourFormName.trim()) {
+      showStatus('Waypoint name is required');
+      return;
+    }
+
+    try {
+      const stopData = {
+        name: tourFormName.trim(),
+        area: tourFormArea.trim(),
+        narration: tourFormNarration.trim(),
+        durationSec: Number(tourFormDuration) || 12,
+        highlights: tourFormHighlights.split(',').map((h) => h.trim()).filter(Boolean),
+        rgbColor: tourFormRgb,
+        servoTilt: Number(tourFormTilt),
+        servoPan: Number(tourFormPan),
+        mapX: Number(tourFormMapX),
+        mapY: Number(tourFormMapY),
+      };
+
+      if (tourModalMode === 'edit' && tourFormId) {
+        await offlineTourService.updateStop(tourFormId, stopData);
+        showStatus('Tour waypoint updated!');
+      } else {
+        await offlineTourService.addStop(stopData);
+        showStatus('New tour waypoint added!');
+      }
+
+      setShowTourModal(false);
+      const updated = await offlineTourService.getStops();
+      setTourStops(updated || []);
+    } catch (err) {
+      showStatus(`Failed to save waypoint: ${err.message}`);
+    }
+  };
+
+  const handleDeleteTourStop = async (id, name) => {
+    if (window.confirm(`Delete tour waypoint "${name}"?`)) {
+      try {
+        await offlineTourService.deleteStop(id);
+        const updated = await offlineTourService.getStops();
+        setTourStops(updated || []);
+        showStatus(`Deleted waypoint: ${name}`);
+      } catch (err) {
+        showStatus(`Delete failed: ${err.message}`);
+      }
+    }
+  };
+
+  const handleToggleTourStopEnabled = async (id, currentEnabled) => {
+    try {
+      await offlineTourService.toggleStopEnabled(id, !currentEnabled);
+      const updated = await offlineTourService.getStops();
+      setTourStops(updated || []);
+    } catch (err) {
+      showStatus(`Toggle failed: ${err.message}`);
+    }
+  };
+
+  const handleMoveTourStop = async (index, direction) => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= tourStops.length) return;
+
+    const newStops = [...tourStops];
+    const [moved] = newStops.splice(index, 1);
+    newStops.splice(targetIndex, 0, moved);
+
+    const orderedIds = newStops.map((s) => s.id);
+    const updated = await offlineTourService.reorderStops(orderedIds);
+    setTourStops(updated || []);
+    showStatus('Waypoint order updated!');
+  };
+
+  const handleResetTourStops = async () => {
+    if (window.confirm('Reset all tour waypoints to default 5 facility stops?')) {
+      try {
+        const restored = await offlineTourService.restoreDefaultStops();
+        setTourStops(restored || []);
+        showStatus('Restored default tour waypoints!');
+      } catch (err) {
+        showStatus(`Restore failed: ${err.message}`);
+      }
+    }
+  };
+
+  const handleTestTourSpeech = (stop) => {
+    if (!stop?.narration) return;
+    setTourTestingSpeechId(stop.id);
+    speakWithVoice(stop.narration, {
+      onEnd: () => setTourTestingSpeechId(null),
+    });
+  };
+
+  const handleTestModalSpeech = () => {
+    if (!tourFormNarration?.trim()) {
+      showStatus('Enter narration text first');
+      return;
+    }
+    setTourTestingSpeechId('modal');
+    speakWithVoice(tourFormNarration, {
+      onEnd: () => setTourTestingSpeechId(null),
+    });
+  };
+
   // ── Real AI LLM Handlers ──
   const handleToggleLlmEnabled = () => {
     const updated = !llmConfig.enabled;
@@ -906,6 +1069,14 @@ export default function AdminDashboard({ onNavigate, onClose }) {
             <span>Registration & Badges</span>
           </button>
           <button
+            className={`adm-nav-item ${activeTab === 'tour' ? 'active' : ''}`}
+            onClick={() => setActiveTab('tour')}
+          >
+            <Compass size={18} />
+            <span>Guided Robot Tour</span>
+            {tourStops.length > 0 && <span className="adm-nav-badge">{tourStops.length}</span>}
+          </button>
+          <button
             className={`adm-nav-item ${activeTab === 'hardware' ? 'active' : ''}`}
             onClick={() => setActiveTab('hardware')}
           >
@@ -970,6 +1141,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
               {activeTab === 'faces' && 'Face Recognition, Vision & Greeting Setup'}
               {activeTab === 'visitors' && 'Visitor Directory & Admission Logs'}
               {activeTab === 'registration' && 'Visitor Registration & Admission Badge Customization'}
+              {activeTab === 'tour' && 'Guided Robot Tour & Facility Waypoints'}
               {activeTab === 'hardware' && 'Robot Hardware, Servo Poses & Wi-Fi Setup'}
               {activeTab === 'weblinks' && 'QR Codes & Official Portals Manager'}
               {activeTab === 'developer' && 'Developer Mode, PIN Security & System Toggles'}
@@ -1067,6 +1239,17 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                     <span className="adm-metric-label">QR Portals</span>
                   </div>
                   <span className="adm-metric-sub">{weblinks.filter((l) => l.isEnabled).length} active on kiosk</span>
+                </div>
+
+                <div className="adm-metric-card" onClick={() => setActiveTab('tour')}>
+                  <div className="adm-metric-icon bg-cyan">
+                    <Compass size={24} />
+                  </div>
+                  <div className="adm-metric-data">
+                    <span className="adm-metric-num">{tourStops.length}</span>
+                    <span className="adm-metric-label">Tour Waypoints</span>
+                  </div>
+                  <span className="adm-metric-sub">{tourStops.filter((s) => s.isEnabled).length} active facility stops</span>
                 </div>
 
                 <div className="adm-metric-card" onClick={() => setActiveTab('voice')}>
@@ -2710,6 +2893,295 @@ export default function AdminDashboard({ onNavigate, onClose }) {
             </div>
           )}
 
+          {/* 7. GUIDED ROBOT TOUR TAB */}
+          {activeTab === 'tour' && (
+            <div className="adm-tab-panel">
+              {/* Tour Top Action Banner */}
+              <div className="adm-card-panel">
+                <div className="adm-panel-header">
+                  <div>
+                    <h3 className="adm-panel-title">Autonomous Guided Robot Tour & Waypoints</h3>
+                    <p className="adm-panel-desc">
+                      Configure facility waypoints, spoken narrations, head servo angles, LED eye colors, and safety radar braking for autonomous robot guided tours.
+                    </p>
+                  </div>
+                  <div className="adm-tour-actions-header">
+                    <button
+                      className="adm-btn-secondary"
+                      onClick={() => onNavigate && onNavigate('/guided-tour')}
+                      title="Launch Guided Tour screen on Kiosk"
+                    >
+                      <Navigation size={16} />
+                      <span>Launch on Kiosk</span>
+                    </button>
+                    <button
+                      className="adm-btn-secondary"
+                      onClick={handleResetTourStops}
+                      title="Restore factory default 5 facility waypoints"
+                    >
+                      <RotateCcw size={16} />
+                      <span>Reset Defaults</span>
+                    </button>
+                    <button
+                      className="adm-add-btn"
+                      onClick={handleOpenAddTourStop}
+                    >
+                      <Plus size={16} />
+                      <span>Add Waypoint</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Global Hardware & Safety Settings Card */}
+                <div className="adm-tour-global-settings">
+                  <h4 className="adm-sub-title">Global Tour Dynamics & Safety Parameters</h4>
+                  <div className="adm-tour-settings-grid">
+                    {/* Cruise Motor Speed */}
+                    <div className="adm-tour-setting-item">
+                      <div className="adm-setting-info">
+                        <label>Cruise Motor Speed (PWM)</label>
+                        <span className="adm-setting-value">{kioskConfig.tourSpeed || 160} / 255</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="100"
+                        max="240"
+                        step="5"
+                        value={kioskConfig.tourSpeed || 160}
+                        onChange={(e) => handleUpdateKioskConfig({ tourSpeed: Number(e.target.value) })}
+                        className="adm-range-slider"
+                      />
+                      <span className="adm-setting-hint">Speed at which robot moves between waypoints (100 = gentle, 220 = fast)</span>
+                    </div>
+
+                    {/* Radar Collision Brake Distance */}
+                    <div className="adm-tour-setting-item">
+                      <div className="adm-setting-info">
+                        <label>Radar Obstacle Brake Distance</label>
+                        <span className="adm-setting-value">{kioskConfig.tourObstacleDistanceCm || 30} cm</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="15"
+                        max="60"
+                        step="5"
+                        value={kioskConfig.tourObstacleDistanceCm || 30}
+                        onChange={(e) => handleUpdateKioskConfig({ tourObstacleDistanceCm: Number(e.target.value) })}
+                        className="adm-range-slider"
+                      />
+                      <span className="adm-setting-hint">Robot auto-pauses when ultrasonic sensor detects person or object closer than this</span>
+                    </div>
+
+                    {/* Auto-announce Narration Toggle */}
+                    <div className="adm-tour-toggle-item">
+                      <div className="adm-setting-info">
+                        <strong>Auto-Announce Waypoint Narration</strong>
+                        <p>Speak stop speech automatically via TTS upon waypoint arrival</p>
+                      </div>
+                      <button
+                        className={`adm-switch-btn ${kioskConfig.tourAutoAnnounce !== false ? 'active' : ''}`}
+                        onClick={() => handleUpdateKioskConfig({ tourAutoAnnounce: !kioskConfig.tourAutoAnnounce })}
+                      >
+                        <div className="adm-switch-thumb" />
+                        <span className="adm-switch-text">{kioskConfig.tourAutoAnnounce !== false ? 'AUTO ON' : 'MANUAL'}</span>
+                      </button>
+                    </div>
+
+                    {/* Arrival Chime Toggle */}
+                    <div className="adm-tour-toggle-item">
+                      <div className="adm-setting-info">
+                        <strong>Waypoint Arrival Chime</strong>
+                        <p>Play synthetic dual-tone harmonic chime when reaching waypoint</p>
+                      </div>
+                      <button
+                        className={`adm-switch-btn ${kioskConfig.tourArrivalChime !== false ? 'active' : ''}`}
+                        onClick={() => handleUpdateKioskConfig({ tourArrivalChime: !kioskConfig.tourArrivalChime })}
+                      >
+                        <div className="adm-switch-thumb" />
+                        <span className="adm-switch-text">{kioskConfig.tourArrivalChime !== false ? 'CHIME ON' : 'SILENT'}</span>
+                      </button>
+                    </div>
+
+                    {/* Loop Tour Toggle */}
+                    <div className="adm-tour-toggle-item">
+                      <div className="adm-setting-info">
+                        <strong>Continuous Loop Mode</strong>
+                        <p>Automatically cycle back to stop #1 after concluding the final stop</p>
+                      </div>
+                      <button
+                        className={`adm-switch-btn ${kioskConfig.tourLoopEnabled ? 'active' : ''}`}
+                        onClick={() => handleUpdateKioskConfig({ tourLoopEnabled: !kioskConfig.tourLoopEnabled })}
+                      >
+                        <div className="adm-switch-thumb" />
+                        <span className="adm-switch-text">{kioskConfig.tourLoopEnabled ? 'LOOP ON' : 'STOP AT END'}</span>
+                      </button>
+                    </div>
+
+                    {/* Voice Navigation Toggle */}
+                    <div className="adm-tour-toggle-item">
+                      <div className="adm-setting-info">
+                        <strong>Voice Command Tour Navigation</strong>
+                        <p>Allow visitors to say "Next Stop", "Previous Stop", "Pause Tour"</p>
+                      </div>
+                      <button
+                        className={`adm-switch-btn ${kioskConfig.tourVoiceNavEnabled !== false ? 'active' : ''}`}
+                        onClick={() => handleUpdateKioskConfig({ tourVoiceNavEnabled: !kioskConfig.tourVoiceNavEnabled })}
+                      >
+                        <div className="adm-switch-thumb" />
+                        <span className="adm-switch-text">{kioskConfig.tourVoiceNavEnabled !== false ? 'VOICE ON' : 'OFF'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Waypoints List */}
+                <div className="adm-tour-list-wrap">
+                  <div className="adm-tour-list-header">
+                    <div>
+                      <h4 className="adm-sub-title">Facility Waypoints ({tourStops.length} Stops Configured)</h4>
+                      <p className="adm-sub-desc">Use arrow buttons to adjust waypoint progression sequence</p>
+                    </div>
+                  </div>
+
+                  {tourStops.length === 0 ? (
+                    <div className="adm-empty-state">
+                      <Compass size={48} color="#00ffff" />
+                      <h4>No Tour Waypoints Found</h4>
+                      <p>Add custom facility waypoints or restore default factory tour stops.</p>
+                      <button className="adm-submit-btn" onClick={handleResetTourStops}>
+                        <RotateCcw size={16} />
+                        <span>Restore Default Stops</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="adm-tour-stops-list">
+                      {tourStops.map((stop, index) => (
+                        <div
+                          key={stop.id}
+                          className={`adm-tour-stop-card ${!stop.isEnabled ? 'disabled' : ''}`}
+                          style={{ '--stop-rgb': stop.rgbColor || '#00FFFF' }}
+                        >
+                          {/* Order & Reorder Controls */}
+                          <div className="adm-tour-order-col">
+                            <button
+                              className="adm-mini-arrow"
+                              disabled={index === 0}
+                              onClick={() => handleMoveTourStop(index, 'up')}
+                              title="Move Stop Up"
+                            >
+                              <ChevronUp size={16} />
+                            </button>
+                            <span className="adm-tour-index-badge">#{index + 1}</span>
+                            <button
+                              className="adm-mini-arrow"
+                              disabled={index === tourStops.length - 1}
+                              onClick={() => handleMoveTourStop(index, 'down')}
+                              title="Move Stop Down"
+                            >
+                              <ChevronDown size={16} />
+                            </button>
+                          </div>
+
+                          {/* Waypoint Main Details */}
+                          <div className="adm-tour-stop-body">
+                            <div className="adm-tour-stop-head">
+                              <div className="adm-tour-stop-title-group">
+                                <h4 className="adm-tour-stop-name">{stop.name}</h4>
+                                {stop.area && <span className="adm-tour-stop-area">{stop.area}</span>}
+                              </div>
+                              <div className="adm-tour-telemetry-tags">
+                                <span className="adm-telemetry-pill map-pos">
+                                  <MapPin size={12} />
+                                  <span>X: {stop.mapX ?? 50}%, Y: {stop.mapY ?? 50}%</span>
+                                </span>
+                                <span
+                                  className="adm-telemetry-pill rgb-tag"
+                                  style={{ borderColor: `${stop.rgbColor || '#00ffff'}66` }}
+                                >
+                                  <span
+                                    className="adm-color-dot"
+                                    style={{ backgroundColor: stop.rgbColor || '#00ffff' }}
+                                  />
+                                  <span>{stop.rgbColor || '#00ffff'}</span>
+                                </span>
+                                <span className="adm-telemetry-pill servo-tag">
+                                  Tilt: {stop.servoTilt ?? 90}° / Pan: {stop.servoPan ?? 90}°
+                                </span>
+                                <span className="adm-telemetry-pill duration-tag">
+                                  {stop.durationSec || 12}s
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Spoken Narration Quote Preview */}
+                            {stop.narration && (
+                              <div className="adm-tour-narration-preview">
+                                <Volume2 size={14} className="adm-tour-narr-icon" />
+                                <p>"{stop.narration}"</p>
+                              </div>
+                            )}
+
+                            {/* Highlights pills */}
+                            {Array.isArray(stop.highlights) && stop.highlights.length > 0 && (
+                              <div className="adm-tour-highlights-row">
+                                {stop.highlights.map((h, i) => (
+                                  <span key={i} className="adm-tour-highlight-badge">
+                                    {h}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Stop Actions */}
+                          <div className="adm-tour-stop-actions">
+                            <div className="adm-switch-wrap" title={stop.isEnabled ? 'Included in Tour' : 'Skipped in Tour'}>
+                              <button
+                                className={`adm-switch-btn ${stop.isEnabled ? 'active' : ''}`}
+                                onClick={() => handleToggleTourStopEnabled(stop.id, stop.isEnabled)}
+                              >
+                                <div className="adm-switch-thumb" />
+                              </button>
+                              <span className="adm-switch-label">
+                                {stop.isEnabled ? 'Active' : 'Skipped'}
+                              </span>
+                            </div>
+
+                            <div className="adm-btn-action-col">
+                              <button
+                                className={`adm-mini-btn speech ${tourTestingSpeechId === stop.id ? 'playing' : ''}`}
+                                onClick={() => handleTestTourSpeech(stop)}
+                                title="Listen to spoken audio narration"
+                              >
+                                <Volume2 size={14} />
+                                <span>{tourTestingSpeechId === stop.id ? 'Speaking...' : 'Test Voice'}</span>
+                              </button>
+                              <button
+                                className="adm-mini-btn edit"
+                                onClick={() => handleOpenEditTourStop(stop)}
+                                title="Edit waypoint details"
+                              >
+                                <Edit2 size={14} />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                className="adm-mini-btn danger"
+                                onClick={() => handleDeleteTourStop(stop.id, stop.name)}
+                                title="Delete waypoint"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 8. DEVELOPER OPTIONS TAB */}
           {activeTab === 'developer' && (
             <div className="adm-tab-panel">
@@ -3135,6 +3607,251 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                 <button type="submit" className="adm-submit-btn">
                   <Save size={16} />
                   <span>{modalMode === 'add' ? 'Create QR Portal' : 'Save Changes'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* GUIDED TOUR ADD / EDIT MODAL */}
+      {showTourModal && (
+        <div className="adm-modal-backdrop" onClick={() => setShowTourModal(false)}>
+          <div className="adm-modal-content wide" onClick={(e) => e.stopPropagation()}>
+            <div className="adm-modal-header">
+              <div className="adm-modal-title-group">
+                <Compass size={22} color="#00ffff" />
+                <h3>{tourModalMode === 'add' ? 'Add Facility Tour Waypoint' : 'Edit Tour Waypoint'}</h3>
+              </div>
+              <button className="adm-modal-close" onClick={() => setShowTourModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTourStop} className="adm-modal-form">
+              <div className="adm-tour-modal-grid">
+                {/* Left Column: Core Identity & Speech */}
+                <div className="adm-tour-modal-col">
+                  <h4 className="adm-modal-subheading">Waypoint Identity & Narration</h4>
+
+                  <div className="adm-form-group">
+                    <label>Waypoint Name *</label>
+                    <input
+                      type="text"
+                      className="adm-form-input"
+                      placeholder="e.g. Welcome Atrium & Reception"
+                      value={tourFormName}
+                      onChange={(e) => setTourFormName(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="adm-form-group">
+                    <label>Facility Zone / Department</label>
+                    <input
+                      type="text"
+                      className="adm-form-input"
+                      placeholder="e.g. Zone A - Main Lobby"
+                      value={tourFormArea}
+                      onChange={(e) => setTourFormArea(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="adm-form-group">
+                    <div className="adm-label-with-action">
+                      <label>Spoken Voice Narration (Aurra Speaks Here)</label>
+                      <button
+                        type="button"
+                        className="adm-inline-test-btn"
+                        onClick={handleTestModalSpeech}
+                        title="Listen to this narration"
+                      >
+                        <Volume2 size={13} />
+                        <span>{tourTestingSpeechId === 'modal' ? 'Speaking...' : 'Test Narration'}</span>
+                      </button>
+                    </div>
+                    <textarea
+                      className="adm-form-textarea"
+                      rows={4}
+                      placeholder="Enter the exact words Aurra should announce upon reaching this stop..."
+                      value={tourFormNarration}
+                      onChange={(e) => setTourFormNarration(e.target.value)}
+                    />
+                    <span className="adm-field-hint">
+                      Spoken smoothly with the configured female/male neural voice engine.
+                    </span>
+                  </div>
+
+                  <div className="adm-form-group">
+                    <label>Exhibit Highlights (Comma separated)</label>
+                    <input
+                      type="text"
+                      className="adm-form-input"
+                      placeholder="e.g. Smart Reception, Facial Check-In, Digital Concierge"
+                      value={tourFormHighlights}
+                      onChange={(e) => setTourFormHighlights(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="adm-form-group">
+                    <div className="adm-label-row">
+                      <label>Presentation Duration</label>
+                      <span className="adm-slider-val-tag">{tourFormDuration}s</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="5"
+                      max="60"
+                      step="1"
+                      value={tourFormDuration}
+                      onChange={(e) => setTourFormDuration(Number(e.target.value))}
+                      className="adm-range-slider"
+                    />
+                  </div>
+                </div>
+
+                {/* Right Column: Hardware Sync & Floorplan Coordinates */}
+                <div className="adm-tour-modal-col">
+                  <h4 className="adm-modal-subheading">Robot Hardware & Map Position</h4>
+
+                  {/* LED Color Picker & Presets */}
+                  <div className="adm-form-group">
+                    <label>Eye & Aura Lighting Theme</label>
+                    <div className="adm-color-picker-row">
+                      <input
+                        type="color"
+                        value={tourFormRgb}
+                        onChange={(e) => setTourFormRgb(e.target.value)}
+                        className="adm-color-input"
+                      />
+                      <input
+                        type="text"
+                        value={tourFormRgb}
+                        onChange={(e) => setTourFormRgb(e.target.value)}
+                        className="adm-form-input color-text"
+                      />
+                      <div className="adm-color-preset-strip">
+                        {['#00FFFF', '#38BDF8', '#8B5CF6', '#10B981', '#F59E0B', '#EC4899', '#EF4444'].map((col) => (
+                          <button
+                            key={col}
+                            type="button"
+                            className="adm-color-preset-dot"
+                            style={{ backgroundColor: col }}
+                            onClick={() => setTourFormRgb(col)}
+                            title={col}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Head Servos */}
+                  <div className="adm-form-group">
+                    <div className="adm-label-row">
+                      <label>Head Servo Tilt Angle</label>
+                      <span className="adm-slider-val-tag">{tourFormTilt}°</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="45"
+                      max="135"
+                      step="5"
+                      value={tourFormTilt}
+                      onChange={(e) => setTourFormTilt(Number(e.target.value))}
+                      className="adm-range-slider"
+                    />
+                    <div className="adm-slider-extremes">
+                      <span>45° (Look Down)</span>
+                      <span>90° (Level)</span>
+                      <span>135° (Look Up)</span>
+                    </div>
+                  </div>
+
+                  <div className="adm-form-group">
+                    <div className="adm-label-row">
+                      <label>Head Servo Pan Angle</label>
+                      <span className="adm-slider-val-tag">{tourFormPan}°</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="30"
+                      max="150"
+                      step="5"
+                      value={tourFormPan}
+                      onChange={(e) => setTourFormPan(Number(e.target.value))}
+                      className="adm-range-slider"
+                    />
+                    <div className="adm-slider-extremes">
+                      <span>30° (Right)</span>
+                      <span>90° (Straight)</span>
+                      <span>150° (Left)</span>
+                    </div>
+                  </div>
+
+                  {/* Interactive Map Coordinates */}
+                  <div className="adm-form-group">
+                    <label>Facility Floorplan Position</label>
+                    <div className="adm-coords-sliders">
+                      <div className="adm-coord-row">
+                        <span>X Coordinate: <strong>{tourFormMapX}%</strong></span>
+                        <input
+                          type="range"
+                          min="5"
+                          max="95"
+                          step="1"
+                          value={tourFormMapX}
+                          onChange={(e) => setTourFormMapX(Number(e.target.value))}
+                          className="adm-range-slider"
+                        />
+                      </div>
+                      <div className="adm-coord-row">
+                        <span>Y Coordinate: <strong>{tourFormMapY}%</strong></span>
+                        <input
+                          type="range"
+                          min="10"
+                          max="90"
+                          step="1"
+                          value={tourFormMapY}
+                          onChange={(e) => setTourFormMapY(Number(e.target.value))}
+                          className="adm-range-slider"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Floorplan Visual Mini Preview Box */}
+                    <div className="adm-modal-map-preview">
+                      <div className="adm-map-preview-grid" />
+                      <div
+                        className="adm-map-preview-pin"
+                        style={{
+                          left: `${tourFormMapX}%`,
+                          top: `${tourFormMapY}%`,
+                          borderColor: tourFormRgb,
+                          boxShadow: `0 0 14px ${tourFormRgb}`,
+                        }}
+                      >
+                        <div
+                          className="adm-map-preview-dot"
+                          style={{ backgroundColor: tourFormRgb }}
+                        />
+                        <span className="adm-map-preview-label">{tourFormName || 'Waypoint'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="adm-modal-actions">
+                <button
+                  type="button"
+                  className="adm-btn-secondary"
+                  onClick={() => setShowTourModal(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="adm-submit-btn">
+                  <Save size={16} />
+                  <span>{tourModalMode === 'add' ? 'Add Waypoint' : 'Save Changes'}</span>
                 </button>
               </div>
             </form>

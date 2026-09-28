@@ -40,6 +40,7 @@ class VoiceNavigationService {
 
   speak(text, options = {}) {
     this.isSpeakingTts = true;
+    this.notify({ isSpeaking: true, isThinking: false });
     if (this.recognition && this.isListening) {
       try {
         this.recognition.abort();
@@ -49,12 +50,13 @@ class VoiceNavigationService {
     }
     const originalOnEnd = options.onEnd;
     const resumeListening = () => {
+      this.isSpeakingTts = false;
+      this.notify({ isSpeaking: false });
       setTimeout(() => {
-        this.isSpeakingTts = false;
         if (!this.userPaused && !this.manualStop) {
           this.startListening(true);
         }
-      }, 600);
+      }, 400);
     };
 
     speakWithVoice(text, {
@@ -536,3 +538,7 @@ class VoiceNavigationService {
 }
 
 export const voiceNavigationService = new VoiceNavigationService();
+
+if (typeof window !== 'undefined') {
+  window.voiceNavigationService = voiceNavigationService;
+}

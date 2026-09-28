@@ -3,12 +3,13 @@
  */
 .interaction-avatar-wrapper {
   position: relative;
-  width: 260px;
-  height: 260px;
+  width: min(380px, 45vh);
+  height: min(380px, 45vh);
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto;
+  transition: all 0.3s ease;
 }
 
 .interaction-avatar-canvas {

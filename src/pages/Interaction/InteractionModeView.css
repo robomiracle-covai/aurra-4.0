@@ -352,19 +352,65 @@
 .hud-status-text.thinking { color: #c084fc; }
 .hud-status-text.speaking { color: #fb7185; }
 
+/* Live Visitor Spoken Utterance Bubble */
+.hud-live-transcript-bubble {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  border-radius: 20px;
+  padding: 4px 14px;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
+  animation: fadeInPill 0.2s ease-out;
+}
+
+@keyframes fadeInPill {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.live-transcript-tag {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #34d399;
+  letter-spacing: 0.08em;
+}
+
+.live-transcript-text {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #f0fdf4;
+}
+
 /* Spoken Feedback Card */
 .hud-feedback-card {
   width: 100%;
-  background: rgba(3, 17, 39, 0.85);
-  border: 1px solid rgba(0, 255, 255, 0.3);
+  background: rgba(3, 17, 39, 0.9);
+  border: 1px solid rgba(0, 255, 255, 0.35);
   border-radius: 16px;
   padding: 14px 20px;
   backdrop-filter: blur(14px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 255, 255, 0.15);
   pointer-events: auto;
+  animation: slideUpFeedback 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUpFeedback {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .feedback-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.feedback-title-group {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -372,7 +418,22 @@
   font-weight: 800;
   letter-spacing: 0.1em;
   color: #00ffff;
-  margin-bottom: 6px;
+}
+
+.feedback-close-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.feedback-close-btn:hover {
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.15);
 }
 
 .feedback-card-text {

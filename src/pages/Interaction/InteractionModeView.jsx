@@ -78,8 +78,6 @@ export default function InteractionModeView({ onNavigate }) {
       const { match } = e.detail || {};
       if (match?.answer) {
         setLastFeedback(match.answer);
-        setCoreStatus('SPEAKING');
-        setTimeout(() => setCoreStatus('IDLE'), 4000);
       }
     };
 
@@ -87,13 +85,17 @@ export default function InteractionModeView({ onNavigate }) {
 
     const unsubscribe = voiceNavigationService.subscribe((state) => {
       setIsListening(state.isListening);
-      if (state.transcript) setLastTranscript(state.transcript);
+      if (state.transcript !== undefined) setLastTranscript(state.transcript);
       if (state.feedback) setLastFeedback(state.feedback);
 
-      if (state.isThinking) {
+      if (state.isSpeaking) {
+        setCoreStatus('SPEAKING');
+      } else if (state.isThinking) {
         setCoreStatus('THINKING');
-      } else if (state.isListening && coreStatusRef.current === 'IDLE') {
+      } else if (state.isListening) {
         setCoreStatus('LISTENING');
+      } else {
+        setCoreStatus('IDLE');
       }
     });
 
@@ -102,6 +104,15 @@ export default function InteractionModeView({ onNavigate }) {
       unsubscribe();
     };
   }, []);
+
+  // Auto-dismiss spoken feedback card after 8.5 seconds of idle
+  useEffect(() => {
+    if (!lastFeedback) return;
+    const timer = setTimeout(() => {
+      setLastFeedback('');
+    }, 8500);
+    return () => clearTimeout(timer);
+  }, [lastFeedback]);
 
   // Check Hardware Status
   useEffect(() => {
@@ -333,18 +344,35 @@ export default function InteractionModeView({ onNavigate }) {
           <h2 className={`hud-status-text ${coreStatus.toLowerCase()}`}>
             {!isListening && '🚫 MIC MUTED / AI PAUSED'}
             {isListening && coreStatus === 'LISTENING' && '🎤 LISTENING TO VISITOR...'}
-            {isListening && coreStatus === 'THINKING' && '⚡ PROCESSING QUERY (GROK AI)...'}
+            {isListening && coreStatus === 'THINKING' && '⚡ PROCESSING QUERY...'}
             {isListening && coreStatus === 'SPEAKING' && '🔊 SPEAKING RESPONSE...'}
             {isListening && coreStatus === 'IDLE' && (recognizedPerson ? `✨ ENGAGED: ${recognizedPerson}` : '✨ STANDBY & MONITORING')}
           </h2>
+
+          {/* Live Visitor Spoken Utterance Bubble */}
+          {lastTranscript && isListening && coreStatus !== 'SPEAKING' && (
+            <div className="hud-live-transcript-bubble">
+              <span className="live-transcript-tag">YOU SAID</span>
+              <p className="live-transcript-text">"{lastTranscript}"</p>
+            </div>
+          )}
         </div>
 
         {/* Live Spoken Feedback Container */}
         {lastFeedback && (
           <div className="hud-feedback-card">
             <div className="feedback-card-header">
-              <Volume2 size={16} color="#00ffff" />
-              <span>SPOKEN AUDIO RESPONSE</span>
+              <div className="feedback-title-group">
+                <Volume2 size={16} color="#00ffff" />
+                <span>SPOKEN AUDIO RESPONSE</span>
+              </div>
+              <button
+                className="feedback-close-btn"
+                onClick={() => setLastFeedback('')}
+                title="Dismiss"
+              >
+                ✕
+              </button>
             </div>
             <p className="feedback-card-text">"{lastFeedback}"</p>
           </div>

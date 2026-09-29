@@ -127,4 +127,23 @@ db.version(6).stores({
   }
 });
 
+// Version 7: Classic Robomiracle Robot Showcase Tours & Step Presentations
+db.version(7).stores({
+  userFaces: '++id, name',
+  cards: '++id, title, href, isEnabled, voiceAccessEnabled',
+  images: '++id, title, isSelected',
+  headers: '++id, headerName',
+  qaQuestions: '++id, question, category',
+  visitors: '++id, name, phone, email, company, purpose, host, badgeType, badgeNumber, checkInTime, checkOutTime, status',
+  weblinks: 'id, title, category, url, isEnabled, sortOrder',
+  tourStops: '++id, name, area, orderIndex, isEnabled',
+  robotTours: 'id, slug, title, orderIndex, isEnabled',
+}).upgrade(async (tx) => {
+  const { DEFAULT_ROBOT_TOURS } = await import('../data/defaultRobotTours');
+  const robotCount = await tx.table('robotTours').count();
+  if (robotCount === 0) {
+    await tx.table('robotTours').bulkAdd(DEFAULT_ROBOT_TOURS);
+  }
+});
+
 

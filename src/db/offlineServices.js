@@ -3,6 +3,7 @@ import { DEFAULT_REGISTRATION_CARDS, DEFAULT_SLIDES } from '../data/defaultCards
 import { DEFAULT_QA_QUESTIONS } from '../data/defaultQuestions';
 import { OFFICIAL_WEBLINKS } from '../pages/WebLinks/weblinksData';
 import { DEFAULT_TOUR_STOPS } from '../data/defaultTourStops';
+import { DEFAULT_ROBOT_TOURS } from '../data/defaultRobotTours';
 
 const parseNumericId = (id) => {
   const n = Number(id);
@@ -366,6 +367,7 @@ export const offlineBackupService = {
       visitors: await db.visitors.toArray(),
       weblinks: await db.weblinks.toArray(),
       tourStops: await db.tourStops.toArray(),
+      robotTours: await db.robotTours.toArray(),
     };
     return data;
   },
@@ -414,6 +416,12 @@ export const offlineBackupService = {
         await db.tourStops.bulkAdd(backupData.tourStops);
       }
     }
+    if (Array.isArray(backupData.robotTours)) {
+      await db.robotTours.clear();
+      if (backupData.robotTours.length > 0) {
+        await db.robotTours.bulkAdd(backupData.robotTours);
+      }
+    }
     return { success: true };
   },
 
@@ -428,6 +436,8 @@ export const offlineBackupService = {
     await db.qaQuestions.bulkAdd(DEFAULT_QA_QUESTIONS);
     await db.tourStops.clear();
     await db.tourStops.bulkAdd(DEFAULT_TOUR_STOPS);
+    await db.robotTours.clear();
+    await db.robotTours.bulkAdd(DEFAULT_ROBOT_TOURS);
     await db.userFaces.clear();
     await db.visitors.clear();
     await db.weblinks.clear();
@@ -736,6 +746,119 @@ export const offlineTourService = {
     return await db.tourStops.orderBy('orderIndex').toArray();
   },
 };
+
+/**
+ * Offline Robomiracle Robot Showcase Tours (IndexedDB)
+ * Complete management of Robot cards, 5-step interactive presentations, and 3-phase voice
+ */
+export const offlineRobotTourService = {
+  getRobots: async () => {
+    let robots = await db.robotTours.orderBy('orderIndex').toArray();
+    if (!robots || robots.length === 0) {
+      await db.robotTours.bulkAdd(DEFAULT_ROBOT_TOURS);
+      robots = await db.robotTours.orderBy('orderIndex').toArray();
+    }
+    return robots;
+  },
+
+  getRobotById: async (idOrSlug) => {
+    if (!idOrSlug) return null;
+    let robot = await db.robotTours.get(idOrSlug);
+    if (!robot) {
+      robot = await db.robotTours.where('slug').equals(idOrSlug).first();
+    }
+    if (!robot) {
+      const robots = await db.robotTours.toArray();
+      robot = robots.find((r) => String(r.id) === String(idOrSlug) || r.slug === idOrSlug);
+    }
+    return robot || null;
+  },
+
+  addRobot: async (robotData) => {
+    const existing = await db.robotTours.toArray();
+    const nextOrder = existing.length > 0 
+      ? Math.max(...existing.map((r) => r.orderIndex ?? 0)) + 1 
+      : 0;
+    const slug = (robotData.slug || robotData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')).trim();
+    const newRobot = {
+      id: robotData.id || slug,
+      slug,
+      title: robotData.title.trim(),
+      subtitle: (robotData.subtitle || '').trim(),
+      image: robotData.image || '/aurra/hero.webp',
+      badge: robotData.badge || 'Robotics',
+      isEnabled: robotData.isEnabled !== false,
+      orderIndex: nextOrder,
+      steps: Array.isArray(robotData.steps) ? robotData.steps : [],
+      createdAt: new Date().toISOString(),
+    };
+    await db.robotTours.put(newRobot);
+    return newRobot;
+  },
+
+  updateRobot: async (id, data) => {
+    const robot = await offlineRobotTourService.getRobotById(id);
+    if (!robot) throw new Error(`Robot not found: ${id}`);
+    const updated = {
+      ...robot,
+      ...data,
+      updatedAt: new Date().toISOString(),
+    };
+    await db.robotTours.put(updated);
+    return updated;
+  },
+
+  deleteRobot: async (id) => {
+    const robot = await offlineRobotTourService.getRobotById(id);
+    if (robot) {
+      await db.robotTours.delete(robot.id);
+      return { success: true };
+    }
+    return { success: false };
+  },
+
+  toggleRobotEnabled: async (id, isEnabled) => {
+    const robot = await offlineRobotTourService.getRobotById(id);
+    if (robot) {
+      await db.robotTours.update(robot.id, { isEnabled });
+      return { success: true, isEnabled };
+    }
+    return { success: false };
+  },
+
+  reorderRobots: async (orderedIds) => {
+    for (let index = 0; index < orderedIds.length; index++) {
+      const id = orderedIds[index];
+      const robot = await offlineRobotTourService.getRobotById(id);
+      if (robot) {
+        await db.robotTours.update(robot.id, { orderIndex: index });
+      }
+    }
+    return await offlineRobotTourService.getRobots();
+  },
+
+  saveRobotSteps: async (robotId, steps) => {
+    const robot = await offlineRobotTourService.getRobotById(robotId);
+    if (!robot) throw new Error(`Robot not found: ${robotId}`);
+    const updated = {
+      ...robot,
+      steps: steps.map((s, idx) => ({
+        ...s,
+        stepNumber: idx + 1,
+      })),
+      updatedAt: new Date().toISOString(),
+    };
+    await db.robotTours.put(updated);
+    return updated;
+  },
+
+  restoreDefaultRobots: async () => {
+    await db.robotTours.clear();
+    await db.robotTours.bulkAdd(DEFAULT_ROBOT_TOURS);
+    return await db.robotTours.orderBy('orderIndex').toArray();
+  },
+};
+
 
 
 

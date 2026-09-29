@@ -1,656 +1,519 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  ArrowLeft, Compass, Play, Pause, SkipForward, SkipBack, 
-  AlertOctagon, Volume2, ShieldAlert, CheckCircle2, MapPin, 
-  Sparkles, RefreshCw, Cpu, Activity, Zap, Radio
+  ArrowLeft, Play, Pause, SkipForward, SkipBack, 
+  Volume2, RotateCcw, Sparkles, CheckCircle2, Bot, 
+  ChevronRight, Award, Compass, Eye
 } from 'lucide-react';
-import { offlineTourService } from '../../db/offlineServices';
-import { esp32Service } from '../../services/esp32Service';
-import { kioskConfigService } from '../../services/kioskConfigService';
-import { voiceNavigationService } from '../../services/voiceNavigationService';
+import { offlineRobotTourService } from '../../db/offlineServices';
 import { speakWithVoice, cancelSpeech } from '../../utils/speechSynthesis';
+import { kioskConfigService } from '../../services/kioskConfigService';
+import { esp32Service } from '../../services/esp32Service';
 import { logger } from '../../services/logger';
+import { assetUrl } from '../../utils/platform';
 import './GuidedTourView.css';
 
-/**
- * High-tech synthetic chime using Web Audio API (Zero external file dependency)
- */
-function playArrivalChime() {
-  try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const now = ctx.currentTime;
-    
-    // Dual frequency harmonic chime (E5 and B5)
-    [659.25, 987.77].forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now + idx * 0.12);
-      
-      gain.gain.setValueAtTime(0.2, now + idx * 0.12);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.6);
-      
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      
-      osc.start(now + idx * 0.12);
-      osc.stop(now + idx * 0.12 + 0.65);
-    });
-  } catch (err) {
-    console.warn('[TOUR] Audio chime error:', err);
-  }
-}
+const FALLBACK_PLACEHOLDER = '/aurra/hero.webp';
 
 export default function GuidedTourView({ onNavigate }) {
-  const [stops, setStops] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [tourState, setTourState] = useState('IDLE'); // 'IDLE' | 'NAVIGATING' | 'ARRIVED' | 'SPEAKING' | 'PAUSED' | 'EMERGENCY_STOP'
-  const [transitProgress, setTransitProgress] = useState(0); // 0 to 100%
-  const [obstacleWarning, setObstacleWarning] = useState(false);
-  const [radarDistance, setRadarDistance] = useState({ front: 45, back: 60 });
-  const [isEspOnline, setIsEspOnline] = useState(false);
-  const [config, setConfig] = useState(() => kioskConfigService.getConfig());
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  // Navigation & Data State
+  const [robots, setRobots] = useState([]);
+  const [selectedRobot, setSelectedRobot] = useState(null); // null = Gallery mode, object = Presentation mode
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [contentPhase, setContentPhase] = useState('intro'); // 'intro' | 'mainContent' | 'thankYou'
+  
+  // Tour Playback & Audio State
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [toastCountdown, setToastCountdown] = useState(null); // null | 3 | 2 | 1
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [kioskConfig, setKioskConfig] = useState(() => kioskConfigService.getConfig());
 
-  const transitTimerRef = useRef(null);
-  const timerIntervalRef = useRef(null);
-  const currentStop = stops[currentIndex] || null;
+  const countdownTimerRef = useRef(null);
+  const phaseTimerRef = useRef(null);
+  const isSpeakingRef = useRef(false);
 
-  // 1. Load Tour Stops from IndexedDB
+  // 1. Load Robots on Mount
   useEffect(() => {
-    loadStops();
-    const unsubConfig = kioskConfigService.subscribe((cfg) => setConfig(cfg));
+    loadRobots();
+    const unsub = kioskConfigService.subscribe((cfg) => setKioskConfig(cfg));
     return () => {
-      unsubConfig();
-      handleCleanup();
+      unsub();
+      handleStopTour();
     };
   }, []);
 
-  const loadStops = async () => {
+  const loadRobots = async () => {
     try {
-      const data = await offlineTourService.getStops();
-      const enabledOnly = data.filter((s) => s.isEnabled !== false);
-      setStops(enabledOnly);
+      const data = await offlineRobotTourService.getRobots();
+      const enabledOnly = data.filter((r) => r.isEnabled !== false);
+      setRobots(enabledOnly);
     } catch (err) {
-      logger.error('TOUR', `Failed to load tour stops: ${err.message}`);
+      logger.error('TOUR', `Failed loading robot tours: ${err.message}`);
     }
   };
 
-  // 2. Hardware Telemetry & Ultrasonic Radar Polling
-  useEffect(() => {
-    const unsubHw = esp32Service.subscribe((hw) => {
-      setIsEspOnline(Boolean(hw.online));
-      if (hw.frontDist !== undefined && hw.backDist !== undefined) {
-        setRadarDistance({ front: hw.frontDist, back: hw.backDist });
+  // Safe Cleanup
+  const handleStopTour = () => {
+    cancelSpeech();
+    isSpeakingRef.current = false;
+    setIsSpeaking(false);
+    setIsPlaying(false);
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
+  };
 
-        // Obstacle Safety Check while driving
-        const threshold = config.tourObstacleDistanceCm || 30;
-        if (hw.frontDist > 0 && hw.frontDist <= threshold) {
-          if (tourState === 'NAVIGATING') {
-            triggerObstaclePause(hw.frontDist);
-          }
-        } else {
-          setObstacleWarning(false);
-        }
+  // 2. Select a Robot and Launch Presentation
+  const handleSelectRobot = (robot) => {
+    handleStopTour();
+    setSelectedRobot(robot);
+    setCurrentStepIndex(0);
+    setContentPhase('intro');
+    setIsCompleted(false);
+
+    // Sync robot hardware eye color
+    if (robot.slug === 'aurra') esp32Service.setRgb('#00FFFF');
+    else if (robot.slug === 'nexus') esp32Service.setRgb('#38BDF8');
+    else if (robot.slug === 'nova') esp32Service.setRgb('#8B5CF6');
+    else if (robot.slug === 'dine') esp32Service.setRgb('#10B981');
+    else if (robot.slug === 'gi') esp32Service.setRgb('#F59E0B');
+
+    // Trigger Initial 3-second Countdown Toast
+    startCountdownAndPlay(robot, 0, 'intro');
+  };
+
+  // 3. Start Countdown Toast
+  const startCountdownAndPlay = (robot, stepIdx, phase) => {
+    handleStopTour();
+    setToastCountdown(3);
+
+    let count = 3;
+    countdownTimerRef.current = setInterval(() => {
+      count -= 1;
+      if (count > 0) {
+        setToastCountdown(count);
+      } else {
+        clearInterval(countdownTimerRef.current);
+        setToastCountdown(null);
+        setIsPlaying(true);
+        playPhaseSpeech(robot, stepIdx, phase);
       }
-    });
+    }, 1000);
+  };
 
-    return () => unsubHw();
-  }, [tourState, config.tourObstacleDistanceCm]);
+  // 4. Play Voice for Current Phase
+  const playPhaseSpeech = (robot, stepIdx, phase) => {
+    const activeRobot = robot || selectedRobot;
+    if (!activeRobot || !activeRobot.steps || activeRobot.steps.length === 0) return;
 
-  // 3. Tour Elapsed Timer
-  useEffect(() => {
-    if (tourState === 'NAVIGATING' || tourState === 'SPEAKING' || tourState === 'ARRIVED') {
-      timerIntervalRef.current = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
-      }, 1000);
-    } else {
-      clearInterval(timerIntervalRef.current);
+    const step = activeRobot.steps[stepIdx];
+    if (!step) return;
+
+    const textToSpeak = step[phase] || step.intro || step.mainContent || '';
+    if (!textToSpeak) {
+      advanceToNextPhase(activeRobot, stepIdx, phase);
+      return;
     }
-    return () => clearInterval(timerIntervalRef.current);
-  }, [tourState]);
 
-  // Clean unmount helper
-  const handleCleanup = () => {
     cancelSpeech();
-    esp32Service.stopMotors();
-    esp32Service.setServo(1, config.defaultHeadTiltAngle || 90);
-    esp32Service.setServo(2, config.defaultHeadPanAngle || 90);
-    if (transitTimerRef.current) clearInterval(transitTimerRef.current);
-  };
+    isSpeakingRef.current = true;
+    setIsSpeaking(true);
 
-  // Trigger obstacle safety auto-brake
-  const triggerObstaclePause = (distCm) => {
-    esp32Service.stopMotors();
-    setTourState('PAUSED');
-    setObstacleWarning(true);
-    cancelSpeech();
-    speakWithVoice(`Obstacle detected ${distCm} centimeters ahead. Tour navigation temporarily paused for safety.`);
-    logger.warn('TOUR', `Obstacle detected at ${distCm}cm - tour paused.`);
-  };
-
-  // Start tour from current or first stop
-  const handleStartTour = () => {
-    if (stops.length === 0) return;
-    setTourState('NAVIGATING');
-    startTransitToStop(currentIndex);
-  };
-
-  // Navigate & Drive to specific stop index
-  const startTransitToStop = useCallback((targetIndex) => {
-    if (targetIndex < 0 || targetIndex >= stops.length) return;
-    
-    cancelSpeech();
-    setCurrentIndex(targetIndex);
-    setTourState('NAVIGATING');
-    setTransitProgress(0);
-
-    const targetStop = stops[targetIndex];
-    const speed = config.tourSpeed || 160;
-
-    // Dispatch Motor Drive command to ESP32
-    esp32Service.driveMotor('forward', speed);
-
-    // Dynamic Eye Color during transit (electric blue drive glow)
-    esp32Service.setRgb('#00D5FF');
-
-    // Pan head forward
-    esp32Service.setServo(1, 90);
-    esp32Service.setServo(2, 90);
-
-    // Simulate / timed transit duration (3.5 seconds transit window)
-    const transitDurationMs = 3500;
-    const intervalMs = 50;
-    const step = 100 / (transitDurationMs / intervalMs);
-
-    if (transitTimerRef.current) clearInterval(transitTimerRef.current);
-
-    transitTimerRef.current = setInterval(() => {
-      setTransitProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(transitTimerRef.current);
-          handleArriveAtStop(targetStop);
-          return 100;
-        }
-        return prev + step;
-      });
-    }, intervalMs);
-  }, [stops, config.tourSpeed]);
-
-  // Arrive at stop: brake motors, pose servos, set theme eye color, speak narration
-  const handleArriveAtStop = (stop) => {
-    // 1. Brake motors to full stop
-    esp32Service.stopMotors();
-
-    // 2. Aim head servos toward exhibit/waypoint
-    if (stop.servoTilt !== undefined && stop.servoPan !== undefined) {
-      esp32Service.setServo(1, stop.servoTilt);
-      esp32Service.setServo(2, stop.servoPan);
-    }
-
-    // 3. Set custom exhibit RGB eye glow
-    if (stop.rgbColor) {
-      esp32Service.setRgb(stop.rgbColor);
-    }
-
-    // 4. Play audio arrival chime
-    if (config.tourArrivalChime !== false) {
-      playArrivalChime();
-    }
-
-    // 5. Automatically narrate exhibit if configured
-    if (config.tourAutoAnnounce !== false && stop.narration) {
-      setTourState('SPEAKING');
-      speakWithVoice(stop.narration, {
-        onStart: () => setTourState('SPEAKING'),
-        onEnd: () => {
-          setTourState('ARRIVED');
-          // If auto-loop is enabled and on last stop
-          if (currentIndex === stops.length - 1 && config.tourLoopEnabled) {
-            setTimeout(() => startTransitToStop(0), 4000);
-          }
-        },
-      });
-    } else {
-      setTourState('ARRIVED');
-    }
-  };
-
-  // Pause Tour
-  const handlePauseTour = () => {
-    if (transitTimerRef.current) clearInterval(transitTimerRef.current);
-    esp32Service.stopMotors();
-    cancelSpeech();
-    setTourState('PAUSED');
-  };
-
-  // Resume Tour
-  const handleResumeTour = () => {
-    setObstacleWarning(false);
-    if (transitProgress < 100) {
-      setTourState('NAVIGATING');
-      const speed = config.tourSpeed || 160;
-      esp32Service.driveMotor('forward', speed);
-      startTransitToStop(currentIndex);
-    } else {
-      handleNextStop();
-    }
-  };
-
-  // Next Stop Navigation
-  const handleNextStop = () => {
-    if (currentIndex < stops.length - 1) {
-      startTransitToStop(currentIndex + 1);
-    } else if (config.tourLoopEnabled) {
-      startTransitToStop(0);
-    } else {
-      setTourState('ARRIVED');
-      speakWithVoice("We have reached the final stop of our guided facility tour. Thank you for visiting Robomiracle Technologies!");
-    }
-  };
-
-  // Previous Stop Navigation
-  const handlePrevStop = () => {
-    if (currentIndex > 0) {
-      startTransitToStop(currentIndex - 1);
-    }
-  };
-
-  // Instant Emergency Stop
-  const handleEmergencyStop = () => {
-    if (transitTimerRef.current) clearInterval(transitTimerRef.current);
-    esp32Service.stopMotors();
-    cancelSpeech();
-    setTourState('EMERGENCY_STOP');
-    esp32Service.setRgb('#EF4444'); // Flash Red
-    logger.warn('TOUR', 'Emergency stop triggered by user.');
-  };
-
-  // Replay Spoken Narration
-  const handleReplayNarration = () => {
-    if (!currentStop?.narration) return;
-    cancelSpeech();
-    setTourState('SPEAKING');
-    speakWithVoice(currentStop.narration, {
-      onEnd: () => setTourState('ARRIVED'),
+    speakWithVoice(textToSpeak, {
+      gender: kioskConfig.voiceGender || 'female',
+      rate: Number(kioskConfig.speechRate || 1.0),
+      pitch: Number(kioskConfig.speechPitch || 1.05),
+      onStart: () => {
+        isSpeakingRef.current = true;
+        setIsSpeaking(true);
+      },
+      onEnd: () => {
+        isSpeakingRef.current = false;
+        setIsSpeaking(false);
+        // Small pause between phases for natural speaking flow
+        phaseTimerRef.current = setTimeout(() => {
+          advanceToNextPhase(activeRobot, stepIdx, phase);
+        }, 800);
+      },
+      onError: () => {
+        isSpeakingRef.current = false;
+        setIsSpeaking(false);
+        phaseTimerRef.current = setTimeout(() => {
+          advanceToNextPhase(activeRobot, stepIdx, phase);
+        }, 1000);
+      },
     });
   };
 
-  // Format seconds mm:ss
-  const formatTime = (secs) => {
-    const m = Math.floor(secs / 60).toString().padStart(2, '0');
-    const s = (secs % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
+  // 5. Automatic Progression between Intro -> Main Content -> Thank You -> Next Step
+  const advanceToNextPhase = (robot, stepIdx, currentPhase) => {
+    const activeRobot = robot || selectedRobot;
+    if (!activeRobot || !activeRobot.steps) return;
+
+    if (currentPhase === 'intro') {
+      setContentPhase('mainContent');
+      playPhaseSpeech(activeRobot, stepIdx, 'mainContent');
+    } else if (currentPhase === 'mainContent') {
+      setContentPhase('thankYou');
+      playPhaseSpeech(activeRobot, stepIdx, 'thankYou');
+    } else if (currentPhase === 'thankYou') {
+      // Step complete! Advance to next step or conclude
+      if (stepIdx < activeRobot.steps.length - 1) {
+        const nextIdx = stepIdx + 1;
+        setCurrentStepIndex(nextIdx);
+        setContentPhase('intro');
+        playPhaseSpeech(activeRobot, nextIdx, 'intro');
+      } else {
+        // Concluded all steps!
+        setIsPlaying(false);
+        setIsCompleted(true);
+        speakWithVoice(
+          `You have completed the full guided tour of ${activeRobot.title}! Thank you for exploring Robomiracle Technologies.`
+        );
+      }
+    }
   };
+
+  // Jump to specific step via Stepper Bar
+  const handleJumpToStep = (index) => {
+    handleStopTour();
+    setCurrentStepIndex(index);
+    setContentPhase('intro');
+    setIsCompleted(false);
+    setIsPlaying(true);
+    playPhaseSpeech(selectedRobot, index, 'intro');
+  };
+
+  // Toggle Play / Pause
+  const handleTogglePlayPause = () => {
+    if (isPlaying) {
+      handleStopTour();
+    } else {
+      setIsPlaying(true);
+      playPhaseSpeech(selectedRobot, currentStepIndex, contentPhase);
+    }
+  };
+
+  // Step Controls
+  const handlePrevStep = () => {
+    if (currentStepIndex > 0) {
+      handleJumpToStep(currentStepIndex - 1);
+    }
+  };
+
+  const handleNextStep = () => {
+    if (selectedRobot?.steps && currentStepIndex < selectedRobot.steps.length - 1) {
+      handleJumpToStep(currentStepIndex + 1);
+    }
+  };
+
+  const handleReplayCurrentPhase = () => {
+    handleStopTour();
+    setIsPlaying(true);
+    playPhaseSpeech(selectedRobot, currentStepIndex, contentPhase);
+  };
+
+  const handleBackToGallery = () => {
+    handleStopTour();
+    setSelectedRobot(null);
+  };
+
+  const activeStep = selectedRobot?.steps?.[currentStepIndex] || null;
 
   return (
-    <div className="guided-tour-root">
-      {/* ── Top Header Bar ── */}
-      <header className="tour-top-header">
-        <button 
-          className="tour-back-btn" 
-          onClick={() => {
-            handleCleanup();
-            onNavigate('/');
-          }}
-          title="Return to Main Menu"
-        >
-          <ArrowLeft size={20} />
-          <span>BACK</span>
-        </button>
+    <div className="tour-kiosk-root">
+      {/* Cyber HUD Corner Accents */}
+      <div className="tour-hud-corners">
+        <div className="tour-hud-corner top-left">&gt;&gt;&gt;</div>
+        <div className="tour-hud-corner top-right">&lt;&lt;&lt;</div>
+        <div className="tour-hud-corner bottom-left">&gt;&gt;&gt;</div>
+        <div className="tour-hud-corner bottom-right">&lt;&lt;&lt;</div>
+      </div>
 
-        <div className="tour-title-group">
-          <h1>AUTONOMOUS GUIDED ROBOT TOUR</h1>
-          <div className="tour-status-badges">
-            <span className="tour-badge cyan">
-              <Compass size={14} />
-              <span>ROBOT NAV ENGINE</span>
-            </span>
-            <span className={`tour-badge ${isEspOnline ? 'green' : 'amber'}`}>
-              <Radio size={14} />
-              <span>{isEspOnline ? 'ESP32: ONLINE' : 'SIMULATION MODE'}</span>
-            </span>
-            <span className={`tour-state-pill ${tourState.toLowerCase()}`}>
-              {tourState === 'IDLE' && 'READY TO START'}
-              {tourState === 'NAVIGATING' && '🚗 DRIVING TO WAYPOINT...'}
-              {tourState === 'SPEAKING' && '🔊 AURRA NARRATING...'}
-              {tourState === 'ARRIVED' && '✨ WAYPOINT ARRIVAL'}
-              {tourState === 'PAUSED' && '⏸️ TOUR PAUSED'}
-              {tourState === 'EMERGENCY_STOP' && '🛑 EMERGENCY STOP'}
-            </span>
+      {/* Background Animated Atmosphere */}
+      <div className="tour-bg-grid" />
+      <div className="tour-bg-glow" />
+
+      {/* ============================================================== */}
+      {/* 1. GALLERY MODE: ROBOT SELECTION SCREEN */}
+      {/* ============================================================== */}
+      {!selectedRobot && (
+        <div className="tour-gallery-view">
+          <header className="tour-gallery-header">
+            <button
+              className="tour-back-btn"
+              onClick={() => onNavigate && onNavigate('/')}
+              title="Return to Home Screen"
+            >
+              <ArrowLeft size={18} />
+              <span>Back to Home</span>
+            </button>
+            <div className="tour-header-center">
+              <span className="tour-kiosk-badge">
+                <Compass size={14} />
+                <span>ROBOMIRACLE GUIDED TOUR</span>
+              </span>
+              <h1 className="tour-main-heading">Welcome to the Guided Tour</h1>
+              <p className="tour-main-subheading">
+                Select an intelligent humanoid or autonomous service robot to begin an interactive step-by-step voice walkthrough.
+              </p>
+            </div>
+            <div className="tour-header-spacer" />
+          </header>
+
+          {/* Robot Product Grid */}
+          <div className="tour-cards-grid">
+            {robots.map((robot) => (
+              <div
+                key={robot.id || robot.slug}
+                className="tour-robot-card"
+                onClick={() => handleSelectRobot(robot)}
+              >
+                <div className="tour-card-badge">{robot.badge || 'Autonomous Robot'}</div>
+                
+                <div className="tour-card-img-wrap">
+                  <img
+                    src={assetUrl(robot.image || FALLBACK_PLACEHOLDER)}
+                    alt={robot.title}
+                    className="tour-card-img"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = assetUrl(FALLBACK_PLACEHOLDER);
+                    }}
+                  />
+                  <div className="tour-card-scanline" />
+                </div>
+
+                <div className="tour-card-body">
+                  <h2 className="tour-card-title">{robot.title}</h2>
+                  <p className="tour-card-subtitle">{robot.subtitle || 'AI Guided Tour'}</p>
+                  
+                  <div className="tour-card-footer">
+                    <span className="tour-card-steps-count">
+                      <Sparkles size={13} color="#00ffff" />
+                      <span>{robot.steps?.length || 0} Tour Steps</span>
+                    </span>
+                    <button className="tour-launch-btn">
+                      <span>Start Tour</span>
+                      <ChevronRight size={15} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
+      )}
 
-        <button 
-          className="tour-estop-btn"
-          onClick={handleEmergencyStop}
-          title="Immediate Emergency Brake & Stop"
-        >
-          <AlertOctagon size={18} />
-          <span>E-STOP</span>
-        </button>
-      </header>
+      {/* ============================================================== */}
+      {/* 2. PRESENTATION MODE: 5-STEP INTERACTIVE WALKTHROUGH */}
+      {/* ============================================================== */}
+      {selectedRobot && (
+        <div className="tour-presentation-view">
+          {/* Top Bar Header */}
+          <header className="tour-presentation-header">
+            <button className="tour-back-btn" onClick={handleBackToGallery}>
+              <ArrowLeft size={18} />
+              <span>All Robots</span>
+            </button>
 
-      {/* ── Main Split Body ── */}
-      <div className="tour-main-body">
-        {/* Left Side: Interactive Holographic Facility Floorplan Map */}
-        <section className="tour-map-panel">
-          <div className="map-panel-header">
-            <span className="map-panel-title">
-              <MapPin size={16} color="#00ffff" />
-              <span>FACILITY WAYPOINT RADAR &amp; PATHFINDER</span>
-            </span>
-            <span className="map-telemetry">
-              RADAR: {radarDistance.front}cm FRONT | {radarDistance.back}cm REAR
-            </span>
-          </div>
+            <div className="tour-pres-title-wrap">
+              <span className="tour-pres-tag">{selectedRobot.badge || 'Robotics'}</span>
+              <h2 className="tour-pres-title">{selectedRobot.title}</h2>
+              <span className="tour-pres-subtitle">{selectedRobot.subtitle}</span>
+            </div>
 
-          <div className="holographic-map-container">
-            {/* SVG Interactive Cyber Floorplan */}
-            <svg className="facility-svg-map" viewBox="0 0 100 100">
-              <defs>
-                <linearGradient id="cyberPathGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#00ffff" stopOpacity="0.8" />
-                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.8" />
-                </linearGradient>
-                <filter id="cyberGlow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="1.5" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
+            <div className="tour-pres-actions">
+              <button
+                className={`tour-pres-speech-btn ${isSpeaking ? 'active' : ''}`}
+                onClick={handleReplayCurrentPhase}
+                title="Replay Voice Speech"
+              >
+                <Volume2 size={16} />
+                <span>{isSpeaking ? 'Speaking...' : 'Replay Audio'}</span>
+              </button>
+            </div>
+          </header>
 
-              {/* Grid Background Lines */}
-              <pattern id="gridPattern" width="10" height="10" patternUnits="userSpaceOnUse">
-                <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(0, 255, 255, 0.08)" strokeWidth="0.5" />
-              </pattern>
-              <rect width="100" height="100" fill="url(#gridPattern)" />
-
-              {/* Facility Boundary Walls */}
-              <rect x="5" y="10" width="90" height="80" rx="3" fill="none" stroke="rgba(56, 189, 248, 0.3)" strokeWidth="1" />
-              
-              {/* Internal Department Partitions */}
-              <line x1="50" y1="10" x2="50" y2="45" stroke="rgba(56, 189, 248, 0.2)" strokeWidth="0.8" strokeDasharray="2,2" />
-              <line x1="5" y1="50" x2="45" y2="50" stroke="rgba(56, 189, 248, 0.2)" strokeWidth="0.8" strokeDasharray="2,2" />
-              <line x1="55" y1="50" x2="95" y2="50" stroke="rgba(56, 189, 248, 0.2)" strokeWidth="0.8" strokeDasharray="2,2" />
-
-              {/* Connecting Laser Guide Path between stops */}
-              {stops.length > 1 && (
-                <polyline
-                  points={stops.map((s) => `${s.mapX || 50},${s.mapY || 50}`).join(' ')}
-                  fill="none"
-                  stroke="url(#cyberPathGrad)"
-                  strokeWidth="1.2"
-                  strokeDasharray="3,2"
-                  filter="url(#cyberGlow)"
-                  className="pulsing-tour-path"
-                />
-              )}
-
-              {/* Waypoint Markers */}
-              {stops.map((stop, idx) => {
-                const isActive = idx === currentIndex;
-                const isVisited = idx < currentIndex;
-                const x = stop.mapX || 50;
-                const y = stop.mapY || 50;
-
-                return (
-                  <g 
-                    key={stop.id || idx} 
-                    className={`waypoint-node ${isActive ? 'active' : ''}`}
-                    onClick={() => startTransitToStop(idx)}
-                  >
-                    {/* Outer Ping Ring for Active Node */}
-                    {isActive && (
-                      <circle cx={x} cy={y} r="6" fill="none" stroke="#00ffff" strokeWidth="0.8" className="ping-ring" />
-                    )}
-                    
-                    {/* Node Base Circle */}
-                    <circle 
-                      cx={x} 
-                      cy={y} 
-                      r={isActive ? 3.8 : 2.8} 
-                      fill={isActive ? (stop.rgbColor || '#00ffff') : (isVisited ? '#00ffff' : '#1e293b')} 
-                      stroke={isActive ? '#ffffff' : '#38bdf8'} 
-                      strokeWidth="0.8"
-                    />
-
-                    {/* Stop Number Label */}
-                    <text 
-                      x={x} 
-                      y={y + 1} 
-                      textAnchor="middle" 
-                      fontSize="2.2" 
-                      fontWeight="bold" 
-                      fill={isActive ? '#000000' : '#ffffff'}
-                    >
-                      {idx + 1}
-                    </text>
-
-                    {/* Stop Name Tag */}
-                    <text 
-                      x={x} 
-                      y={y - 4} 
-                      textAnchor="middle" 
-                      fontSize="2.2" 
-                      fill={isActive ? '#00ffff' : 'rgba(255, 255, 255, 0.7)'}
-                      fontWeight={isActive ? 'bold' : 'normal'}
-                    >
-                      {stop.name}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* Animated Robot Position Marker */}
-              {currentStop && (
-                <g 
-                  className="robot-position-marker"
-                  transform={`translate(${currentStop.mapX || 50}, ${currentStop.mapY || 50})`}
-                >
-                  <circle cx="0" cy="0" r="4.5" fill="none" stroke="#00ffff" strokeWidth="1" className="robot-radar-pulse" />
-                  <polygon points="0,-3.2 2.8,2.8 -2.8,2.8" fill="#00ffff" />
-                </g>
-              )}
-            </svg>
-
-            {/* Radar Proximity Obstacle Warning Banner */}
-            {obstacleWarning && (
-              <div className="tour-obstacle-alert">
-                <ShieldAlert size={22} className="alert-icon" />
-                <div>
-                  <strong>OBSTACLE DETECTED ({radarDistance.front}cm)</strong>
-                  <span>Tour paused. Clear path in front of Aurra to resume.</span>
-                </div>
-                <button className="resume-btn" onClick={handleResumeTour}>
-                  Resume
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Bottom Waypoint Step Pills */}
-          <div className="tour-waypoints-timeline">
-            {stops.map((stop, idx) => {
-              const isActive = idx === currentIndex;
-              const isPast = idx < currentIndex;
+          {/* Stepper Navigation Bar (1, 2, 3, 4, 5) */}
+          <div className="tour-stepper-bar">
+            {selectedRobot.steps?.map((step, idx) => {
+              const isCurrent = idx === currentStepIndex;
+              const isPast = idx < currentStepIndex;
               return (
-                <div 
-                  key={stop.id || idx} 
-                  className={`waypoint-step ${isActive ? 'active' : ''} ${isPast ? 'past' : ''}`}
-                  onClick={() => startTransitToStop(idx)}
-                >
-                  <div className="step-circle">
-                    {isPast ? <CheckCircle2 size={14} color="#10b981" /> : idx + 1}
+                <React.Fragment key={idx}>
+                  <div
+                    className={`tour-step-node ${isCurrent ? 'current' : ''} ${isPast ? 'done' : ''}`}
+                    onClick={() => handleJumpToStep(idx)}
+                    title={`Jump to Step ${idx + 1}: ${step.stepName}`}
+                  >
+                    <div className="tour-step-circle">
+                      {isPast ? <CheckCircle2 size={16} /> : <span>{idx + 1}</span>}
+                    </div>
+                    <span className="tour-step-label">{step.stepName || `Step ${idx + 1}`}</span>
                   </div>
-                  <span className="step-label">{stop.name}</span>
-                </div>
+                  {idx < selectedRobot.steps.length - 1 && (
+                    <div className={`tour-step-line ${idx < currentStepIndex ? 'done' : ''}`} />
+                  )}
+                </React.Fragment>
               );
             })}
           </div>
-        </section>
 
-        {/* Right Side: Active Waypoint Showcase & Audio Narration Card */}
-        <main className="tour-details-panel">
-          {currentStop ? (
-            <div className="exhibit-card">
-              {/* Exhibit Header */}
-              <div className="exhibit-header">
-                <div className="exhibit-index-badge">
-                  WAYPOINT {currentIndex + 1} OF {stops.length}
+          {/* Main 2-Column Presentation Stage */}
+          <div className="tour-stage-arena">
+            {/* Left Column: Robot Photo Showcase */}
+            <div className="tour-stage-left">
+              <div className="tour-photo-viewport">
+                <img
+                  key={`${currentStepIndex}-${activeStep?.image}`}
+                  src={assetUrl(activeStep?.image || selectedRobot.image || FALLBACK_PLACEHOLDER)}
+                  alt={activeStep?.stepName || selectedRobot.title}
+                  className="tour-photo-img"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = assetUrl(FALLBACK_PLACEHOLDER);
+                  }}
+                />
+                <div className="tour-photo-frame" />
+                <div className="tour-photo-caption">
+                  <Bot size={14} color="#00ffff" />
+                  <span>{activeStep?.stepName || selectedRobot.title}</span>
                 </div>
-                <span className="exhibit-area-pill">{currentStop.area}</span>
-              </div>
-
-              <h2 className="exhibit-title">{currentStop.name}</h2>
-
-              {/* Highlights Chips */}
-              {currentStop.highlights && currentStop.highlights.length > 0 && (
-                <div className="exhibit-highlights">
-                  {currentStop.highlights.map((item, i) => (
-                    <span key={i} className="highlight-tag">
-                      <Sparkles size={11} color="#00ffff" />
-                      <span>{item}</span>
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Aurra Spoken Narration Stream Box */}
-              <div className="narration-stream-box">
-                <div className="narration-stream-header">
-                  <div className="aurra-voice-indicator">
-                    <span className={`voice-dot ${tourState === 'SPEAKING' ? 'active' : ''}`} />
-                    <span className="voice-title">AURRA SPOKEN NARRATION</span>
-                  </div>
-                  {tourState === 'SPEAKING' && (
-                    <div className="sound-wave-bars">
-                      <span /><span /><span /><span /><span />
-                    </div>
-                  )}
-                </div>
-
-                <div className="narration-text">
-                  "{currentStop.narration || 'Proceeding along guided tour waypoint.'}"
-                </div>
-
-                <div className="narration-controls-row">
-                  <button 
-                    className="replay-speech-btn" 
-                    onClick={handleReplayNarration}
-                    title="Speak Narration Again"
-                  >
-                    <Volume2 size={16} />
-                    <span>Replay Voice</span>
-                  </button>
-                  <span className="duration-tag">
-                    EST. {currentStop.durationSec || 12}s PRESENTATION
-                  </span>
-                </div>
-              </div>
-
-              {/* Hardware & Servo Sync Card */}
-              <div className="hardware-telemetry-row">
-                <div className="hw-mini-card">
-                  <span className="hw-label">TARGET EYE RGB</span>
-                  <div className="rgb-color-badge">
-                    <span className="rgb-swatch" style={{ background: currentStop.rgbColor || '#00FFFF' }} />
-                    <strong>{currentStop.rgbColor || '#00FFFF'}</strong>
-                  </div>
-                </div>
-
-                <div className="hw-mini-card">
-                  <span className="hw-label">HEAD SERVO POSE</span>
-                  <strong>Tilt: {currentStop.servoTilt ?? 90}° | Pan: {currentStop.servoPan ?? 90}°</strong>
-                </div>
-
-                <div className="hw-mini-card">
-                  <span className="hw-label">TOUR TIME</span>
-                  <strong>{formatTime(elapsedSeconds)}</strong>
-                </div>
-              </div>
-
-              {/* Navigation Progress Bar while driving */}
-              {tourState === 'NAVIGATING' && (
-                <div className="transit-progress-container">
-                  <div className="transit-label">
-                    <span>TRANSIT TO WAYPOINT {currentIndex + 1}...</span>
-                    <span>{Math.round(transitProgress)}%</span>
-                  </div>
-                  <div className="transit-bar-track">
-                    <div className="transit-bar-fill" style={{ width: `${transitProgress}%` }} />
-                  </div>
-                </div>
-              )}
-
-              {/* Primary Tour Controls Action Bar */}
-              <div className="tour-actions-bar">
-                <button 
-                  className="tour-nav-btn" 
-                  onClick={handlePrevStop}
-                  disabled={currentIndex === 0 || tourState === 'NAVIGATING'}
-                  title="Previous Waypoint"
-                >
-                  <SkipBack size={18} />
-                  <span>PREV</span>
-                </button>
-
-                {tourState === 'IDLE' && (
-                  <button className="tour-primary-btn start" onClick={handleStartTour}>
-                    <Play size={20} />
-                    <span>START GUIDED TOUR</span>
-                  </button>
-                )}
-
-                {tourState === 'NAVIGATING' && (
-                  <button className="tour-primary-btn pause" onClick={handlePauseTour}>
-                    <Pause size={20} />
-                    <span>PAUSE TRANSIT</span>
-                  </button>
-                )}
-
-                {tourState === 'PAUSED' && (
-                  <button className="tour-primary-btn resume" onClick={handleResumeTour}>
-                    <Play size={20} />
-                    <span>RESUME TOUR</span>
-                  </button>
-                )}
-
-                {(tourState === 'ARRIVED' || tourState === 'SPEAKING') && (
-                  <button 
-                    className="tour-primary-btn next" 
-                    onClick={handleNextStop}
-                    title="Advance to next stop"
-                  >
-                    <span>NEXT WAYPOINT</span>
-                    <SkipForward size={20} />
-                  </button>
-                )}
-
-                <button 
-                  className="tour-nav-btn" 
-                  onClick={handleNextStop}
-                  disabled={currentIndex === stops.length - 1 && !config.tourLoopEnabled}
-                  title="Skip to Next Waypoint"
-                >
-                  <span>NEXT</span>
-                  <SkipForward size={18} />
-                </button>
               </div>
             </div>
-          ) : (
-            <div className="tour-empty-state">
-              <Compass size={48} color="#00ffff" />
-              <h3>No Tour Waypoints Found</h3>
-              <p>Configure waypoints in the Admin Dashboard to start the tour.</p>
+
+            {/* Right Column: 3-Phase Spoken Presentation Card */}
+            <div className="tour-stage-right">
+              <div className="tour-card-content-box">
+                {/* Step Header */}
+                <div className="tour-step-info-row">
+                  <span className="tour-step-badge">
+                    STEP {currentStepIndex + 1} OF {selectedRobot.steps?.length || 0}
+                  </span>
+                  <h3 className="tour-step-heading">{activeStep?.stepName}</h3>
+                </div>
+
+                {/* 3-Phase Tabs Indicator (Intro -> Main Content -> Thank You) */}
+                <div className="tour-phase-tabs">
+                  <button
+                    className={`tour-phase-tab ${contentPhase === 'intro' ? 'active' : ''}`}
+                    onClick={() => {
+                      setContentPhase('intro');
+                      playPhaseSpeech(selectedRobot, currentStepIndex, 'intro');
+                    }}
+                  >
+                    <span>1. Intro</span>
+                  </button>
+                  <button
+                    className={`tour-phase-tab ${contentPhase === 'mainContent' ? 'active' : ''}`}
+                    onClick={() => {
+                      setContentPhase('mainContent');
+                      playPhaseSpeech(selectedRobot, currentStepIndex, 'mainContent');
+                    }}
+                  >
+                    <span>2. Details</span>
+                  </button>
+                  <button
+                    className={`tour-phase-tab ${contentPhase === 'thankYou' ? 'active' : ''}`}
+                    onClick={() => {
+                      setContentPhase('thankYou');
+                      playPhaseSpeech(selectedRobot, currentStepIndex, 'thankYou');
+                    }}
+                  >
+                    <span>3. Summary</span>
+                  </button>
+                </div>
+
+                {/* Spoken Text Display Arena with Audio Wave */}
+                <div className="tour-speech-display">
+                  <div className="tour-wave-row">
+                    <span className="tour-phase-label-tag">
+                      {contentPhase === 'intro' && 'INTRODUCTION'}
+                      {contentPhase === 'mainContent' && 'MAIN HIGHLIGHTS & SPECS'}
+                      {contentPhase === 'thankYou' && 'STEP SUMMARY'}
+                    </span>
+                    {isSpeaking && (
+                      <div className="tour-mini-wave">
+                        <span className="bar" />
+                        <span className="bar" />
+                        <span className="bar" />
+                        <span className="bar" />
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="tour-speech-text">
+                    {contentPhase === 'intro' && (activeStep?.intro || 'Welcome to this step!')}
+                    {contentPhase === 'mainContent' && (activeStep?.mainContent || 'Details about this feature.')}
+                    {contentPhase === 'thankYou' && (activeStep?.thankYou || 'Thank you for exploring!')}
+                  </p>
+                </div>
+
+                {/* Completion Celebration Badge */}
+                {isCompleted && (
+                  <div className="tour-completion-banner">
+                    <Award size={24} color="#00ff88" />
+                    <div>
+                      <strong>Tour Complete!</strong>
+                      <p>You have explored all features of {selectedRobot.title}.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Stage Bottom Navigation Controls */}
+                <div className="tour-stage-controls">
+                  <button
+                    className="tour-ctrl-btn secondary"
+                    onClick={handlePrevStep}
+                    disabled={currentStepIndex === 0}
+                    title="Previous Step"
+                  >
+                    <SkipBack size={16} />
+                    <span>Previous</span>
+                  </button>
+
+                  <button
+                    className={`tour-ctrl-btn primary ${isPlaying ? 'pause' : 'play'}`}
+                    onClick={handleTogglePlayPause}
+                  >
+                    {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                    <span>{isPlaying ? 'Pause Speech' : 'Play Step'}</span>
+                  </button>
+
+                  <button
+                    className="tour-ctrl-btn secondary"
+                    onClick={handleNextStep}
+                    disabled={!selectedRobot.steps || currentStepIndex >= selectedRobot.steps.length - 1}
+                    title="Next Step"
+                  >
+                    <span>Next</span>
+                    <SkipForward size={16} />
+                  </button>
+
+                  <button
+                    className="tour-ctrl-btn icon-only"
+                    onClick={() => handleJumpToStep(0)}
+                    title="Restart Tour from Step 1"
+                  >
+                    <RotateCcw size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Toast Countdown Overlay ("Starting in 3... 2... 1...") */}
+          {toastCountdown !== null && (
+            <div className="tour-toast-overlay">
+              <div className="tour-toast-box">
+                <span className="tour-toast-badge">STARTING GUIDED TOUR</span>
+                <div className="tour-toast-number">{toastCountdown}</div>
+                <p>Welcome to {selectedRobot.title} walkthrough</p>
+              </div>
             </div>
           )}
-        </main>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -51,7 +51,8 @@ import {
   ChevronUp,
   ChevronDown,
   MapPin,
-  Navigation
+  Navigation,
+  Layers
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { llmService } from '../../services/llmService';
@@ -64,6 +65,7 @@ import {
   offlineVisitorService,
   offlineWebLinksService,
   offlineTourService,
+  offlineRobotTourService,
   offlineBackupService
 } from '../../db/offlineServices';
 import { devSettingsService } from '../../services/devSettingsService';
@@ -71,6 +73,7 @@ import { esp32Service } from '../../services/esp32Service';
 import { raspberryPiService } from '../../services/raspberryPiService';
 import { kioskConfigService } from '../../services/kioskConfigService';
 import { speakWithVoice } from '../../utils/speechSynthesis';
+import { assetUrl } from '../../utils/platform';
 import { logger } from '../../services/logger';
 import './AdminDashboard.css';
 
@@ -181,6 +184,32 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   const [tourFormMapY, setTourFormMapY] = useState(50);
   const [tourTestingSpeechId, setTourTestingSpeechId] = useState(null);
 
+  // Robomiracle Classic Robot Showcase Tour state
+  const [robotTours, setRobotTours] = useState([]);
+  const [selectedRobotForSteps, setSelectedRobotForSteps] = useState(null);
+  const [tourSubTab, setTourSubTab] = useState('robots'); // 'robots' | 'waypoints'
+
+  // Robot Modal state
+  const [showRobotModal, setShowRobotModal] = useState(false);
+  const [robotModalMode, setRobotModalMode] = useState('add');
+  const [robotFormId, setRobotFormId] = useState('');
+  const [robotFormTitle, setRobotFormTitle] = useState('');
+  const [robotFormSubtitle, setRobotFormSubtitle] = useState('');
+  const [robotFormSlug, setRobotFormSlug] = useState('');
+  const [robotFormBadge, setRobotFormBadge] = useState('Autonomous Robot');
+  const [robotFormImage, setRobotFormImage] = useState('/aurra/hero.webp');
+
+  // Step Modal state
+  const [showStepModal, setShowStepModal] = useState(false);
+  const [stepModalMode, setStepModalMode] = useState('add');
+  const [stepFormIndex, setStepFormIndex] = useState(null);
+  const [stepFormName, setStepFormName] = useState('');
+  const [stepFormIntro, setStepFormIntro] = useState('');
+  const [stepFormMainContent, setStepFormMainContent] = useState('');
+  const [stepFormThankYou, setStepFormThankYou] = useState('');
+  const [stepFormImage, setStepFormImage] = useState('');
+  const [testingStepPhase, setTestingStepPhase] = useState(null);
+
   const showStatus = (msg) => {
     setStatusMsg(msg);
     setTimeout(() => setStatusMsg(''), 3000);
@@ -212,6 +241,9 @@ export default function AdminDashboard({ onNavigate, onClose }) {
 
       const stopsList = await offlineTourService.getStops();
       setTourStops(stopsList || []);
+
+      const robotsList = await offlineRobotTourService.getRobots();
+      setRobotTours(robotsList || []);
 
       setDevSettings(devSettingsService.getSettings());
     } catch (e) {
@@ -892,6 +924,223 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     setTourTestingSpeechId('modal');
     speakWithVoice(tourFormNarration, {
       onEnd: () => setTourTestingSpeechId(null),
+    });
+  };
+
+  // ── Robomiracle Classic Robot Showcase Handlers ──
+  const handleOpenAddRobot = () => {
+    setRobotModalMode('add');
+    setRobotFormId('');
+    setRobotFormTitle('');
+    setRobotFormSubtitle('');
+    setRobotFormSlug('');
+    setRobotFormBadge('Autonomous Robot');
+    setRobotFormImage('/aurra/hero.webp');
+    setShowRobotModal(true);
+  };
+
+  const handleOpenEditRobot = (robot) => {
+    setRobotModalMode('edit');
+    setRobotFormId(robot.id);
+    setRobotFormTitle(robot.title || '');
+    setRobotFormSubtitle(robot.subtitle || '');
+    setRobotFormSlug(robot.slug || '');
+    setRobotFormBadge(robot.badge || 'Robotics');
+    setRobotFormImage(robot.image || '/aurra/hero.webp');
+    setShowRobotModal(true);
+  };
+
+  const handleSaveRobot = async (e) => {
+    e?.preventDefault();
+    if (!robotFormTitle.trim()) {
+      showStatus('Robot title is required');
+      return;
+    }
+
+    try {
+      const data = {
+        title: robotFormTitle.trim(),
+        subtitle: robotFormSubtitle.trim(),
+        slug: robotFormSlug.trim() || robotFormTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        badge: robotFormBadge.trim(),
+        image: robotFormImage.trim() || '/aurra/hero.webp',
+      };
+
+      if (robotModalMode === 'edit' && robotFormId) {
+        await offlineRobotTourService.updateRobot(robotFormId, data);
+        showStatus('Robot details updated!');
+      } else {
+        await offlineRobotTourService.addRobot(data);
+        showStatus('New robot added to tour showcase!');
+      }
+
+      setShowRobotModal(false);
+      const updated = await offlineRobotTourService.getRobots();
+      setRobotTours(updated || []);
+      if (selectedRobotForSteps) {
+        const fresh = await offlineRobotTourService.getRobotById(selectedRobotForSteps.id);
+        setSelectedRobotForSteps(fresh || null);
+      }
+    } catch (err) {
+      showStatus(`Failed to save robot: ${err.message}`);
+    }
+  };
+
+  const handleDeleteRobot = async (id, title) => {
+    if (window.confirm(`Delete robot "${title}" and all its tour steps?`)) {
+      try {
+        await offlineRobotTourService.deleteRobot(id);
+        const updated = await offlineRobotTourService.getRobots();
+        setRobotTours(updated || []);
+        if (selectedRobotForSteps?.id === id) {
+          setSelectedRobotForSteps(null);
+        }
+        showStatus(`Deleted robot: ${title}`);
+      } catch (err) {
+        showStatus(`Delete failed: ${err.message}`);
+      }
+    }
+  };
+
+  const handleToggleRobotEnabled = async (id, currentEnabled) => {
+    try {
+      await offlineRobotTourService.toggleRobotEnabled(id, !currentEnabled);
+      const updated = await offlineRobotTourService.getRobots();
+      setRobotTours(updated || []);
+    } catch (err) {
+      showStatus(`Toggle failed: ${err.message}`);
+    }
+  };
+
+  const handleMoveRobot = async (index, direction) => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= robotTours.length) return;
+
+    const newRobots = [...robotTours];
+    const [moved] = newRobots.splice(index, 1);
+    newRobots.splice(targetIndex, 0, moved);
+
+    const orderedIds = newRobots.map((r) => r.id);
+    const updated = await offlineRobotTourService.reorderRobots(orderedIds);
+    setRobotTours(updated || []);
+    showStatus('Robot order updated!');
+  };
+
+  const handleResetRobotTours = async () => {
+    if (window.confirm('Reset all robot showcase tours and steps to factory defaults?')) {
+      try {
+        const restored = await offlineRobotTourService.restoreDefaultRobots();
+        setRobotTours(restored || []);
+        setSelectedRobotForSteps(null);
+        showStatus('Restored default robots and 5-step presentations!');
+      } catch (err) {
+        showStatus(`Restore failed: ${err.message}`);
+      }
+    }
+  };
+
+  // Step Editing Handlers
+  const handleOpenAddStep = () => {
+    if (!selectedRobotForSteps) return;
+    setStepModalMode('add');
+    setStepFormIndex(null);
+    setStepFormName(`Step ${(selectedRobotForSteps.steps?.length || 0) + 1}`);
+    setStepFormIntro('');
+    setStepFormMainContent('');
+    setStepFormThankYou('');
+    setStepFormImage(selectedRobotForSteps.image || '/aurra/hero.webp');
+    setShowStepModal(true);
+  };
+
+  const handleOpenEditStep = (step, index) => {
+    setStepModalMode('edit');
+    setStepFormIndex(index);
+    setStepFormName(step.stepName || `Step ${index + 1}`);
+    setStepFormIntro(step.intro || '');
+    setStepFormMainContent(step.mainContent || '');
+    setStepFormThankYou(step.thankYou || '');
+    setStepFormImage(step.image || selectedRobotForSteps?.image || '');
+    setShowStepModal(true);
+  };
+
+  const handleSaveStep = async (e) => {
+    e?.preventDefault();
+    if (!selectedRobotForSteps) return;
+    if (!stepFormName.trim()) {
+      showStatus('Step name is required');
+      return;
+    }
+
+    try {
+      const currentSteps = [...(selectedRobotForSteps.steps || [])];
+      const stepData = {
+        stepName: stepFormName.trim(),
+        intro: stepFormIntro.trim(),
+        mainContent: stepFormMainContent.trim(),
+        thankYou: stepFormThankYou.trim(),
+        image: stepFormImage.trim() || selectedRobotForSteps.image || '/aurra/hero.webp',
+      };
+
+      if (stepModalMode === 'edit' && stepFormIndex !== null) {
+        currentSteps[stepFormIndex] = { ...currentSteps[stepFormIndex], ...stepData };
+      } else {
+        currentSteps.push(stepData);
+      }
+
+      const updatedRobot = await offlineRobotTourService.saveRobotSteps(selectedRobotForSteps.id, currentSteps);
+      setSelectedRobotForSteps(updatedRobot);
+      setShowStepModal(false);
+
+      const all = await offlineRobotTourService.getRobots();
+      setRobotTours(all || []);
+      showStatus('Tour step saved successfully!');
+    } catch (err) {
+      showStatus(`Failed to save step: ${err.message}`);
+    }
+  };
+
+  const handleDeleteStep = async (index) => {
+    if (!selectedRobotForSteps) return;
+    if (window.confirm('Delete this tour step?')) {
+      try {
+        const currentSteps = [...(selectedRobotForSteps.steps || [])];
+        currentSteps.splice(index, 1);
+        const updatedRobot = await offlineRobotTourService.saveRobotSteps(selectedRobotForSteps.id, currentSteps);
+        setSelectedRobotForSteps(updatedRobot);
+        const all = await offlineRobotTourService.getRobots();
+        setRobotTours(all || []);
+        showStatus('Step deleted');
+      } catch (err) {
+        showStatus(`Delete failed: ${err.message}`);
+      }
+    }
+  };
+
+  const handleMoveStep = async (index, direction) => {
+    if (!selectedRobotForSteps) return;
+    const steps = [...(selectedRobotForSteps.steps || [])];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= steps.length) return;
+
+    const [moved] = steps.splice(index, 1);
+    steps.splice(targetIndex, 0, moved);
+
+    const updatedRobot = await offlineRobotTourService.saveRobotSteps(selectedRobotForSteps.id, steps);
+    setSelectedRobotForSteps(updatedRobot);
+    const all = await offlineRobotTourService.getRobots();
+    setRobotTours(all || []);
+    showStatus('Step order updated');
+  };
+
+  const handleTestStepSpeech = (text, phaseKey) => {
+    if (!text?.trim()) {
+      showStatus('No text for this speech phase');
+      return;
+    }
+    setTestingStepPhase(phaseKey);
+    speakWithVoice(text, {
+      onEnd: () => setTestingStepPhase(null),
+      onError: () => setTestingStepPhase(null),
     });
   };
 
@@ -2896,288 +3145,371 @@ export default function AdminDashboard({ onNavigate, onClose }) {
           {/* 7. GUIDED ROBOT TOUR TAB */}
           {activeTab === 'tour' && (
             <div className="adm-tab-panel">
-              {/* Tour Top Action Banner */}
               <div className="adm-card-panel">
+                {/* Header & Sub-Tab Switcher */}
                 <div className="adm-panel-header">
                   <div>
-                    <h3 className="adm-panel-title">Autonomous Guided Robot Tour & Waypoints</h3>
+                    <h3 className="adm-panel-title">Robomiracle Guided Robot Tours & Presentations</h3>
                     <p className="adm-panel-desc">
-                      Configure facility waypoints, spoken narrations, head servo angles, LED eye colors, and safety radar braking for autonomous robot guided tours.
+                      Customize the robot product cards (Aurra, Nexus, Nova, Dine, Gi), step-by-step presentation walkthroughs, and 3-phase voice narrations.
                     </p>
                   </div>
                   <div className="adm-tour-actions-header">
                     <button
                       className="adm-btn-secondary"
                       onClick={() => onNavigate && onNavigate('/guided-tour')}
-                      title="Launch Guided Tour screen on Kiosk"
+                      title="Launch Guided Tour on Kiosk"
                     >
                       <Navigation size={16} />
                       <span>Launch on Kiosk</span>
                     </button>
                     <button
                       className="adm-btn-secondary"
-                      onClick={handleResetTourStops}
-                      title="Restore factory default 5 facility waypoints"
+                      onClick={handleResetRobotTours}
+                      title="Restore factory default 5 robots and steps"
                     >
                       <RotateCcw size={16} />
-                      <span>Reset Defaults</span>
+                      <span>Reset Robots</span>
                     </button>
                     <button
                       className="adm-add-btn"
-                      onClick={handleOpenAddTourStop}
+                      onClick={handleOpenAddRobot}
                     >
                       <Plus size={16} />
-                      <span>Add Waypoint</span>
+                      <span>Add Robot</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Global Hardware & Safety Settings Card */}
-                <div className="adm-tour-global-settings">
-                  <h4 className="adm-sub-title">Global Tour Dynamics & Safety Parameters</h4>
-                  <div className="adm-tour-settings-grid">
-                    {/* Cruise Motor Speed */}
-                    <div className="adm-tour-setting-item">
-                      <div className="adm-setting-info">
-                        <label>Cruise Motor Speed (PWM)</label>
-                        <span className="adm-setting-value">{kioskConfig.tourSpeed || 160} / 255</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="100"
-                        max="240"
-                        step="5"
-                        value={kioskConfig.tourSpeed || 160}
-                        onChange={(e) => handleUpdateKioskConfig({ tourSpeed: Number(e.target.value) })}
-                        className="adm-range-slider"
-                      />
-                      <span className="adm-setting-hint">Speed at which robot moves between waypoints (100 = gentle, 220 = fast)</span>
-                    </div>
-
-                    {/* Radar Collision Brake Distance */}
-                    <div className="adm-tour-setting-item">
-                      <div className="adm-setting-info">
-                        <label>Radar Obstacle Brake Distance</label>
-                        <span className="adm-setting-value">{kioskConfig.tourObstacleDistanceCm || 30} cm</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="15"
-                        max="60"
-                        step="5"
-                        value={kioskConfig.tourObstacleDistanceCm || 30}
-                        onChange={(e) => handleUpdateKioskConfig({ tourObstacleDistanceCm: Number(e.target.value) })}
-                        className="adm-range-slider"
-                      />
-                      <span className="adm-setting-hint">Robot auto-pauses when ultrasonic sensor detects person or object closer than this</span>
-                    </div>
-
-                    {/* Auto-announce Narration Toggle */}
-                    <div className="adm-tour-toggle-item">
-                      <div className="adm-setting-info">
-                        <strong>Auto-Announce Waypoint Narration</strong>
-                        <p>Speak stop speech automatically via TTS upon waypoint arrival</p>
-                      </div>
-                      <button
-                        className={`adm-switch-btn ${kioskConfig.tourAutoAnnounce !== false ? 'active' : ''}`}
-                        onClick={() => handleUpdateKioskConfig({ tourAutoAnnounce: !kioskConfig.tourAutoAnnounce })}
-                      >
-                        <div className="adm-switch-thumb" />
-                        <span className="adm-switch-text">{kioskConfig.tourAutoAnnounce !== false ? 'AUTO ON' : 'MANUAL'}</span>
-                      </button>
-                    </div>
-
-                    {/* Arrival Chime Toggle */}
-                    <div className="adm-tour-toggle-item">
-                      <div className="adm-setting-info">
-                        <strong>Waypoint Arrival Chime</strong>
-                        <p>Play synthetic dual-tone harmonic chime when reaching waypoint</p>
-                      </div>
-                      <button
-                        className={`adm-switch-btn ${kioskConfig.tourArrivalChime !== false ? 'active' : ''}`}
-                        onClick={() => handleUpdateKioskConfig({ tourArrivalChime: !kioskConfig.tourArrivalChime })}
-                      >
-                        <div className="adm-switch-thumb" />
-                        <span className="adm-switch-text">{kioskConfig.tourArrivalChime !== false ? 'CHIME ON' : 'SILENT'}</span>
-                      </button>
-                    </div>
-
-                    {/* Loop Tour Toggle */}
-                    <div className="adm-tour-toggle-item">
-                      <div className="adm-setting-info">
-                        <strong>Continuous Loop Mode</strong>
-                        <p>Automatically cycle back to stop #1 after concluding the final stop</p>
-                      </div>
-                      <button
-                        className={`adm-switch-btn ${kioskConfig.tourLoopEnabled ? 'active' : ''}`}
-                        onClick={() => handleUpdateKioskConfig({ tourLoopEnabled: !kioskConfig.tourLoopEnabled })}
-                      >
-                        <div className="adm-switch-thumb" />
-                        <span className="adm-switch-text">{kioskConfig.tourLoopEnabled ? 'LOOP ON' : 'STOP AT END'}</span>
-                      </button>
-                    </div>
-
-                    {/* Voice Navigation Toggle */}
-                    <div className="adm-tour-toggle-item">
-                      <div className="adm-setting-info">
-                        <strong>Voice Command Tour Navigation</strong>
-                        <p>Allow visitors to say "Next Stop", "Previous Stop", "Pause Tour"</p>
-                      </div>
-                      <button
-                        className={`adm-switch-btn ${kioskConfig.tourVoiceNavEnabled !== false ? 'active' : ''}`}
-                        onClick={() => handleUpdateKioskConfig({ tourVoiceNavEnabled: !kioskConfig.tourVoiceNavEnabled })}
-                      >
-                        <div className="adm-switch-thumb" />
-                        <span className="adm-switch-text">{kioskConfig.tourVoiceNavEnabled !== false ? 'VOICE ON' : 'OFF'}</span>
-                      </button>
-                    </div>
-                  </div>
+                {/* Sub-Tabs: Robot Showcase vs Facility Waypoints */}
+                <div className="adm-subtab-strip">
+                  <button
+                    className={`adm-subtab-btn ${tourSubTab === 'robots' ? 'active' : ''}`}
+                    onClick={() => {
+                      setTourSubTab('robots');
+                      setSelectedRobotForSteps(null);
+                    }}
+                  >
+                    <Bot size={15} />
+                    <span>Robot Showcase Tours ({robotTours.length})</span>
+                  </button>
+                  <button
+                    className={`adm-subtab-btn ${tourSubTab === 'waypoints' ? 'active' : ''}`}
+                    onClick={() => setTourSubTab('waypoints')}
+                  >
+                    <Compass size={15} />
+                    <span>Facility Waypoints & Radar ({tourStops.length})</span>
+                  </button>
                 </div>
 
-                {/* Waypoints List */}
-                <div className="adm-tour-list-wrap">
-                  <div className="adm-tour-list-header">
-                    <div>
-                      <h4 className="adm-sub-title">Facility Waypoints ({tourStops.length} Stops Configured)</h4>
-                      <p className="adm-sub-desc">Use arrow buttons to adjust waypoint progression sequence</p>
-                    </div>
-                  </div>
-
-                  {tourStops.length === 0 ? (
-                    <div className="adm-empty-state">
-                      <Compass size={48} color="#00ffff" />
-                      <h4>No Tour Waypoints Found</h4>
-                      <p>Add custom facility waypoints or restore default factory tour stops.</p>
-                      <button className="adm-submit-btn" onClick={handleResetTourStops}>
-                        <RotateCcw size={16} />
-                        <span>Restore Default Stops</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="adm-tour-stops-list">
-                      {tourStops.map((stop, index) => (
-                        <div
-                          key={stop.id}
-                          className={`adm-tour-stop-card ${!stop.isEnabled ? 'disabled' : ''}`}
-                          style={{ '--stop-rgb': stop.rgbColor || '#00FFFF' }}
-                        >
-                          {/* Order & Reorder Controls */}
-                          <div className="adm-tour-order-col">
-                            <button
-                              className="adm-mini-arrow"
-                              disabled={index === 0}
-                              onClick={() => handleMoveTourStop(index, 'up')}
-                              title="Move Stop Up"
+                {/* ============================================================== */}
+                {/* SUBTAB 1: ROBOT SHOWCASE TOURS (CLASSIC REQUESTED FORMAT)     */}
+                {/* ============================================================== */}
+                {tourSubTab === 'robots' && (
+                  <div className="adm-robot-tour-admin-wrap">
+                    {/* View A: Robots Cards List */}
+                    {!selectedRobotForSteps ? (
+                      <div className="adm-robots-list-arena">
+                        <div className="adm-robots-grid">
+                          {robotTours.map((robot, index) => (
+                            <div
+                              key={robot.id || robot.slug}
+                              className={`adm-robot-admin-card ${!robot.isEnabled ? 'disabled' : ''}`}
                             >
-                              <ChevronUp size={16} />
-                            </button>
-                            <span className="adm-tour-index-badge">#{index + 1}</span>
-                            <button
-                              className="adm-mini-arrow"
-                              disabled={index === tourStops.length - 1}
-                              onClick={() => handleMoveTourStop(index, 'down')}
-                              title="Move Stop Down"
-                            >
-                              <ChevronDown size={16} />
-                            </button>
-                          </div>
-
-                          {/* Waypoint Main Details */}
-                          <div className="adm-tour-stop-body">
-                            <div className="adm-tour-stop-head">
-                              <div className="adm-tour-stop-title-group">
-                                <h4 className="adm-tour-stop-name">{stop.name}</h4>
-                                {stop.area && <span className="adm-tour-stop-area">{stop.area}</span>}
-                              </div>
-                              <div className="adm-tour-telemetry-tags">
-                                <span className="adm-telemetry-pill map-pos">
-                                  <MapPin size={12} />
-                                  <span>X: {stop.mapX ?? 50}%, Y: {stop.mapY ?? 50}%</span>
-                                </span>
-                                <span
-                                  className="adm-telemetry-pill rgb-tag"
-                                  style={{ borderColor: `${stop.rgbColor || '#00ffff'}66` }}
-                                >
-                                  <span
-                                    className="adm-color-dot"
-                                    style={{ backgroundColor: stop.rgbColor || '#00ffff' }}
+                              <div className="adm-robot-card-top">
+                                <div className="adm-robot-thumb-wrap">
+                                  <img
+                                    src={assetUrl(robot.image || '/aurra/hero.webp')}
+                                    alt={robot.title}
+                                    className="adm-robot-thumb"
+                                    onError={(e) => { e.target.src = assetUrl('/aurra/hero.webp'); }}
                                   />
-                                  <span>{stop.rgbColor || '#00ffff'}</span>
-                                </span>
-                                <span className="adm-telemetry-pill servo-tag">
-                                  Tilt: {stop.servoTilt ?? 90}° / Pan: {stop.servoPan ?? 90}°
-                                </span>
-                                <span className="adm-telemetry-pill duration-tag">
-                                  {stop.durationSec || 12}s
-                                </span>
+                                </div>
+                                <div className="adm-robot-info-col">
+                                  <div className="adm-robot-title-row">
+                                    <h4 className="adm-robot-title">{robot.title}</h4>
+                                    <span className="adm-robot-badge">{robot.badge || 'Robotics'}</span>
+                                  </div>
+                                  <span className="adm-robot-subtitle">{robot.subtitle}</span>
+                                  <div className="adm-robot-meta-row">
+                                    <span className="adm-robot-steps-pill">
+                                      <Layers size={13} color="#00ffff" />
+                                      <strong>{robot.steps?.length || 0}</strong> Tour Steps
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="adm-robot-card-actions">
+                                <div className="adm-switch-wrap" title={robot.isEnabled ? 'Active on Kiosk' : 'Hidden on Kiosk'}>
+                                  <button
+                                    className={`adm-switch-btn ${robot.isEnabled ? 'active' : ''}`}
+                                    onClick={() => handleToggleRobotEnabled(robot.id, robot.isEnabled)}
+                                  >
+                                    <div className="adm-switch-thumb" />
+                                  </button>
+                                  <span className="adm-switch-label">{robot.isEnabled ? 'Active' : 'Hidden'}</span>
+                                </div>
+
+                                <div className="adm-robot-btn-group">
+                                  <button
+                                    className="adm-mini-btn customize-steps"
+                                    onClick={() => setSelectedRobotForSteps(robot)}
+                                    title="Edit 5-step walkthrough, photos & speech narrations"
+                                  >
+                                    <Layers size={14} />
+                                    <span>Customize Steps ({robot.steps?.length || 0})</span>
+                                  </button>
+                                  <button
+                                    className="adm-mini-btn edit"
+                                    onClick={() => handleOpenEditRobot(robot)}
+                                    title="Edit robot info"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                  <button
+                                    className="adm-mini-btn danger"
+                                    onClick={() => handleDeleteRobot(robot.id, robot.title)}
+                                    title="Delete robot"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
                               </div>
                             </div>
-
-                            {/* Spoken Narration Quote Preview */}
-                            {stop.narration && (
-                              <div className="adm-tour-narration-preview">
-                                <Volume2 size={14} className="adm-tour-narr-icon" />
-                                <p>"{stop.narration}"</p>
-                              </div>
-                            )}
-
-                            {/* Highlights pills */}
-                            {Array.isArray(stop.highlights) && stop.highlights.length > 0 && (
-                              <div className="adm-tour-highlights-row">
-                                {stop.highlights.map((h, i) => (
-                                  <span key={i} className="adm-tour-highlight-badge">
-                                    {h}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      /* View B: Step Customizer for Selected Robot */
+                      <div className="adm-steps-manager-wrap">
+                        <div className="adm-steps-manager-header">
+                          <button
+                            className="adm-btn-secondary"
+                            onClick={() => setSelectedRobotForSteps(null)}
+                          >
+                            <ArrowLeft size={16} />
+                            <span>Back to All Robots</span>
+                          </button>
+                          <div className="adm-steps-manager-titles">
+                            <h4>Customizing Steps: <strong>{selectedRobotForSteps.title}</strong></h4>
+                            <span className="adm-sub-desc">
+                              {selectedRobotForSteps.steps?.length || 0} steps configured with 3-phase voice AI
+                            </span>
                           </div>
+                          <button
+                            className="adm-add-btn"
+                            onClick={handleOpenAddStep}
+                          >
+                            <Plus size={16} />
+                            <span>Add Tour Step</span>
+                          </button>
+                        </div>
 
-                          {/* Stop Actions */}
-                          <div className="adm-tour-stop-actions">
-                            <div className="adm-switch-wrap" title={stop.isEnabled ? 'Included in Tour' : 'Skipped in Tour'}>
-                              <button
-                                className={`adm-switch-btn ${stop.isEnabled ? 'active' : ''}`}
-                                onClick={() => handleToggleTourStopEnabled(stop.id, stop.isEnabled)}
-                              >
-                                <div className="adm-switch-thumb" />
-                              </button>
-                              <span className="adm-switch-label">
-                                {stop.isEnabled ? 'Active' : 'Skipped'}
-                              </span>
+                        {(!selectedRobotForSteps.steps || selectedRobotForSteps.steps.length === 0) ? (
+                          <div className="adm-empty-state">
+                            <Layers size={40} color="#00ffff" />
+                            <h4>No Steps Configured</h4>
+                            <p>Add tour steps with photos and 3-phase speech (Intro, Main Content, Thank You).</p>
+                            <button className="adm-submit-btn" onClick={handleOpenAddStep}>
+                              <Plus size={16} />
+                              <span>Add First Step</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="adm-steps-list">
+                            {selectedRobotForSteps.steps.map((step, idx) => (
+                              <div key={idx} className="adm-step-admin-card">
+                                <div className="adm-step-order-col">
+                                  <button
+                                    className="adm-mini-arrow"
+                                    disabled={idx === 0}
+                                    onClick={() => handleMoveStep(idx, 'up')}
+                                  >
+                                    <ChevronUp size={16} />
+                                  </button>
+                                  <span className="adm-step-num-badge">#{idx + 1}</span>
+                                  <button
+                                    className="adm-mini-arrow"
+                                    disabled={idx === selectedRobotForSteps.steps.length - 1}
+                                    onClick={() => handleMoveStep(idx, 'down')}
+                                  >
+                                    <ChevronDown size={16} />
+                                  </button>
+                                </div>
+
+                                <div className="adm-step-thumb-col">
+                                  <img
+                                    src={step.image || selectedRobotForSteps.image || '/aurra/hero.webp'}
+                                    alt={step.stepName}
+                                    className="adm-step-thumb"
+                                    onError={(e) => { e.target.src = '/aurra/hero.webp'; }}
+                                  />
+                                </div>
+
+                                <div className="adm-step-body-col">
+                                  <div className="adm-step-name-row">
+                                    <h4 className="adm-step-name">{step.stepName || `Step ${idx + 1}`}</h4>
+                                    <span className="adm-step-img-tag">{step.image || 'default image'}</span>
+                                  </div>
+
+                                  <div className="adm-step-phases-grid">
+                                    <div className="adm-phase-box">
+                                      <div className="adm-phase-head">
+                                        <span className="adm-phase-badge intro">1. INTRO</span>
+                                        <button
+                                          type="button"
+                                          className={`adm-phase-test-btn ${testingStepPhase === `intro-${idx}` ? 'active' : ''}`}
+                                          onClick={() => handleTestStepSpeech(step.intro, `intro-${idx}`)}
+                                          title="Test Intro Speech"
+                                        >
+                                          <Volume2 size={12} />
+                                        </button>
+                                      </div>
+                                      <p>{step.intro || <em>No intro text</em>}</p>
+                                    </div>
+
+                                    <div className="adm-phase-box">
+                                      <div className="adm-phase-head">
+                                        <span className="adm-phase-badge main">2. MAIN CONTENT</span>
+                                        <button
+                                          type="button"
+                                          className={`adm-phase-test-btn ${testingStepPhase === `main-${idx}` ? 'active' : ''}`}
+                                          onClick={() => handleTestStepSpeech(step.mainContent, `main-${idx}`)}
+                                          title="Test Main Content Speech"
+                                        >
+                                          <Volume2 size={12} />
+                                        </button>
+                                      </div>
+                                      <p>{step.mainContent || <em>No main content text</em>}</p>
+                                    </div>
+
+                                    <div className="adm-phase-box">
+                                      <div className="adm-phase-head">
+                                        <span className="adm-phase-badge thank">3. THANK YOU</span>
+                                        <button
+                                          type="button"
+                                          className={`adm-phase-test-btn ${testingStepPhase === `thank-${idx}` ? 'active' : ''}`}
+                                          onClick={() => handleTestStepSpeech(step.thankYou, `thank-${idx}`)}
+                                          title="Test Thank You Speech"
+                                        >
+                                          <Volume2 size={12} />
+                                        </button>
+                                      </div>
+                                      <p>{step.thankYou || <em>No thank you text</em>}</p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="adm-step-actions-col">
+                                  <button
+                                    className="adm-mini-btn edit"
+                                    onClick={() => handleOpenEditStep(step, idx)}
+                                    title="Edit step details & speech"
+                                  >
+                                    <Edit2 size={14} />
+                                    <span>Edit</span>
+                                  </button>
+                                  <button
+                                    className="adm-mini-btn danger"
+                                    onClick={() => handleDeleteStep(idx)}
+                                    title="Delete step"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ============================================================== */}
+                {/* SUBTAB 2: FACILITY WAYPOINTS & RADAR (FLOORPLAN MODE)          */}
+                {/* ============================================================== */}
+                {tourSubTab === 'waypoints' && (
+                  <div className="adm-tour-waypoints-wrap">
+                    {/* Global Hardware & Safety Settings Card */}
+                    <div className="adm-tour-global-settings">
+                      <h4 className="adm-sub-title">Global Tour Dynamics & Safety Parameters</h4>
+                      <div className="adm-tour-settings-grid">
+                        <div className="adm-tour-setting-item">
+                          <div className="adm-setting-info">
+                            <label>Cruise Motor Speed (PWM)</label>
+                            <span className="adm-setting-value">{kioskConfig.tourSpeed || 160} / 255</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="100"
+                            max="240"
+                            step="5"
+                            value={kioskConfig.tourSpeed || 160}
+                            onChange={(e) => handleUpdateKioskConfig({ tourSpeed: Number(e.target.value) })}
+                            className="adm-range-slider"
+                          />
+                        </div>
+
+                        <div className="adm-tour-setting-item">
+                          <div className="adm-setting-info">
+                            <label>Radar Obstacle Brake Distance</label>
+                            <span className="adm-setting-value">{kioskConfig.tourObstacleDistanceCm || 30} cm</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="15"
+                            max="60"
+                            step="5"
+                            value={kioskConfig.tourObstacleDistanceCm || 30}
+                            onChange={(e) => handleUpdateKioskConfig({ tourObstacleDistanceCm: Number(e.target.value) })}
+                            className="adm-range-slider"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Waypoints List */}
+                    <div className="adm-tour-list-wrap">
+                      <div className="adm-tour-list-header">
+                        <div className="adm-flex-between">
+                          <h4 className="adm-sub-title">Floorplan Waypoints ({tourStops.length})</h4>
+                          <button className="adm-add-btn" onClick={handleOpenAddTourStop}>
+                            <Plus size={15} />
+                            <span>Add Waypoint</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="adm-tour-stops-list">
+                        {tourStops.map((stop, index) => (
+                          <div key={stop.id} className="adm-tour-stop-card">
+                            <span className="adm-tour-index-badge">#{index + 1}</span>
+                            <div className="adm-tour-stop-body">
+                              <h4 className="adm-tour-stop-name">{stop.name}</h4>
+                              <p className="adm-sub-desc">{stop.narration}</p>
                             </div>
-
-                            <div className="adm-btn-action-col">
-                              <button
-                                className={`adm-mini-btn speech ${tourTestingSpeechId === stop.id ? 'playing' : ''}`}
-                                onClick={() => handleTestTourSpeech(stop)}
-                                title="Listen to spoken audio narration"
-                              >
-                                <Volume2 size={14} />
-                                <span>{tourTestingSpeechId === stop.id ? 'Speaking...' : 'Test Voice'}</span>
-                              </button>
+                            <div className="adm-tour-stop-actions">
                               <button
                                 className="adm-mini-btn edit"
                                 onClick={() => handleOpenEditTourStop(stop)}
-                                title="Edit waypoint details"
                               >
                                 <Edit2 size={14} />
-                                <span>Edit</span>
                               </button>
                               <button
                                 className="adm-mini-btn danger"
                                 onClick={() => handleDeleteTourStop(stop.id, stop.name)}
-                                title="Delete waypoint"
                               >
                                 <Trash2 size={14} />
                               </button>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -3852,6 +4184,250 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                 <button type="submit" className="adm-submit-btn">
                   <Save size={16} />
                   <span>{tourModalMode === 'add' ? 'Add Waypoint' : 'Save Changes'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Add/Edit Robot */}
+      {showRobotModal && (
+        <div className="adm-modal-overlay" onClick={() => setShowRobotModal(false)}>
+          <div className="adm-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="adm-modal-header">
+              <div className="adm-modal-title">
+                <Bot size={20} color="#00ffff" />
+                <h3>{robotModalMode === 'add' ? 'Add Robot Showcase Tour' : 'Edit Robot Details'}</h3>
+              </div>
+              <button className="adm-modal-close" onClick={() => setShowRobotModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRobot} className="adm-modal-body">
+              <div className="adm-form-grid">
+                <div className="adm-form-group">
+                  <label>Robot Title *</label>
+                  <input
+                    type="text"
+                    value={robotFormTitle}
+                    onChange={(e) => setRobotFormTitle(e.target.value)}
+                    placeholder="e.g. Aurra Robot, Nexus Robot..."
+                    required
+                  />
+                </div>
+
+                <div className="adm-form-group">
+                  <label>Category Badge</label>
+                  <input
+                    type="text"
+                    value={robotFormBadge}
+                    onChange={(e) => setRobotFormBadge(e.target.value)}
+                    placeholder="e.g. AI Receptionist, Heavy Service, Educational..."
+                  />
+                </div>
+
+                <div className="adm-form-group span-2">
+                  <label>Subtitle / Role Description</label>
+                  <input
+                    type="text"
+                    value={robotFormSubtitle}
+                    onChange={(e) => setRobotFormSubtitle(e.target.value)}
+                    placeholder="e.g. Autonomous Multilingual Reception Humanoid Platform"
+                  />
+                </div>
+
+                <div className="adm-form-group">
+                  <label>Slug / ID</label>
+                  <input
+                    type="text"
+                    value={robotFormSlug}
+                    onChange={(e) => setRobotFormSlug(e.target.value)}
+                    placeholder="e.g. aurra, nexus, nova, dine, gi..."
+                  />
+                </div>
+
+                <div className="adm-form-group">
+                  <label>Hero Image Path or URL</label>
+                  <input
+                    type="text"
+                    value={robotFormImage}
+                    onChange={(e) => setRobotFormImage(e.target.value)}
+                    placeholder="/aurra/hero.webp"
+                  />
+                </div>
+
+                <div className="adm-form-group span-2">
+                  <label>Quick Image Presets</label>
+                  <div className="adm-preset-chips">
+                    {[
+                      { name: 'Aurra', path: '/aurra/hero.webp' },
+                      { name: 'Nexus', path: '/nexus/hero.webp' },
+                      { name: 'Nova', path: '/nova/hero.webp' },
+                      { name: 'Dine', path: '/dine/hero.webp' },
+                      { name: 'Gi', path: '/g1/g1.webp' },
+                      { name: 'Nila', path: '/nila/hero.webp' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.path}
+                        type="button"
+                        className={`adm-preset-chip ${robotFormImage === preset.path ? 'active' : ''}`}
+                        onClick={() => setRobotFormImage(preset.path)}
+                      >
+                        {preset.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {robotFormImage && (
+                  <div className="adm-form-group span-2">
+                    <label>Image Preview</label>
+                    <div className="adm-image-preview-box">
+                      <img
+                        src={assetUrl(robotFormImage)}
+                        alt="Preview"
+                        onError={(e) => { e.target.src = assetUrl('/aurra/hero.webp'); }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="adm-modal-actions">
+                <button
+                  type="button"
+                  className="adm-btn-secondary"
+                  onClick={() => setShowRobotModal(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="adm-submit-btn">
+                  <Save size={16} />
+                  <span>{robotModalMode === 'add' ? 'Add Robot' : 'Save Details'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Add/Edit Tour Step */}
+      {showStepModal && (
+        <div className="adm-modal-overlay" onClick={() => setShowStepModal(false)}>
+          <div className="adm-modal-card adm-modal-large" onClick={(e) => e.stopPropagation()}>
+            <div className="adm-modal-header">
+              <div className="adm-modal-title">
+                <Layers size={20} color="#00ffff" />
+                <h3>
+                  {stepModalMode === 'add'
+                    ? `Add Step to ${selectedRobotForSteps?.title || 'Robot'}`
+                    : `Edit Step ${stepFormIndex !== null ? stepFormIndex + 1 : ''} (${stepFormName})`}
+                </h3>
+              </div>
+              <button className="adm-modal-close" onClick={() => setShowStepModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveStep} className="adm-modal-body">
+              <div className="adm-form-grid">
+                <div className="adm-form-group">
+                  <label>Step Name / Topic *</label>
+                  <input
+                    type="text"
+                    value={stepFormName}
+                    onChange={(e) => setStepFormName(e.target.value)}
+                    placeholder="e.g. Multilingual Voice AI, Autonomous Navigation..."
+                    required
+                  />
+                </div>
+
+                <div className="adm-form-group">
+                  <label>Step Showcase Image Path</label>
+                  <input
+                    type="text"
+                    value={stepFormImage}
+                    onChange={(e) => setStepFormImage(e.target.value)}
+                    placeholder="/aurra/2.webp"
+                  />
+                </div>
+
+                {/* 3 Speech Phases */}
+                <div className="adm-form-group span-2 adm-phase-editor-box">
+                  <div className="adm-phase-editor-header">
+                    <div className="adm-phase-title-tag intro">Phase 1: Intro Speech</div>
+                    <button
+                      type="button"
+                      className="adm-phase-test-btn"
+                      onClick={() => handleTestStepSpeech(stepFormIntro, 'intro')}
+                      disabled={!stepFormIntro.trim()}
+                    >
+                      <Volume2 size={14} />
+                      <span>{testingStepPhase === 'intro' ? 'Speaking...' : 'Test Intro Speech'}</span>
+                    </button>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={stepFormIntro}
+                    onChange={(e) => setStepFormIntro(e.target.value)}
+                    placeholder="Opening hook spoken by Aurra when arriving at this step (e.g. Welcome to Step 1! Let's explore how I communicate...)"
+                  />
+                </div>
+
+                <div className="adm-form-group span-2 adm-phase-editor-box">
+                  <div className="adm-phase-editor-header">
+                    <div className="adm-phase-title-tag main">Phase 2: Main Content Speech</div>
+                    <button
+                      type="button"
+                      className="adm-phase-test-btn"
+                      onClick={() => handleTestStepSpeech(stepFormMainContent, 'main')}
+                    >
+                      <Volume2 size={14} />
+                      <span>{testingStepPhase === 'main' ? 'Speaking...' : 'Test Main Speech'}</span>
+                    </button>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={stepFormMainContent}
+                    onChange={(e) => setStepFormMainContent(e.target.value)}
+                    placeholder="In-depth explanation and core technical specs spoken by Aurra..."
+                  />
+                </div>
+
+                <div className="adm-form-group span-2 adm-phase-editor-box">
+                  <div className="adm-phase-editor-header">
+                    <div className="adm-phase-title-tag thankyou">Phase 3: Thank You / Transition</div>
+                    <button
+                      type="button"
+                      className="adm-phase-test-btn"
+                      onClick={() => handleTestStepSpeech(stepFormThankYou, 'thankyou')}
+                    >
+                      <Volume2 size={14} />
+                      <span>{testingStepPhase === 'thankyou' ? 'Speaking...' : 'Test Transition Speech'}</span>
+                    </button>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={stepFormThankYou}
+                    onChange={(e) => setStepFormThankYou(e.target.value)}
+                    placeholder="Closing wrap-up sentence before automatically advancing to next step..."
+                  />
+                </div>
+              </div>
+
+              <div className="adm-modal-actions">
+                <button
+                  type="button"
+                  className="adm-btn-secondary"
+                  onClick={() => setShowStepModal(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="adm-submit-btn">
+                  <Save size={16} />
+                  <span>{stepModalMode === 'add' ? 'Add Step' : 'Save Step'}</span>
                 </button>
               </div>
             </form>

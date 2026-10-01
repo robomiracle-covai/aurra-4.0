@@ -52,9 +52,11 @@ import {
   ChevronDown,
   MapPin,
   Navigation,
-  Layers
+  Layers,
+  MessageSquare
 } from 'lucide-react';
 import QRCode from 'qrcode';
+import AdminChatHistoryView from '../../components/AdminChatHistoryView';
 import { llmService } from '../../services/llmService';
 import {
   offlineCardService,
@@ -75,6 +77,8 @@ import { kioskConfigService } from '../../services/kioskConfigService';
 import { speakWithVoice } from '../../utils/speechSynthesis';
 import { assetUrl } from '../../utils/platform';
 import { logger } from '../../services/logger';
+import ImageSelectorField from '../../components/ImageSelectorField';
+import ImageGalleryModal from '../../components/ImageGalleryModal';
 import './AdminDashboard.css';
 
 export default function AdminDashboard({ onNavigate, onClose }) {
@@ -93,6 +97,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   const [newSlideTitle, setNewSlideTitle] = useState('');
   const [newSlideSubtitle, setNewSlideSubtitle] = useState('');
   const [newSlideUrl, setNewSlideUrl] = useState('');
+  const [isSlideGalleryOpen, setIsSlideGalleryOpen] = useState(false);
 
   // Q&A state
   const [questions, setQuestions] = useState([]);
@@ -1289,6 +1294,13 @@ export default function AdminDashboard({ onNavigate, onClose }) {
             <span>Real AI Grok LLM & API</span>
           </button>
           <button
+            className={`adm-nav-item dev-highlight ${activeTab === 'chat-history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('chat-history')}
+          >
+            <MessageSquare size={18} color="#00ffff" />
+            <span>Chat History & Transcripts</span>
+          </button>
+          <button
             className={`adm-nav-item ${activeTab === 'questions' ? 'active' : ''}`}
             onClick={() => setActiveTab('questions')}
           >
@@ -1386,6 +1398,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
               {activeTab === 'slides' && 'Home Screen Slideshow Banners'}
               {activeTab === 'voice' && 'Universal Voice Assistant & Audio Customization'}
               {activeTab === 'ai-llm' && 'Real AI Grok Cloud API & LLM Intelligence Settings'}
+              {activeTab === 'chat-history' && 'AI Chat Transcripts & Interaction History'}
               {activeTab === 'questions' && 'Q&A Knowledge Base for Voice & Text'}
               {activeTab === 'faces' && 'Face Recognition, Vision & Greeting Setup'}
               {activeTab === 'visitors' && 'Visitor Directory & Admission Logs'}
@@ -1533,6 +1546,17 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                   </div>
                   <span className="adm-metric-sub">{kioskConfig.badgeIdPrefix || 'AUR-VIS'} • Photo {kioskConfig.requireVisitorPhoto ? 'REQ' : 'OPT'}</span>
                 </div>
+
+                <div className="adm-metric-card" onClick={() => setActiveTab('chat-history')}>
+                  <div className="adm-metric-icon" style={{ background: 'rgba(0, 255, 255, 0.12)', border: '1px solid rgba(0, 255, 255, 0.3)' }}>
+                    <MessageSquare size={24} color="#00ffff" />
+                  </div>
+                  <div className="adm-metric-data">
+                    <span className="adm-metric-num" style={{ color: '#00ffff' }}>TRANSCRIPTS</span>
+                    <span className="adm-metric-label">Chat & Voice Log</span>
+                  </div>
+                  <span className="adm-metric-sub">ChatGPT Viewer • Audio & Text</span>
+                </div>
               </div>
 
               {/* Quick Actions Panel */}
@@ -1550,6 +1574,10 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                   <button className="adm-btn-action" onClick={() => setActiveTab('developer')}>
                     <Sliders size={18} />
                     <span>Configure Developer Toggles (1-Tap Admin)</span>
+                  </button>
+                  <button className="adm-btn-action" onClick={() => setActiveTab('chat-history')}>
+                    <MessageSquare size={18} color="#00ffff" />
+                    <span>View AI Chat Transcripts</span>
                   </button>
                   <button className="adm-btn-action" onClick={() => setActiveTab('branding')}>
                     <LayoutTemplate size={18} />
@@ -1687,7 +1715,17 @@ export default function AdminDashboard({ onNavigate, onClose }) {
 
                 {/* Add Slide Form */}
                 <form onSubmit={handleAddSlide} className="adm-add-slide-form">
-                  <h4>Add New Slide Banner</h4>
+                  <div className="adm-slide-form-head">
+                    <h4>Add New Slide Banner</h4>
+                    <button
+                      type="button"
+                      className="adm-gallery-pick-btn"
+                      onClick={() => setIsSlideGalleryOpen(true)}
+                    >
+                      <ImageIcon size={15} />
+                      <span>Browse Image Gallery</span>
+                    </button>
+                  </div>
                   <div className="adm-slide-inputs-grid">
                     <input
                       type="text"
@@ -1702,17 +1740,47 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                       value={newSlideSubtitle}
                       onChange={(e) => setNewSlideSubtitle(e.target.value)}
                     />
-                    <input
-                      type="text"
-                      placeholder="Image URL or local file path"
-                      value={newSlideUrl}
-                      onChange={(e) => setNewSlideUrl(e.target.value)}
-                    />
+                    <div className="adm-slide-url-picker-wrap">
+                      <input
+                        type="text"
+                        placeholder="Image path, URL or select from gallery"
+                        value={newSlideUrl}
+                        onChange={(e) => setNewSlideUrl(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="adm-inline-gallery-btn"
+                        onClick={() => setIsSlideGalleryOpen(true)}
+                        title="Pick from Gallery"
+                      >
+                        <ImageIcon size={14} />
+                        <span>Gallery</span>
+                      </button>
+                    </div>
                     <button type="submit" className="adm-submit-btn compact">
                       <Plus size={16} />
                       <span>Add Slide</span>
                     </button>
                   </div>
+                  {newSlideUrl && (
+                    <div className="adm-slide-preview-strip">
+                      <img
+                        src={newSlideUrl.startsWith('data:') ? newSlideUrl : assetUrl(newSlideUrl)}
+                        alt="Preview"
+                        className="adm-slide-preview-thumb"
+                        onError={(e) => (e.target.style.display = 'none')}
+                      />
+                      <span className="adm-slide-preview-path">{newSlideUrl}</span>
+                      <button
+                        type="button"
+                        className="adm-mini-clear-btn"
+                        onClick={() => setNewSlideUrl('')}
+                        title="Clear Image"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  )}
                 </form>
 
                 {/* Slides List */}
@@ -2182,6 +2250,13 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* ── DEDICATED CHAT HISTORY & TRANSCRIPTS TAB PANEL ── */}
+          {activeTab === 'chat-history' && (
+            <div className="adm-tab-panel">
+              <AdminChatHistoryView />
             </div>
           )}
 
@@ -3340,10 +3415,10 @@ export default function AdminDashboard({ onNavigate, onClose }) {
 
                                 <div className="adm-step-thumb-col">
                                   <img
-                                    src={step.image || selectedRobotForSteps.image || '/aurra/hero.webp'}
+                                    src={step.image?.startsWith('data:') ? step.image : assetUrl(step.image || selectedRobotForSteps.image || '/aurra/hero.webp')}
                                     alt={step.stepName}
                                     className="adm-step-thumb"
-                                    onError={(e) => { e.target.src = '/aurra/hero.webp'; }}
+                                    onError={(e) => { e.target.src = assetUrl('/aurra/hero.webp'); }}
                                   />
                                 </div>
 
@@ -4248,51 +4323,19 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                   />
                 </div>
 
-                <div className="adm-form-group">
-                  <label>Hero Image Path or URL</label>
-                  <input
-                    type="text"
+                <div className="adm-form-group span-2">
+                  <ImageSelectorField
+                    label="Hero Image (Display on Kiosk & Guided Tour)"
                     value={robotFormImage}
-                    onChange={(e) => setRobotFormImage(e.target.value)}
+                    onChange={setRobotFormImage}
+                    robotSlug={robotFormSlug || 'aurra'}
                     placeholder="/aurra/hero.webp"
+                    fallbackDefault="/aurra/hero.webp"
+                    modalTitle={`Select Hero Image for ${robotFormTitle || 'Robot'}`}
+                    required
+                    helperText="Select from gallery or click Quick Pick chips to change hero portrait."
                   />
                 </div>
-
-                <div className="adm-form-group span-2">
-                  <label>Quick Image Presets</label>
-                  <div className="adm-preset-chips">
-                    {[
-                      { name: 'Aurra', path: '/aurra/hero.webp' },
-                      { name: 'Nexus', path: '/nexus/hero.webp' },
-                      { name: 'Nova', path: '/nova/hero.webp' },
-                      { name: 'Dine', path: '/dine/hero.webp' },
-                      { name: 'Gi', path: '/g1/g1.webp' },
-                      { name: 'Nila', path: '/nila/hero.webp' },
-                    ].map((preset) => (
-                      <button
-                        key={preset.path}
-                        type="button"
-                        className={`adm-preset-chip ${robotFormImage === preset.path ? 'active' : ''}`}
-                        onClick={() => setRobotFormImage(preset.path)}
-                      >
-                        {preset.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {robotFormImage && (
-                  <div className="adm-form-group span-2">
-                    <label>Image Preview</label>
-                    <div className="adm-image-preview-box">
-                      <img
-                        src={assetUrl(robotFormImage)}
-                        alt="Preview"
-                        onError={(e) => { e.target.src = assetUrl('/aurra/hero.webp'); }}
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="adm-modal-actions">
@@ -4344,13 +4387,16 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                   />
                 </div>
 
-                <div className="adm-form-group">
-                  <label>Step Showcase Image Path</label>
-                  <input
-                    type="text"
+                <div className="adm-form-group span-2">
+                  <ImageSelectorField
+                    label="Step Showcase Image (Displayed during speech narration)"
                     value={stepFormImage}
-                    onChange={(e) => setStepFormImage(e.target.value)}
-                    placeholder="/aurra/2.webp"
+                    onChange={setStepFormImage}
+                    robotSlug={selectedRobotForSteps?.slug || 'aurra'}
+                    placeholder={selectedRobotForSteps?.image || '/aurra/2.webp'}
+                    fallbackDefault={selectedRobotForSteps?.image || '/aurra/hero.webp'}
+                    modalTitle={`Select Showcase Image for ${stepFormName || 'Tour Step'}`}
+                    helperText="Choose the image demonstrating this tour step's topic or feature."
                   />
                 </div>
 
@@ -4434,6 +4480,15 @@ export default function AdminDashboard({ onNavigate, onClose }) {
           </div>
         </div>
       )}
+
+      {/* Slide Banner Image Gallery Modal */}
+      <ImageGalleryModal
+        isOpen={isSlideGalleryOpen}
+        onClose={() => setIsSlideGalleryOpen(false)}
+        onSelectImage={(path) => setNewSlideUrl(path)}
+        currentPath={newSlideUrl}
+        title="Select Banner Slide Image"
+      />
     </div>
   );
 }

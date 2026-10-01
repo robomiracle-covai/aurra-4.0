@@ -1,0 +1,1120 @@
+/* ==========================================================================
+   AURRA TESTING INTERACTION MODE - DIAGNOSTIC & FEATURE ISOLATOR LAB
+   Ultra-optimized for MediaTek Helio G100 / Mali-G57 MC2 GPU (2560x1600 WQXGA)
+   Hardware-accelerated, zero heavy backdrop-filter blur to sustain steady 60 FPS
+   ========================================================================== */
+
+.tia-root {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #030712;
+  color: #f3f4f6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+  z-index: 100;
+  transform: translateZ(0);
+}
+
+/* ── Top Diagnostic Header ── */
+.tia-header {
+  height: 64px;
+  padding: 0 20px;
+  background: rgba(11, 19, 43, 0.95);
+  border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.tia-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.tia-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(0, 255, 255, 0.35);
+  border-radius: 8px;
+  color: #38bdf8;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.tia-back-btn:hover {
+  background: rgba(14, 165, 233, 0.2);
+  border-color: #38bdf8;
+}
+
+.tia-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tia-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #f59e0b;
+}
+
+.tia-title-group h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.tia-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tia-telemetry-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 20px;
+  font-size: 12px;
+  color: #10b981;
+}
+
+.tia-fps-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.tia-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tia-btn-icon:hover {
+  background: rgba(51, 65, 85, 0.9);
+  color: #f8fafc;
+}
+
+/* ── Master Feature Isolation Switchboard ── */
+.tia-switchboard-card {
+  padding: 10px 20px;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+  flex-shrink: 0;
+}
+
+.tia-switchboard-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #38bdf8;
+  margin-bottom: 8px;
+}
+
+.tia-switches-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.tia-switch-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(71, 85, 105, 0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tia-switch-item.active {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(56, 189, 248, 0.6);
+}
+
+.tia-switch-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tia-switch-info strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.tia-switch-info p {
+  margin: 0;
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.tia-toggle-pill {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 12px;
+  letter-spacing: 0.05em;
+}
+
+.tia-toggle-pill.on {
+  background: #10b981;
+  color: #022c22;
+}
+
+.tia-toggle-pill.off {
+  background: #475569;
+  color: #cbd5e1;
+}
+
+/* ── Main Testing Split Workspace ── */
+.tia-workspace-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 14px 20px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── LEFT COLUMN: Test Arena & Controls ── */
+.tia-left-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.tia-tab-bar {
+  display: flex;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.8);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(51, 65, 85, 0.4);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.tia-tab {
+  flex: 1;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.tia-tab.active {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+/* 1. Vision Monitor Box */
+.tia-vision-box {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(192, 132, 252, 0.35);
+  border-radius: 8px;
+  padding: 10px;
+  flex-shrink: 0;
+}
+
+.tia-vision-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.tia-vision-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #c084fc;
+  letter-spacing: 0.05em;
+}
+
+.tia-vision-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.tia-interval-select {
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+.tia-video-viewport {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  background: #000;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.tia-video-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.tia-canvas-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transform: scaleX(-1);
+}
+
+.tia-video-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 12px;
+}
+
+/* 2. TTS Standalone Card */
+.tia-tts-card {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 8px;
+  padding: 12px;
+  flex-shrink: 0;
+}
+
+.tia-tts-card h4 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.tia-tts-input {
+  width: 100%;
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  color: #f1f5f9;
+  padding: 8px;
+  font-size: 13px;
+  resize: none;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+}
+
+.tia-tts-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tia-tts-speed-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.tia-tts-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.tia-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  background: #059669;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tia-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tia-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  background: #dc2626;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tia-btn-danger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 3. STT Live Status Card */
+.tia-stt-status-card {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 8px;
+  padding: 10px 14px;
+  flex-shrink: 0;
+}
+
+.tia-stt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.tia-stt-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tia-mic-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.tia-mic-dot.listening {
+  background: #10b981;
+  box-shadow: 0 0 10px #10b981;
+  animation: tia-pulse 1.2s infinite;
+}
+
+.tia-mic-dot.muted {
+  background: #ef4444;
+}
+
+@keyframes tia-pulse {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.7; }
+}
+
+.tia-mic-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #334155;
+  border: 1px solid #475569;
+  color: #e2e8f0;
+}
+
+.tia-mic-toggle-btn.active {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #f59e0b;
+  color: #fbbf24;
+}
+
+.tia-transcript-preview {
+  background: rgba(2, 6, 23, 0.7);
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.tia-transcript-label {
+  font-size: 10px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.tia-transcript-text {
+  margin: 4px 0 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.tia-transcript-text .interim {
+  color: #fbbf24;
+  font-style: italic;
+}
+
+.tia-transcript-text .final {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.tia-transcript-text .idle {
+  color: #475569;
+  font-size: 12px;
+}
+
+.tia-stt-error {
+  margin: 4px 0 0 0;
+  color: #f87171;
+  font-size: 11px;
+}
+
+/* 4. Hardware Servos Card */
+.tia-hw-card {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 8px;
+  padding: 12px;
+  flex-shrink: 0;
+}
+
+.tia-hw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.tia-hw-header h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.tia-status-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 10px;
+}
+
+.tia-status-pill.online {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.tia-status-pill.offline {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.tia-hw-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tia-hw-slider-row input[type="range"] {
+  flex: 1;
+}
+
+.tia-btn-sm {
+  padding: 4px 10px;
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  color: #f1f5f9;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* 5. Messages Container */
+.tia-chat-container {
+  flex: 1;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.tia-messages-list {
+  flex: 1;
+  padding: 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tia-message-row {
+  display: flex;
+  width: 100%;
+}
+
+.tia-message-row.user-side {
+  justify-content: flex-end;
+}
+
+.tia-message-row.assistant-side {
+  justify-content: flex-start;
+}
+
+.tia-message-bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.user-side .tia-message-bubble {
+  background: #0284c7;
+  color: #ffffff;
+  border-bottom-right-radius: 2px;
+}
+
+.assistant-side .tia-message-bubble {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  border-bottom-left-radius: 2px;
+}
+
+.tia-bubble-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 10px;
+}
+
+.tia-bubble-sender {
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.user-side .tia-bubble-sender {
+  color: #bae6fd;
+}
+
+.tia-source-tag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.tia-source-tag.offline_faq {
+  color: #10b981;
+}
+
+.tia-source-tag.cloud_groq_llm {
+  color: #c084fc;
+}
+
+.tia-source-tag.hardware_control {
+  color: #38bdf8;
+}
+
+.tia-source-tag.system {
+  color: #f59e0b;
+}
+
+.tia-latency-tag {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.tia-bubble-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tia-message-bubble.thinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #38bdf8;
+  font-size: 12px;
+}
+
+.pulse-icon {
+  animation: tia-pulse 1.2s infinite;
+}
+
+/* Chat Input Dock */
+.tia-input-dock {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(2, 6, 23, 0.95);
+  border-top: 1px solid rgba(51, 65, 85, 0.5);
+  flex-shrink: 0;
+}
+
+.tia-text-input {
+  flex: 1;
+  height: 42px;
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 0 14px;
+  color: #ffffff;
+  font-size: 13px;
+  outline: none;
+}
+
+.tia-text-input:focus {
+  border-color: #38bdf8;
+}
+
+.tia-send-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 42px;
+  padding: 0 16px;
+  background: #0284c7;
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.tia-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── RIGHT COLUMN: Diagnostic Terminal ── */
+.tia-right-panel {
+  display: flex;
+  flex-direction: column;
+  background: #0a0f1d;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.tia-logs-header {
+  height: 44px;
+  padding: 0 14px;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.tia-logs-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #38bdf8;
+  letter-spacing: 0.05em;
+}
+
+.tia-logs-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.tia-log-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  color: #94a3b8;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.tia-log-btn:hover {
+  background: #334155;
+  color: #ffffff;
+}
+
+.tia-terminal-stream {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+
+.tia-terminal-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #475569;
+  font-size: 12px;
+  text-align: center;
+  padding: 20px;
+}
+
+.tia-log-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  word-break: break-all;
+}
+
+.tia-log-line .log-time {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.tia-log-line .log-source {
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.tia-log-line .log-source.system {
+  color: #f59e0b;
+}
+
+.tia-log-line .log-source.stt {
+  color: #fbbf24;
+}
+
+.tia-log-line .log-source.tts {
+  color: #10b981;
+}
+
+.tia-log-line .log-source.llm {
+  color: #c084fc;
+}
+
+.tia-log-line .log-source.faq {
+  color: #34d399;
+}
+
+.tia-log-line .log-source.vision {
+  color: #e879f9;
+}
+
+.tia-log-line .log-source.hardware {
+  color: #38bdf8;
+}
+
+.tia-log-line .log-msg {
+  color: #cbd5e1;
+  flex: 1;
+}
+
+.tia-log-line.warn .log-msg {
+  color: #fde047;
+}
+
+.tia-log-line.error .log-msg {
+  color: #f87171;
+}
+
+.tia-log-line.success .log-msg {
+  color: #4ade80;
+}
+
+.tia-log-line .log-latency {
+  color: #10b981;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Quick Prompts Dock */
+.tia-quick-prompts {
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.95);
+  border-top: 1px solid rgba(51, 65, 85, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.tia-quick-label {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tia-chips-row {
+  display: flex;
+  gap: 6px;
+}
+
+.tia-chips-row button {
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 12px;
+  padding: 4px 10px;
+  color: #94a3b8;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.tia-chips-row button:hover {
+  background: #334155;
+  color: #38bdf8;
+  border-color: #38bdf8;
+}
+
+/* ── Responsive adjustments for portrait or small screens ── */
+@media (max-width: 900px) {
+  .tia-workspace-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+  .tia-switches-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ── Nav Row with Tab Bar & Model Selector ── */
+.tia-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.tia-nav-row .tia-tab-bar {
+  flex: 1;
+}
+
+.tia-model-selector-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(192, 132, 252, 0.4);
+  border-radius: 8px;
+  padding: 4px 10px;
+  flex-shrink: 0;
+}
+
+.tia-model-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #c084fc;
+}
+
+.tia-model-dropdown {
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  color: #f1f5f9;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  outline: none;
+  cursor: pointer;
+}
+
+.tia-model-dropdown:focus {
+  border-color: #c084fc;
+}
+
+/* ── Detailed Origin Source Inspection Cards Inside Bubble ── */
+.tia-source-card {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  border: 1px solid transparent;
+}
+
+/* 1. Custom Offline FAQ Card */
+.tia-source-card.faq-card {
+  background: rgba(6, 78, 59, 0.35);
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.tia-source-card.faq-card .source-card-header {
+  color: #34d399;
+}
+
+/* 2. Cloud LLM Generated Card */
+.tia-source-card.llm-card {
+  background: rgba(88, 28, 135, 0.35);
+  border-color: rgba(192, 132, 252, 0.5);
+}
+
+.tia-source-card.llm-card .source-card-header {
+  color: #c084fc;
+}
+
+/* 3. Fallback Card */
+.tia-source-card.fallback-card {
+  background: rgba(120, 53, 15, 0.35);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.tia-source-card.fallback-card .source-card-header {
+  color: #fbbf24;
+}
+
+.source-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  margin-bottom: 5px;
+}
+
+.source-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.source-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.meta-key {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.meta-val {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+
+.meta-val.highlight {
+  color: #6ee7b7;
+  font-weight: 700;
+}
+
+.meta-val.highlight-purple {
+  color: #e9d5ff;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.meta-val.score {
+  color: #34d399;
+  font-weight: 800;
+}
+
+.meta-val.speed {
+  color: #38bdf8;
+  font-weight: 800;
+}
+
+.meta-divider {
+  color: #475569;
+}
+
+.fallback-note {
+  margin: 0;
+  color: #fde047;
+  font-size: 11px;
+}
+

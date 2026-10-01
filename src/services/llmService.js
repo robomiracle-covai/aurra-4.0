@@ -29,10 +29,10 @@ export const getDefaultLlmConfig = () => ({
   enabled: true,
   apiUrl: 'https://api.groq.com/openai/v1',
   apiKey: import.meta.env.VITE_LLM_API_KEY || DEFAULT_API_KEY,
-  model: 'openai/gpt-oss-20b',
+  model: 'qwen/qwen3.8-27b',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   temperature: 0.6,
-  maxTokens: 120,
+  maxTokens: 300,
   timeoutMs: 8000,
 });
 
@@ -53,7 +53,10 @@ class LlmService {
           merged.apiKey = defaults.apiKey;
         }
         if (!merged.model || merged.model.includes('llama-3.3-70b')) {
-          merged.model = 'openai/gpt-oss-20b';
+          merged.model = 'qwen/qwen3.8-27b';
+        }
+        if (!merged.maxTokens || merged.maxTokens < 200) {
+          merged.maxTokens = 300;
         }
         return merged;
       }
@@ -162,14 +165,14 @@ class LlmService {
     ];
 
     const modelName = (!this.config.model || this.config.model.includes('llama-3.3-70b'))
-      ? 'openai/gpt-oss-20b'
+      ? 'qwen/qwen3.8-27b'
       : this.config.model;
 
     const body = {
       model: modelName,
       messages,
       temperature: this.config.temperature || 0.6,
-      max_tokens: this.config.maxTokens || 120,
+      max_tokens: this.config.maxTokens || 300,
     };
 
     const startTime = Date.now();
@@ -196,7 +199,7 @@ class LlmService {
 
       const data = await response.json();
       const msgObj = data.choices?.[0]?.message;
-      const rawText = msgObj?.content || msgObj?.reasoning_content || '';
+      const rawText = msgObj?.content || msgObj?.reasoning || msgObj?.reasoning_content || '';
       const cleaned = this.cleanResponseText(rawText);
       const latency = Date.now() - startTime;
 
@@ -210,6 +213,8 @@ class LlmService {
         text: cleaned,
         latencyMs: latency,
         model: body.model,
+        provider: 'Groq Cloud AI',
+        tokens: data.usage?.total_tokens || null,
       };
     } catch (err) {
       clearTimeout(timeoutId);

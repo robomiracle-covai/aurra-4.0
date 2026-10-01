@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { offlineCardService, offlineSliderService, offlineBrandingService } from '../db/offlineServices';
 import { logger } from '../services/logger';
+import ImageGalleryModal from './ImageGalleryModal';
 import './AdminDrawer.css';
 
 export default function AdminDrawer({ isOpen, onClose, onRefreshData }) {
@@ -28,6 +29,7 @@ export default function AdminDrawer({ isOpen, onClose, onRefreshData }) {
   const [newSlideTitle, setNewSlideTitle] = useState('');
   const [newSlideSubtitle, setNewSlideSubtitle] = useState('');
   const [newSlideUrl, setNewSlideUrl] = useState('');
+  const [isSlideGalleryOpen, setIsSlideGalleryOpen] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
 
   useEffect(() => {
@@ -303,12 +305,25 @@ export default function AdminDrawer({ isOpen, onClose, onRefreshData }) {
                     value={newSlideSubtitle}
                     onChange={(e) => setNewSlideSubtitle(e.target.value)}
                   />
-                  <input
-                    type="text"
-                    placeholder="Image URL or leave empty for cyber graphic banner"
-                    value={newSlideUrl}
-                    onChange={(e) => setNewSlideUrl(e.target.value)}
-                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="Image URL or choose from gallery"
+                      value={newSlideUrl}
+                      onChange={(e) => setNewSlideUrl(e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="admin-action-btn secondary"
+                      onClick={() => setIsSlideGalleryOpen(true)}
+                      style={{ padding: '0 12px', whiteSpace: 'nowrap' }}
+                      title="Select from Gallery"
+                    >
+                      <ImageIcon size={14} />
+                      <span>Gallery</span>
+                    </button>
+                  </div>
                 </div>
                 <button type="submit" className="admin-action-btn primary">
                   <Plus size={14} />
@@ -383,6 +398,14 @@ export default function AdminDrawer({ isOpen, onClose, onRefreshData }) {
           )}
         </div>
       </div>
+
+      <ImageGalleryModal
+        isOpen={isSlideGalleryOpen}
+        onClose={() => setIsSlideGalleryOpen(false)}
+        onSelectImage={(path) => setNewSlideUrl(path)}
+        currentPath={newSlideUrl}
+        title="Select Banner Slide Image"
+      />
     </div>
   );
 }

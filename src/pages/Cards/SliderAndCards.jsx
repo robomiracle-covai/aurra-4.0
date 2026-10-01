@@ -19,7 +19,8 @@ import {
   Activity,
   CheckCircle2,
   ChevronRight,
-  Wifi
+  Wifi,
+  FlaskConical
 } from 'lucide-react';
 import { offlineCardService, offlineSliderService, offlineBrandingService } from '../../db/offlineServices';
 import { logger } from '../../services/logger';
@@ -37,6 +38,7 @@ const getCardIcon = (href, className) => {
   if (href?.includes('facilities')) return <Building2 size={28} color="#00ffff" />;
   if (href?.includes('face') || href?.includes('greet')) return <Camera size={28} color="#00ffff" />;
   if (href?.includes('control')) return <Sliders size={28} color="#00ffff" />;
+  if (href?.includes('testing-interaction')) return <FlaskConical size={28} color="#f59e0b" />;
   if (href?.includes('interaction')) return <Eye size={28} color="#00ffff" />;
   if (href?.includes('web')) return <Globe size={28} color="#00ffff" />;
   if (href?.includes('hardware')) return <Activity size={28} color="#00ffff" />;

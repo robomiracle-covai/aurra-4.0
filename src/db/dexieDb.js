@@ -146,4 +146,80 @@ db.version(7).stores({
   }
 });
 
+// Version 8: Chat Sessions & Interaction Conversation Logs
+db.version(8).stores({
+  userFaces: '++id, name',
+  cards: '++id, title, href, isEnabled, voiceAccessEnabled',
+  images: '++id, title, isSelected',
+  headers: '++id, headerName',
+  qaQuestions: '++id, question, category',
+  visitors: '++id, name, phone, email, company, purpose, host, badgeType, badgeNumber, checkInTime, checkOutTime, status',
+  weblinks: 'id, title, category, url, isEnabled, sortOrder',
+  tourStops: '++id, name, area, orderIndex, isEnabled',
+  robotTours: 'id, slug, title, orderIndex, isEnabled',
+  chatSessions: 'id, title, createdAt, updatedAt, messageCount',
+  chatMessages: '++id, sessionId, role, text, timestamp, inputType, source, confidence',
+}).upgrade(async (tx) => {
+  const sessionCount = await tx.table('chatSessions').count();
+  if (sessionCount === 0) {
+    const demoSessionId = 'session_demo_aurra_intro';
+    const now = Date.now();
+    await tx.table('chatSessions').add({
+      id: demoSessionId,
+      title: 'Welcome & System Interaction Demo',
+      createdAt: new Date(now - 3600000).toISOString(),
+      updatedAt: new Date(now - 3600000 + 120000).toISOString(),
+      messageCount: 4,
+    });
+    await tx.table('chatMessages').bulkAdd([
+      {
+        sessionId: demoSessionId,
+        role: 'assistant',
+        text: 'Hello! I am Aurra, your intelligent receptionist humanoid. How can I help you today?',
+        timestamp: new Date(now - 3600000).toISOString(),
+        inputType: 'voice',
+        source: 'greeting',
+        confidence: 100,
+      },
+      {
+        sessionId: demoSessionId,
+        role: 'user',
+        text: 'What robots are developed by Robomiracle?',
+        timestamp: new Date(now - 3600000 + 30000).toISOString(),
+        inputType: 'voice',
+        source: 'user',
+        confidence: 100,
+      },
+      {
+        sessionId: demoSessionId,
+        role: 'assistant',
+        text: 'Robomiracle manufactures Aurra (Flagship Humanoid Receptionist), Nexus (Industrial Service Platform), Nova (Educational Guide), Dine (Hospitality Service), and G1 (Agile Humanoid).',
+        timestamp: new Date(now - 3600000 + 45000).toISOString(),
+        inputType: 'voice',
+        source: 'offline-faq',
+        confidence: 98,
+      },
+      {
+        sessionId: demoSessionId,
+        role: 'user',
+        text: 'Can I register as a visitor?',
+        timestamp: new Date(now - 3600000 + 90000).toISOString(),
+        inputType: 'text',
+        source: 'user',
+        confidence: 100,
+      },
+      {
+        sessionId: demoSessionId,
+        role: 'assistant',
+        text: 'Yes! You can complete visitor registration directly at this kiosk. Tap "Check-In Form" or say "I\'d like to register" to get your digital badge.',
+        timestamp: new Date(now - 3600000 + 105000).toISOString(),
+        inputType: 'text',
+        source: 'offline-faq',
+        confidence: 96,
+      },
+    ]);
+  }
+});
+
+
 

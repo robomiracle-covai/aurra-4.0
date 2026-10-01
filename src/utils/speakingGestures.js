@@ -44,13 +44,23 @@ export const triggerRandomSpeechGesture = () => {
  */
 export const startSpeakingAnimatronics = () => {
   if (isSpeakingAnimatronicsActive) return;
+  
+  // Guard: If neither ESP32 nor Raspberry Pi is online, do NOT fire background HTTP requests
+  if (!esp32Service.online && !raspberryPiService.online) {
+    return;
+  }
+
   isSpeakingAnimatronicsActive = true;
 
   // Dispatch 'speaking' expression to Raspberry Pi HDMI display
-  raspberryPiService.sendExpression('speaking');
+  if (raspberryPiService.online) {
+    raspberryPiService.sendExpression('speaking');
+  }
 
-  // Trigger initial natural gesture immediately
-  triggerRandomSpeechGesture();
+  // Trigger initial natural gesture immediately if ESP32 is online
+  if (esp32Service.online) {
+    triggerRandomSpeechGesture();
+  }
 
   // Cycle gestures every 1.8s while speaking (smooth pacing)
   if (animatronicTimer) clearInterval(animatronicTimer);
@@ -60,7 +70,9 @@ export const startSpeakingAnimatronics = () => {
       animatronicTimer = null;
       return;
     }
-    triggerRandomSpeechGesture();
+    if (esp32Service.online) {
+      triggerRandomSpeechGesture();
+    }
   }, 1800);
 };
 

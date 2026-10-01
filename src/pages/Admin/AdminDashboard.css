@@ -2793,4 +2793,121 @@
   width: 90% !important;
 }
 
+/* ── Slide Banner Gallery Picker Enhancements ── */
+.adm-slide-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.adm-slide-form-head h4 {
+  margin: 0;
+}
+
+.adm-gallery-pick-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(0, 255, 255, 0.12);
+  border: 1px solid rgba(0, 255, 255, 0.35);
+  color: #00ffff;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.adm-gallery-pick-btn:hover {
+  background: rgba(0, 255, 255, 0.22);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+  color: #ffffff;
+}
+
+.adm-slide-url-picker-wrap {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+.adm-slide-url-picker-wrap input {
+  width: 100%;
+  padding-right: 90px !important;
+}
+
+.adm-inline-gallery-btn {
+  position: absolute;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: rgba(0, 255, 255, 0.15);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  color: #00ffff;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.adm-inline-gallery-btn:hover {
+  background: rgba(0, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.adm-slide-preview-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(0, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 255, 0.18);
+  border-radius: 8px;
+}
+
+.adm-slide-preview-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+}
+
+.adm-slide-preview-path {
+  font-size: 11px;
+  color: #cbd5e1;
+  font-family: monospace;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-mini-clear-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.adm-mini-clear-btn:hover {
+  background: rgba(255, 70, 70, 0.25);
+  color: #ff6b6b;
+}
+
+
 

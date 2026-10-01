@@ -99,35 +99,32 @@ export const filterIndianMaleVoices = (voices = []) =>
 
 export const filterMaleVoices = filterIndianMaleVoices;
 
-const pickWebVoice = (voices, gender = 'male', selectedVoiceURI = '') => {
-  const maleVoices = filterIndianMaleVoices(voices);
+const pickWebVoice = (voices = [], gender = 'female', selectedVoiceURI = '') => {
   if (selectedVoiceURI) {
-    const matched = maleVoices.find(
+    const matched = voices.find(
       (v) => v.voiceURI === selectedVoiceURI || v.name === selectedVoiceURI
     );
     if (matched) return matched;
   }
 
-  const presets = VOICE_PRESETS.male;
+  // Priority 1: Natural Indian English Female (e.g. Neerja, Heera)
+  const indianFemale = voices.find((v) => {
+    const n = (v.name || '').toLowerCase();
+    const l = (v.lang || '').toLowerCase();
+    return (l.includes('en-in') || l.includes('hi-in') || n.includes('india')) &&
+           (n.includes('female') || n.includes('neerja') || n.includes('heera') || isFemaleVoiceName(n));
+  });
+  if (indianFemale) return indianFemale;
 
-  let selected = null;
-  for (const preset of presets) {
-    selected = maleVoices.find((v) => v.name.toLowerCase().includes(preset.toLowerCase()));
-    if (selected) break;
-  }
+  // Priority 2: Any Indian locale voice
+  const anyIndian = voices.find((v) => (v.lang || '').toLowerCase().includes('-in'));
+  if (anyIndian) return anyIndian;
 
-  if (!selected) {
-    selected = maleVoices.find((v) => {
-      const name = v.name.toLowerCase();
-      const lang = (v.lang || '').toLowerCase();
-      return (
-        (name.includes('en-in') && name.includes('-ene-')) ||
-        (lang.includes('-in') && !name.includes('-end-'))
-      );
-    });
-  }
+  // Priority 3: Any English female voice
+  const anyFemale = voices.find((v) => isFemaleVoiceName(v.name));
+  if (anyFemale) return anyFemale;
 
-  return selected || maleVoices.find((v) => (v.lang || '').toLowerCase().includes('-in')) || maleVoices[0] || null;
+  return voices[0] || null;
 };
 
 export const isAnySpeaking = () => {
@@ -315,11 +312,11 @@ export const speakWithVoice = async (text, options = {}) => {
   try {
     const voices = await waitForSpeechVoices();
     const utterance = new SpeechSynthesisUtterance(String(text));
-    const selectedVoice = pickWebVoice(voices, 'male', selectedVoiceURI);
+    const selectedVoice = pickWebVoice(voices, gender || 'female', selectedVoiceURI);
 
     if (selectedVoice) utterance.voice = selectedVoice;
     utterance.rate = rate;
-    utterance.pitch = pitch ?? 0.85;
+    utterance.pitch = pitch ?? (gender === 'male' ? 0.9 : 1.05);
     utterance.volume = 1;
     utterance.onstart = handleStart;
     utterance.onend = handleEnd;

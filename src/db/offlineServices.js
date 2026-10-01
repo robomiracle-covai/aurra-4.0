@@ -70,6 +70,14 @@ export const offlineCardService = {
     if (!cards || cards.length === 0) {
       await db.cards.bulkAdd(DEFAULT_REGISTRATION_CARDS);
       cards = await db.cards.toArray();
+    } else {
+      // Auto-seed any newly registered default cards if missing from existing Dexie DB
+      for (const defCard of DEFAULT_REGISTRATION_CARDS) {
+        if (!cards.some((c) => c.href === defCard.href)) {
+          await db.cards.add(defCard);
+        }
+      }
+      cards = await db.cards.toArray();
     }
     return cards;
   },
@@ -858,6 +866,9 @@ export const offlineRobotTourService = {
     return await db.robotTours.orderBy('orderIndex').toArray();
   },
 };
+
+export { chatHistoryService as offlineChatService } from '../services/chatHistoryService';
+
 
 
 

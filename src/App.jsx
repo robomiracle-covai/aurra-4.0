@@ -6,6 +6,7 @@ import Control from './pages/Control/Control';
 import HardwareConnection from './pages/Hardware/HardwareConnection';
 import VisitorRegistration from './pages/Registration/VisitorRegistration';
 import InteractionModeView from './pages/Interaction/InteractionModeView';
+import TestingInteractionModeView from './pages/Interaction/TestingInteractionModeView';
 import FeaturePlaceholder from './pages/FeatureView/FeaturePlaceholder';
 import WebLinks from './pages/WebLinks/WebLinks';
 import GuidedTourView from './pages/GuidedTour/GuidedTourView';
@@ -62,6 +63,8 @@ function App() {
           <VisitorRegistration onNavigate={handleNavigate} />
         ) : currentRoute === '/interaction' ? (
           <InteractionModeView onNavigate={handleNavigate} />
+        ) : currentRoute === '/testing-interaction' ? (
+          <TestingInteractionModeView onNavigate={handleNavigate} />
         ) : currentRoute === '/face-recognition' ? (
           <FaceRecognition onNavigate={handleNavigate} />
         ) : currentRoute === '/qa' ? (
@@ -99,8 +102,8 @@ function App() {
         />
       )}
 
-      {/* Globally Floating Persistent Voice Assistant Bar (hidden while in Admin and Interaction Mode) */}
-      {!isAdminOpen && currentRoute !== '/interaction' && (
+      {/* Globally Floating Persistent Voice Assistant Bar (hidden while in Admin, Interaction Mode, and Testing Lab) */}
+      {!isAdminOpen && currentRoute !== '/interaction' && currentRoute !== '/testing-interaction' && (
         <div className="global-floating-voice-bar">
           <VoiceAssistantBar
             onNavigate={handleNavigate}

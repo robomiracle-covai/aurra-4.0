@@ -90,6 +90,16 @@ export const DEFAULT_REGISTRATION_CARDS = [
     voiceAccessEnabled: true,
     voiceKeywords: ['hardware', 'esp32', 'status', 'telemetry', 'connection'],
   },
+  {
+    id: 10,
+    title: 'Testing Interactive Mode',
+    subtitle: 'Diagnostic Lab & Isolated Feature Testing',
+    href: '/testing-interaction',
+    className: 'testing-interaction',
+    isEnabled: true,
+    voiceAccessEnabled: true,
+    voiceKeywords: ['testing interaction', 'test mode', 'diagnostic', 'testing', 'isolator'],
+  },
 ];
 
 export const DEFAULT_SLIDES = [

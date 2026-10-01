@@ -42,5 +42,8 @@ export default defineConfig(({ mode }) => ({
   server: {
     port: 5174,
     host: true,
+    watch: {
+      ignored: ['**/android/**', '**/dist/**'],
+    },
   },
 }));

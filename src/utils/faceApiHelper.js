@@ -39,18 +39,28 @@ export const loadFaceApiModels = async () => {
 
 export const isFaceApiLoaded = () => loaded;
 
-export const detectFacesInVideo = async (videoElement, detectorType = 'tinyFace') => {
+export const detectFacesInVideo = async (videoElement, detectorType = 'tinyFace', options = {}) => {
   if (!loaded || !videoElement) return [];
+  const { withDescriptors = false, inputSize = 224, scoreThreshold = 0.5 } = options;
   const detectorOptions = detectorType === 'tinyFace'
-    ? new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
-    : new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 });
+    ? new faceapi.TinyFaceDetectorOptions({ inputSize, scoreThreshold })
+    : new faceapi.SsdMobilenetv1Options({ minConfidence: scoreThreshold });
 
   try {
-    const detections = await faceapi
-      .detectAllFaces(videoElement, detectorOptions)
-      .withFaceLandmarks()
-      .withFaceDescriptors();
-    return detections || [];
+    if (withDescriptors) {
+      // First quick presence check to avoid heavy 68-landmark/descriptor passes when no one is in frame
+      const basic = await faceapi.detectAllFaces(videoElement, detectorOptions);
+      if (!basic || basic.length === 0) return [];
+
+      const detections = await faceapi
+        .detectAllFaces(videoElement, detectorOptions)
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+      return detections || [];
+    } else {
+      const basic = await faceapi.detectAllFaces(videoElement, detectorOptions);
+      return basic || [];
+    }
   } catch (err) {
     try {
       const basic = await faceapi.detectAllFaces(videoElement, detectorOptions);

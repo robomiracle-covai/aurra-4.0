@@ -12,6 +12,7 @@ import { hardwareDispatcher } from './hardwareDispatcher';
 import { speakWithVoice, cancelSpeech, isAnySpeaking } from '../utils/speechSynthesis';
 import { llmService } from './llmService';
 import { logger } from './logger';
+import { chatHistoryService } from './chatHistoryService';
 
 export function isAcousticEcho(heardText, lastSpokenText) {
   if (!heardText) return false;
@@ -108,10 +109,34 @@ class VoiceNavigationService {
     this.lastSpeechEndTime = 0;
     this.isProcessingCommand = false;
     this.isProcessing = false;
+    this.isTypingMode = false;
     this.lastUserQueryTime = 0;
     this.lastProcessedUtterance = '';
     this.lastProcessedTime = 0;
     this.lastSpokenText = '';
+  }
+
+  setTypingMode(enabled) {
+    this.isTypingMode = Boolean(enabled);
+    if (this.isTypingMode) {
+      logger.info('VOICE', 'Typing mode ON: Microphone muted to avoid voice/keyboard cross-talk');
+      if (this.recognition && this.isListening) {
+        try {
+          this.recognition.abort();
+        } catch {
+          /* ignore */
+        }
+      }
+      this.isListening = false;
+      this.currentTranscript = '';
+      this.notify({ isListening: false, isTypingMode: true, transcript: '' });
+    } else {
+      logger.info('VOICE', 'Typing mode OFF: Resuming background listener if appropriate');
+      this.notify({ isTypingMode: false });
+      if (!this.userPaused && !this.manualStop && !this.isSpeakingTts && !this.isProcessing) {
+        this.startListening(true);
+      }
+    }
   }
 
   setForceLlmOnly(enabled) {
@@ -241,6 +266,11 @@ class VoiceNavigationService {
       };
 
       this.recognition.onresult = (event) => {
+        // Immediate drop: if user is typing on the keyboard, ignore any voice noise
+        if (this.isTypingMode) {
+          return;
+        }
+
         let interim = '';
         let final = '';
 
@@ -286,8 +316,8 @@ class VoiceNavigationService {
       };
 
       this.recognition.onend = () => {
-        // If user explicitly stopped or paused, do NOT restart
-        if (this.manualStop || this.userPaused) {
+        // If user is typing on the keyboard, or explicitly paused, do NOT restart
+        if (this.isTypingMode || this.manualStop || this.userPaused) {
           this.isListening = false;
           this.notify({ isListening: false });
           return;
@@ -336,7 +366,7 @@ class VoiceNavigationService {
     }
   }
 
-  async processVoiceCommand(rawUtterance) {
+  async processVoiceCommand(rawUtterance, { inputType = 'voice' } = {}) {
     if (!rawUtterance || typeof rawUtterance !== 'string') return;
     const utterance = rawUtterance.toLowerCase().trim();
 
@@ -407,19 +437,23 @@ class VoiceNavigationService {
 
     // 2. Strict Concurrency Mutex & Hardware Busy Guard:
     const isBusy = this.isProcessing || this.isSpeakingTts || isAnySpeaking();
-    if (isBusy) {
+    if (isBusy && inputType === 'voice') {
       logger.speech('VOICE', `Rejected utterance while busy (processing=${this.isProcessing}, speaking=${this.isSpeakingTts}): "${rawUtterance}"`);
       return;
     }
 
-    // 3. Post-speech acoustic settling delay (850ms)
-    if (this.lastSpeechEndTime && (Date.now() - this.lastSpeechEndTime < 850)) {
+    if (inputType === 'text' && isBusy) {
+      this.cancelSpeech();
+    }
+
+    // 3. Post-speech acoustic settling delay (850ms) - only applies to voice
+    if (inputType === 'voice' && this.lastSpeechEndTime && (Date.now() - this.lastSpeechEndTime < 850)) {
       logger.speech('VOICE', `Dropped utterance during acoustic settling: "${rawUtterance}"`);
       return;
     }
 
-    // 4. Acoustic Self-Echo & System Prompt Rejection
-    if (isAcousticEcho(rawUtterance, this.lastFeedback) || isAcousticEcho(rawUtterance, this.lastSpokenText)) {
+    // 4. Acoustic Self-Echo & System Prompt Rejection - only applies to voice
+    if (inputType === 'voice' && (isAcousticEcho(rawUtterance, this.lastFeedback) || isAcousticEcho(rawUtterance, this.lastSpokenText))) {
       logger.speech('VOICE', `Dropped acoustic self-echo utterance: "${rawUtterance}"`);
       return;
     }
@@ -436,6 +470,24 @@ class VoiceNavigationService {
     this.lastProcessedUtterance = utterance;
     this.lastProcessedTime = Date.now();
     this.lastUserQueryTime = Date.now();
+    const queryStartTime = performance.now();
+
+    const logTiming = (stage, detail = '') => {
+      const elapsed = Math.round(performance.now() - queryStartTime);
+      logger.info('TIMING', `[+${elapsed}ms] ${stage} ${detail}`.trim());
+      console.log(`%c[AURRA TIMING +${elapsed}ms] ${stage} ${detail}`.trim(), 'color: #00ffff; font-weight: bold;');
+    };
+
+    logTiming(`Query received via [${inputType.toUpperCase()}]`, `"${rawUtterance}"`);
+
+    // Log user query to persistent chat history
+    chatHistoryService.addMessage({
+      role: 'user',
+      text: rawUtterance,
+      inputType,
+      source: 'user',
+      confidence: 100,
+    });
 
     // ACQUIRE MUTEX LOCK
     this.isProcessing = true;
@@ -461,8 +513,9 @@ class VoiceNavigationService {
 
       if (llmResult.success && llmResult.text) {
         const aiReply = llmResult.text;
+        const latency = Math.round(performance.now() - queryStartTime);
+        logTiming(`Groq LLM response arrived`, `(${latency}ms total latency)`);
         this.setFeedback(aiReply);
-        logger.speech('VOICE', `[Direct Groq AI Answer (${llmResult.latencyMs}ms)]: "${aiReply}"`);
 
         this.conversationHistory.push({ role: 'user', content: rawUtterance });
         this.conversationHistory.push({ role: 'assistant', content: aiReply });
@@ -471,6 +524,15 @@ class VoiceNavigationService {
         }
 
         this.speak(aiReply);
+
+        chatHistoryService.addMessage({
+          role: 'assistant',
+          text: aiReply,
+          inputType,
+          source: 'groq-llm-direct',
+          confidence: 100,
+          latencyMs: latency,
+        });
 
         window.dispatchEvent(new CustomEvent('aurra:qa-answered', {
           detail: {
@@ -493,9 +555,20 @@ class VoiceNavigationService {
     // 5. Robot Hardware Commands (ESP32 / Motors / Servos / Eyes)
     const hwResult = hardwareDispatcher.evaluate(utterance);
     if (hwResult.handled) {
+      const latency = Math.round(performance.now() - queryStartTime);
+      logTiming(`Hardware command matched`, `(${hwResult.action} in ${latency}ms)`);
       this.setFeedback(hwResult.message);
-      logger.speech('VOICE', `Hardware command: [${hwResult.action}] -> "${hwResult.message}"`);
       this.speak(hwResult.message);
+
+      chatHistoryService.addMessage({
+        role: 'assistant',
+        text: hwResult.message,
+        inputType,
+        source: 'hardware',
+        confidence: 100,
+        latencyMs: latency,
+      });
+
       return;
     }
 
@@ -546,6 +619,17 @@ class VoiceNavigationService {
           matchedCard = cards.find((c) => c.href === '/weblinks') || {
             title: 'Website & Social Links',
             href: '/weblinks',
+            voiceAccessEnabled: true,
+          };
+        } else if (
+          utterance.includes('testing interactive') ||
+          utterance.includes('test mode') ||
+          utterance.includes('diagnostic mode') ||
+          utterance.includes('test lab')
+        ) {
+          matchedCard = cards.find((c) => c.href === '/testing-interaction') || {
+            title: 'Testing Interactive Mode',
+            href: '/testing-interaction',
             voiceAccessEnabled: true,
           };
         } else if (
@@ -613,10 +697,20 @@ class VoiceNavigationService {
       const qaResult = await offlineQaService.findBestAnswer(rawUtterance);
       if (qaResult && qaResult.match && (qaResult.confidence >= 60 || !llmService.isConfigured())) {
         const item = qaResult.match;
+        const latency = Math.round(performance.now() - queryStartTime);
+        logTiming(`Offline FAQ matched`, `"${item.question}" (${qaResult.confidence}% in ${latency}ms)`);
         this.setFeedback(item.answer);
-        logger.speech('VOICE', `[Tier 2: Offline FAQ] [${item.question}] (${qaResult.confidence}% match): "${item.answer}"`);
         
         this.speak(item.answer);
+
+        chatHistoryService.addMessage({
+          role: 'assistant',
+          text: item.answer,
+          inputType,
+          source: 'offline-faq',
+          confidence: qaResult.confidence,
+          latencyMs: latency,
+        });
 
         window.dispatchEvent(new CustomEvent('aurra:qa-answered', {
           detail: {
@@ -633,7 +727,7 @@ class VoiceNavigationService {
       if (llmService.isConfigured()) {
         this.isThinking = true;
         this.notify({ isThinking: true, feedback: 'Thinking...' });
-        logger.speech('VOICE', `[Tier 3: Escalating to Real AI LLM] Query: "${rawUtterance}"`);
+        logTiming(`Escalating to Groq LLM Cloud API`);
 
         const llmResult = await llmService.generateResponse(rawUtterance, this.conversationHistory);
         this.isThinking = false;
@@ -641,8 +735,9 @@ class VoiceNavigationService {
 
         if (llmResult.success && llmResult.text) {
           const aiReply = llmResult.text;
+          const latency = Math.round(performance.now() - queryStartTime);
+          logTiming(`Groq LLM answer arrived`, `(API: ${llmResult.latencyMs}ms, Total: ${latency}ms)`);
           this.setFeedback(aiReply);
-          logger.speech('VOICE', `[Tier 3: Groq AI Answer (${llmResult.latencyMs}ms)]: "${aiReply}"`);
 
           // Maintain recent conversation history
           this.conversationHistory.push({ role: 'user', content: rawUtterance });
@@ -652,6 +747,15 @@ class VoiceNavigationService {
           }
 
           this.speak(aiReply);
+
+          chatHistoryService.addMessage({
+            role: 'assistant',
+            text: aiReply,
+            inputType,
+            source: 'groq-llm',
+            confidence: 99,
+            latencyMs: latency,
+          });
 
           window.dispatchEvent(new CustomEvent('aurra:qa-answered', {
             detail: {
@@ -673,8 +777,9 @@ class VoiceNavigationService {
       this.isThinking = false;
       this.notify({ isThinking: false });
       const fallbackMsg = "Sorry, I could not catch that.";
+      const latency = Math.round(performance.now() - queryStartTime);
+      logTiming(`Fallback triggered (${latency}ms)`);
       this.setFeedback(fallbackMsg);
-      logger.info('VOICE', `Utterance "${utterance}" did not match any active cards or FAQs.`);
       this.speak(fallbackMsg);
 
     } catch (err) {

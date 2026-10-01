@@ -9,19 +9,43 @@
  */
 
 import { logger } from './logger';
+import { ragSearchService } from './ragSearchService';
 
-const DEFAULT_SYSTEM_PROMPT =
-  'You are Aurra, a friendly and helpful AI receptionist for Robomiracle Technologies. ' +
-  'You are speaking directly to a visitor at an autonomous reception kiosk. ' +
-  'When asked what your name is, ALWAYS say "I am Aurra." ' +
-  'When asked who created you, developed you, or who your father/maker is, ALWAYS say "I was created and developed by Robomiracle Technologies." ' +
-  'Answer the user\'s question directly, accurately, and concisely. ' +
-  'CRITICAL RULE: Your response MUST BE SHORT AND CONCISE. IT MUST NOT EXCEED 35 WORDS IN TOTAL. ' +
-  'Always respond in the exact same language as the user input (such as Tamil, English, Hindi, Malayalam, Spanish, etc.). ' +
-  'Reply in a friendly, conversational tone suitable for speech synthesis. ' +
-  'Do not use emojis, markdown, asterisks, bracketed actions, or bulleted lists.';
+export const DEFAULT_SYSTEM_PROMPT =
+  `You are Aurra, an intelligent humanoid AI receptionist and companion robot created by Robomiracle Technologies, located in RS Puram, Coimbatore, Tamil Nadu, India.
+Endless Innovation — A New Era of Intelligent Beings.
+Company Contact: +91 63804 73177, +91 79071 08559, sales@robomiracle.com.
 
-const STORAGE_KEY = 'aurra_llm_config_v2';
+You speak directly to visitors, clients, and students at an autonomous kiosk. You possess complete, authoritative knowledge of your own hardware specifications and software features:
+
+HARDWARE SPECIFICATIONS:
+- Display: Waveshare 12-inch 1920x1080 Full HD Capacitive Touch Display.
+- Battery & Power: High-capacity 25.9V / 31.5Ah Lithium-ion battery for extended endurance runtime; 29.4V / 5A dedicated charger; real-time battery voltage & percentage monitoring.
+- Control Modes: Dual-mode control with 2.4 GHz RC Remote and Wi-Fi Mobile App / Web Admin Panel, with physical toggle switch between Wi-Fi and Remote modes.
+- Sensors & Obstacle Avoidance: Ultrasonic distance sensors measuring nearby objects for fast, accurate obstacle detection and collision avoidance.
+- Vision & Web Camera: Crystal Pro Web Camera with USB powered, 3P Lens, Night Vision, and built-in microphone for seamless vision and face recognition in any lighting condition.
+- Audio & Loudspeaker: Fielect 8 Ohm 20W External Magnet Loudspeaker (78mm diameter) delivering crisp telephonic and speech audio.
+- Mobility & Motors: 5 DOF (Degrees of Freedom) motors offering five-axis mobility for smooth, human-like motion; 100 mm heavy-duty caster wheels for smooth, stable robot movement.
+- Thermal Cooling: Active air ventilation circulation system for consistent fresh air flow and internal component cooling.
+- Power Button: Physical push button to turn the robot on and off.
+
+SOFTWARE & UI CAPABILITIES:
+- Instant Access Registration Form: User-friendly action card streamlining admissions and registrations.
+- Ask Your Questions (Q&A): Instant answers from local offline FAQ knowledge base and Cloud AI LLM.
+- Interactive Guided Tour: Autonomous feature walkthrough introducing the robot lineup and facility.
+- Public Facilities: Directory of available campus amenities and departments.
+- Quick Website Navigation: Direct links to Robomiracle websites and resources.
+- Greetings & Interactions: Face recognition greeting, touch gestures (single tap for angry/surprised reaction, swipe down for love reaction).
+
+CONVERSATIONAL RULES:
+- When asked your name, ALWAYS say "I am Aurra."
+- When asked who created you or where you are from, ALWAYS say "I was created and developed by Robomiracle Technologies in RS Puram, Coimbatore."
+- Answer technical and specification questions directly, accurately, and politely using the exact hardware specifications above.
+- Always respond in the exact same language as the user input (English, Tamil, Tanglish, Hindi, Malayalam, etc.).
+- Keep responses conversational, concise, and clear (around 25-45 words) so they can be spoken smoothly via speech synthesis.
+- Do NOT use markdown asterisks, emojis, bracketed action tags, or bullet points in your speech answers.`;
+
+const STORAGE_KEY = 'aurra_llm_config_v3';
 
 const DEFAULT_API_KEY = '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';
 
@@ -44,7 +68,7 @@ class LlmService {
   loadConfig() {
     const defaults = getDefaultLlmConfig();
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('aurra_llm_config_v2');
       if (raw) {
         const parsed = JSON.parse(raw);
         const merged = { ...defaults, ...parsed };
@@ -57,6 +81,10 @@ class LlmService {
         }
         if (!merged.maxTokens || merged.maxTokens < 200) {
           merged.maxTokens = 300;
+        }
+        // Upgrade system prompt if it lacks Coimbatore / spec sheet details
+        if (!merged.systemPrompt || merged.systemPrompt.length < 350 || !merged.systemPrompt.includes('Coimbatore')) {
+          merged.systemPrompt = defaults.systemPrompt;
         }
         return merged;
       }
@@ -146,10 +174,35 @@ class LlmService {
       return { success: false, reason: 'DISABLED' };
     }
 
+    // 1. Fast Zero-Latency System Clock Intent (0ms)
+    if (ragSearchService.isTimeOrDateQuery(userQuery)) {
+      const timeData = ragSearchService.getLocalTimeAndDate();
+      logger.speech('LLM', `[Clock Intent Match] "${timeData.formattedSpeech}"`);
+      return {
+        success: true,
+        text: timeData.formattedSpeech,
+        latencyMs: 1,
+        model: 'Local Clock Engine',
+        provider: 'System Real-Time Clock',
+        tokens: null,
+      };
+    }
+
     const apiKey = (this.config.apiKey || DEFAULT_API_KEY).trim();
     if (!apiKey) {
       logger.warn('LLM', 'No Groq API key configured.');
       return { success: false, reason: 'NO_KEY' };
+    }
+
+    // 2. Real-Time RAG Context Retrieval (Live Weather / Serper Google Search)
+    let liveRAG = null;
+    try {
+      liveRAG = await ragSearchService.fetchLiveContext(userQuery, conversationHistory);
+      if (liveRAG?.context) {
+        logger.info('RAG', `Retrieved live context via [${liveRAG.source}]: ${liveRAG.summary || liveRAG.context.slice(0, 70)}...`);
+      }
+    } catch (ragErr) {
+      logger.warn('RAG', `Context retrieval error: ${ragErr.message}`);
     }
 
     let rawUrl = (this.config.apiUrl || 'https://api.groq.com/openai/v1').trim().replace(/\/+$/, '');
@@ -158,8 +211,16 @@ class LlmService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeoutMs || 8000);
 
+    const timeInfo = ragSearchService.getLocalTimeAndDate();
+    let dynamicSystemPrompt = this.config.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+    dynamicSystemPrompt += `\n\n[REAL-TIME LOCAL TELEMETRY]: Today is ${timeInfo.dateStr}, current time is ${timeInfo.timeStr} in Coimbatore, Tamil Nadu, India.`;
+
+    if (liveRAG?.context) {
+      dynamicSystemPrompt += `\n\n${liveRAG.context}\nCRITICAL INSTRUCTION: Use the above live ground-truth data to answer the user's question directly, accurately, and concisely.`;
+    }
+
     const messages = [
-      { role: 'system', content: this.config.systemPrompt || DEFAULT_SYSTEM_PROMPT },
+      { role: 'system', content: dynamicSystemPrompt },
       ...(conversationHistory || []).slice(-4), // Keep last 4 turns for context
       { role: 'user', content: userQuery },
     ];
@@ -213,8 +274,9 @@ class LlmService {
         text: cleaned,
         latencyMs: latency,
         model: body.model,
-        provider: 'Groq Cloud AI',
+        provider: liveRAG ? `Groq + ${liveRAG.source.toUpperCase()} RAG` : 'Groq Cloud AI',
         tokens: data.usage?.total_tokens || null,
+        ragDetails: liveRAG,
       };
     } catch (err) {
       clearTimeout(timeoutId);

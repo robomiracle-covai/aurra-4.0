@@ -32,7 +32,7 @@ import {
   Check
 } from 'lucide-react';
 import { offlineCardService, offlineQaService, offlineFaceService } from '../../db/offlineServices';
-import { llmService } from '../../services/llmService';
+import { llmService, DEFAULT_SYSTEM_PROMPT } from '../../services/llmService';
 import { esp32Service } from '../../services/esp32Service';
 import { speakWithVoice, cancelSpeech, isAnySpeaking } from '../../utils/speechSynthesis';
 import { elevenLabsService, DEFAULT_ELEVENLABS_VOICES } from '../../services/elevenLabsService';
@@ -58,7 +58,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
     {
       id: 1,
       role: 'assistant',
-      text: 'Diagnostic Mode Active. You can test features in isolation or combined. Microphone and Camera are OFF by default.',
+      text: 'Diagnostic Mode Active. Aurra is loaded with official hardware & software specifications from Robomiracle Technologies (Coimbatore).',
       timestamp: Date.now(),
       source: 'system',
       latencyMs: 0
@@ -70,10 +70,34 @@ export default function TestingInteractionModeView({ onNavigate }) {
     return llmService.getConfig().model || 'qwen/qwen3.8-27b';
   });
 
+  // ── System Prompt (Aurra Spec Sheet Knowledge Base) State ──
+  const [systemPromptText, setSystemPromptText] = useState(() => {
+    return llmService.getConfig().systemPrompt || DEFAULT_SYSTEM_PROMPT;
+  });
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
+  const [promptSavedNotice, setPromptSavedNotice] = useState(false);
+
   const handleModelChange = (newModel) => {
     setSelectedLlmModel(newModel);
     llmService.saveConfig({ model: newModel });
     addLog('LLM', `Switched active Cloud LLM model to: "${newModel}"`, 'info');
+  };
+
+  const handleSaveSystemPrompt = (newPrompt) => {
+    const trimmed = (newPrompt || '').trim();
+    llmService.saveConfig({ systemPrompt: trimmed });
+    setSystemPromptText(trimmed);
+    setPromptSavedNotice(true);
+    setTimeout(() => setPromptSavedNotice(false), 3000);
+    addLog('LLM', 'Updated active Cloud LLM system prompt with Aurra Spec Sheet knowledge', 'success');
+  };
+
+  const handleResetSystemPrompt = () => {
+    llmService.saveConfig({ systemPrompt: DEFAULT_SYSTEM_PROMPT });
+    setSystemPromptText(DEFAULT_SYSTEM_PROMPT);
+    setPromptSavedNotice(true);
+    setTimeout(() => setPromptSavedNotice(false), 3000);
+    addLog('LLM', 'Reset Cloud LLM system prompt to Aurra Spec Sheet baseline', 'info');
   };
 
   // ── STT (Voice Recognition) State ──
@@ -453,15 +477,19 @@ export default function TestingInteractionModeView({ onNavigate }) {
 
         if (llmResult.success && llmResult.text) {
           replyText = llmResult.text;
-          matchSource = 'groq-llm';
+          matchSource = llmResult.model === 'Local Clock Engine' ? 'local-clock' : 'groq-llm';
           matchConfidence = 99;
           llmDetails = {
             model: llmResult.model || currentModel,
             provider: llmResult.provider || 'Groq Cloud API',
             latencyMs: llmResult.latencyMs || llmLatency,
             tokens: llmResult.tokens,
+            ragDetails: llmResult.ragDetails,
           };
-          addLog('PIPELINE', `[Step 4] Groq LLM [${llmDetails.model}] answer returned (${llmDetails.latencyMs}ms API)`, 'success', llmLatency);
+          if (llmResult.ragDetails) {
+            addLog('RAG', `Live context fetched via [${llmResult.ragDetails.source}]: ${llmResult.ragDetails.summary || 'Web Ground Truth'}`, 'timing', llmResult.ragDetails.latencyMs);
+          }
+          addLog('PIPELINE', `[Step 4] ${llmResult.model === 'Local Clock Engine' ? 'Local Clock' : 'Groq LLM [' + llmDetails.model + ']'} answer returned (${llmDetails.latencyMs}ms)`, 'success', llmLatency);
         } else {
           addLog('PIPELINE', `[Step 4] Groq LLM failed: ${llmResult.error || 'Empty response'}`, 'warn', llmLatency);
           fallbackInfo = {
@@ -780,8 +808,65 @@ export default function TestingInteractionModeView({ onNavigate }) {
                 <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (Large 120B)</option>
                 <option value="allam-2-7b">allam-2-7b (7B)</option>
               </select>
+              <button
+                type="button"
+                className={`tia-prompt-toggle-btn ${showSystemPrompt ? 'active' : ''}`}
+                onClick={() => setShowSystemPrompt(!showSystemPrompt)}
+                title="View & Edit System Prompt (Spec Sheet Knowledge)"
+              >
+                <Sliders size={12} />
+                <span>Spec Prompt</span>
+              </button>
             </div>
           </div>
+
+          {/* 0. AURRA SPEC SHEET SYSTEM PROMPT INSPECTOR (When Prompt toggled or Text & LLM tab active) */}
+          {(showSystemPrompt || activeTab === 'chat') && (
+            <div className="tia-prompt-card">
+              <div className="tia-prompt-header">
+                <div className="tia-prompt-title">
+                  <Sparkles size={14} color="#00ffff" />
+                  <strong>AURRA SPEC SHEET SYSTEM PROMPT (LIVE LLM KNOWLEDGE)</strong>
+                </div>
+                <div className="tia-prompt-badge">
+                  <span>Robomiracle Coimbatore Baseline</span>
+                </div>
+              </div>
+              <p className="tia-prompt-desc">
+                Injected into Cloud AI ({selectedLlmModel}): provides full specs on 25.9V battery, 12" Waveshare display, 5 DOF motors, casters, and Robomiracle identity:
+              </p>
+              <textarea
+                className="tia-prompt-textarea"
+                rows={4}
+                value={systemPromptText}
+                onChange={(e) => setSystemPromptText(e.target.value)}
+                placeholder="Enter system prompt for Aurra..."
+              />
+              <div className="tia-prompt-actions">
+                <div className="tia-prompt-btns">
+                  <button
+                    type="button"
+                    className="tia-btn-sm primary"
+                    onClick={() => handleSaveSystemPrompt(systemPromptText)}
+                  >
+                    <Check size={13} />
+                    <span>Save to LLM</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="tia-btn-sm secondary"
+                    onClick={handleResetSystemPrompt}
+                  >
+                    <RotateCcw size={13} />
+                    <span>Reset to Spec Sheet Baseline</span>
+                  </button>
+                </div>
+                {promptSavedNotice && (
+                  <span className="tia-prompt-notice">✓ System Prompt Updated!</span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* 1. VISION MONITOR (Visible when Vision is ON or tab active) */}
           {(enableVision || activeTab === 'vision') && (
@@ -928,7 +1013,15 @@ export default function TestingInteractionModeView({ onNavigate }) {
                         <span className="tia-bubble-sender">{isUser ? 'User' : 'Aurra AI'}</span>
                         {msg.source && (
                           <span className={`tia-source-tag ${msg.source}`}>
-                            {msg.source === 'offline-faq' ? 'CUSTOMIZED FAQ' : msg.source === 'groq-llm' ? 'CLOUD LLM' : msg.source.toUpperCase()}
+                            {msg.source === 'offline-faq'
+                              ? 'CUSTOMIZED FAQ'
+                              : msg.source === 'local-clock'
+                              ? 'LOCAL CLOCK (0ms)'
+                              : msg.llmInfo?.ragDetails
+                              ? `CLOUD LLM + ${msg.llmInfo.ragDetails.source.toUpperCase()} RAG`
+                              : msg.source === 'groq-llm'
+                              ? 'CLOUD LLM'
+                              : msg.source.toUpperCase()}
                           </span>
                         )}
                         {msg.latencyMs !== undefined && (
@@ -939,6 +1032,24 @@ export default function TestingInteractionModeView({ onNavigate }) {
                       <p className="tia-bubble-text">{msg.text}</p>
 
                       {/* Diagnostic Source Inspector Box */}
+                      {!isUser && msg.source === 'local-clock' && (
+                        <div className="tia-source-card clock-card" style={{ borderLeftColor: '#38bdf8' }}>
+                          <div className="source-card-header">
+                            <Clock size={13} color="#38bdf8" />
+                            <strong>SOURCE: HARDWARE SYSTEM CLOCK (0ms LATENCY)</strong>
+                          </div>
+                          <div className="source-card-body">
+                            <div className="source-meta-row">
+                              <span className="meta-key">Location:</span>
+                              <span className="meta-val highlight" style={{ color: '#38bdf8' }}>Coimbatore, Tamil Nadu (IST)</span>
+                              <span className="meta-divider">•</span>
+                              <span className="meta-key">Resolution:</span>
+                              <span className="meta-val speed">Instant (0ms Local RTC)</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {!isUser && msg.source === 'offline-faq' && msg.matchedFaq && (
                         <div className="tia-source-card faq-card">
                           <div className="source-card-header">
@@ -989,6 +1100,20 @@ export default function TestingInteractionModeView({ onNavigate }) {
                                 </>
                               )}
                             </div>
+                            {msg.llmInfo.ragDetails && (
+                              <div className="source-meta-row" style={{ marginTop: '5px', borderTop: '1px dashed rgba(192, 132, 252, 0.3)', paddingTop: '4px' }}>
+                                <span className="meta-key">Live RAG Engine:</span>
+                                <span className="meta-val" style={{ color: '#00ffff' }}>
+                                  {msg.llmInfo.ragDetails.source === 'open-meteo' ? 'Open-Meteo Live Weather' : 'Google Serper Live Search'}
+                                </span>
+                                <span className="meta-divider">•</span>
+                                <span className="meta-key">Ground Truth:</span>
+                                <span className="meta-val">{msg.llmInfo.ragDetails.summary || 'Live Web Data'}</span>
+                                <span className="meta-divider">•</span>
+                                <span className="meta-key">RAG Latency:</span>
+                                <span className="meta-val speed">{msg.llmInfo.ragDetails.latencyMs}ms</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1100,12 +1225,14 @@ export default function TestingInteractionModeView({ onNavigate }) {
           </div>
 
           <div className="tia-quick-prompts">
-            <span className="tia-quick-label">Quick Test Queries:</span>
+            <span className="tia-quick-label">Real-Time & Spec Quick Queries:</span>
             <div className="tia-chips-row">
-              <button type="button" onClick={() => handleExecuteQuery('Who are you?', 'text')}>"Who are you?"</button>
-              <button type="button" onClick={() => handleExecuteQuery('Where is cafeteria?', 'text')}>"Cafeteria?"</button>
+              <button type="button" onClick={() => handleExecuteQuery('What is the current time?', 'text')}>"Current Time (0ms)"</button>
+              <button type="button" onClick={() => handleExecuteQuery('What is the weather in Coimbatore today?', 'text')}>"Coimbatore Weather"</button>
+              <button type="button" onClick={() => handleExecuteQuery('Who is the Chief Minister of Tamil Nadu?', 'text')}>"CM of Tamil Nadu (Google Search)"</button>
+              <button type="button" onClick={() => handleExecuteQuery('Who created you and where are you from?', 'text')}>"Who created you?"</button>
+              <button type="button" onClick={() => handleExecuteQuery('What battery and charger specifications do you use?', 'text')}>"Battery Specs"</button>
               <button type="button" onClick={() => handleExecuteQuery('Robot tilt head up', 'text')}>"Head Up"</button>
-              <button type="button" onClick={() => handleExecuteQuery('Explain quantum physics in 2 sentences', 'text')}>"Groq LLM Test"</button>
             </div>
           </div>
         </div>

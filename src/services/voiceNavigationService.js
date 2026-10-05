@@ -656,6 +656,27 @@ class VoiceNavigationService {
             href: '/guided-tour',
             voiceAccessEnabled: true,
           };
+        } else if (
+          utterance.includes('facility') ||
+          utterance.includes('facilities') ||
+          utterance.includes('amenities') ||
+          utterance.includes('washroom') ||
+          utterance.includes('restroom') ||
+          utterance.includes('toilet') ||
+          utterance.includes('canteen') ||
+          utterance.includes('cafeteria') ||
+          utterance.includes('drinking water') ||
+          utterance.includes('elevator') ||
+          utterance.includes('stairs') ||
+          utterance.includes('room directory') ||
+          utterance.includes('floor directory') ||
+          utterance.includes('building map')
+        ) {
+          matchedCard = cards.find((c) => c.href === '/facilities') || {
+            title: 'Public Facilities',
+            href: '/facilities',
+            voiceAccessEnabled: true,
+          };
         }
       }
 

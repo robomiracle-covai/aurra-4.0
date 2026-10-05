@@ -10,6 +10,7 @@ import TestingInteractionModeView from './pages/Interaction/TestingInteractionMo
 import FeaturePlaceholder from './pages/FeatureView/FeaturePlaceholder';
 import WebLinks from './pages/WebLinks/WebLinks';
 import GuidedTourView from './pages/GuidedTour/GuidedTourView';
+import PublicFacilitiesView from './pages/Facilities/PublicFacilitiesView';
 import VoiceAssistantBar from './components/VoiceAssistantBar';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import './App.css';
@@ -77,6 +78,8 @@ function App() {
           <HardwareConnection onNavigate={handleNavigate} />
         ) : currentRoute === '/weblinks' ? (
           <WebLinks onNavigate={handleNavigate} />
+        ) : currentRoute === '/facilities' ? (
+          <PublicFacilitiesView onNavigate={handleNavigate} />
         ) : currentRoute !== '/' ? (
           <FeaturePlaceholder
             path={currentRoute}

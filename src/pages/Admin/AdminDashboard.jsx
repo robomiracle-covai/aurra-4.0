@@ -53,11 +53,13 @@ import {
   MapPin,
   Navigation,
   Layers,
-  MessageSquare
+  MessageSquare,
+  Building2
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import AdminChatHistoryView from '../../components/AdminChatHistoryView';
-import { llmService } from '../../services/llmService';
+import { llmService, DEFAULT_SYSTEM_PROMPT } from '../../services/llmService';
+import { getLiveKnowledgeBlock, mergeKnowledgeIntoPrompt } from '../../services/facilityTourKnowledgeService';
 import {
   offlineCardService,
   offlineSliderService,
@@ -68,6 +70,7 @@ import {
   offlineWebLinksService,
   offlineTourService,
   offlineRobotTourService,
+  offlineFacilityService,
   offlineBackupService
 } from '../../db/offlineServices';
 import { devSettingsService } from '../../services/devSettingsService';
@@ -215,6 +218,30 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   const [stepFormImage, setStepFormImage] = useState('');
   const [testingStepPhase, setTestingStepPhase] = useState(null);
 
+  // Campus Facilities & Room Directory state
+  const [facilities, setFacilities] = useState([]);
+  const [facilitySearch, setFacilitySearch] = useState('');
+  const [facilityFloorFilter, setFacilityFloorFilter] = useState('all');
+  const [showFacilityModal, setShowFacilityModal] = useState(false);
+  const [facilityModalMode, setFacilityModalMode] = useState('add');
+  const [facilityForm, setFacilityForm] = useState({
+    id: '',
+    code: '',
+    name: '',
+    floor: 'ground',
+    floorLabel: 'Ground Floor (Level 0)',
+    wing: 'Central Atrium',
+    category: 'reception',
+    categoryLabel: 'Reception & Check-In',
+    icon: 'Building2',
+    hours: '9:00 AM – 6:00 PM',
+    distanceMeters: 15,
+    walkTime: '20 sec walk',
+    status: 'Open',
+    directions: '',
+    amenities: 'Wi-Fi, Accessible',
+  });
+
   const showStatus = (msg) => {
     setStatusMsg(msg);
     setTimeout(() => setStatusMsg(''), 3000);
@@ -249,6 +276,9 @@ export default function AdminDashboard({ onNavigate, onClose }) {
 
       const robotsList = await offlineRobotTourService.getRobots();
       setRobotTours(robotsList || []);
+
+      const facilitiesList = await offlineFacilityService.getFacilities();
+      setFacilities(facilitiesList || []);
 
       setDevSettings(devSettingsService.getSettings());
     } catch (e) {
@@ -1184,8 +1214,21 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   const handleResetLlmSystemPrompt = () => {
     const defaultConfig = llmService.saveConfig({ systemPrompt: undefined });
     setLlmConfig(defaultConfig);
-    setLlmSystemPromptInput(defaultConfig.systemPrompt);
-    showStatus('System Persona reset to default');
+    setLlmSystemPromptInput(defaultConfig.systemPrompt || DEFAULT_SYSTEM_PROMPT);
+    showStatus('System Persona reset to baseline with Facilities & Tours');
+  };
+
+  const handleSyncPromptWithKnowledge = async () => {
+    try {
+      const liveBlock = await getLiveKnowledgeBlock(true);
+      const merged = mergeKnowledgeIntoPrompt(llmSystemPromptInput || llmConfig.systemPrompt || DEFAULT_SYSTEM_PROMPT, liveBlock);
+      setLlmSystemPromptInput(merged);
+      const next = llmService.saveConfig({ systemPrompt: merged });
+      setLlmConfig(next);
+      showStatus('Auto-merged latest campus facilities & tours into prompt!');
+    } catch (err) {
+      showStatus(`Sync error: ${err.message}`);
+    }
   };
 
   const handleUpdateLlmParams = (params) => {
@@ -1226,6 +1269,121 @@ export default function AdminDashboard({ onNavigate, onClose }) {
       link.tag?.toLowerCase().includes(q) ||
       link.description?.toLowerCase().includes(q);
     return matchesCat && matchesQ;
+  });
+
+  // Facility management handlers
+  const handleToggleFacility = async (id, isEnabled) => {
+    try {
+      await offlineFacilityService.toggleFacilityEnabled(id, isEnabled);
+      setFacilities((prev) => prev.map((f) => (f.id === id ? { ...f, isEnabled } : f)));
+      showStatus(`Facility ${isEnabled ? 'enabled' : 'disabled'}`);
+    } catch (err) {
+      showStatus(`Error updating facility: ${err.message}`);
+    }
+  };
+
+  const handleDeleteFacility = async (id, name) => {
+    if (!window.confirm(`Delete facility "${name}"?`)) return;
+    try {
+      await offlineFacilityService.deleteFacility(id);
+      setFacilities((prev) => prev.filter((f) => f.id !== id));
+      showStatus(`Deleted "${name}"`);
+    } catch (err) {
+      showStatus(`Error deleting facility: ${err.message}`);
+    }
+  };
+
+  const handleOpenAddFacility = () => {
+    setFacilityModalMode('add');
+    setFacilityForm({
+      id: `fac-${Date.now()}`,
+      code: `G-0${facilities.length + 1}`,
+      name: '',
+      floor: 'ground',
+      floorLabel: 'Ground Floor (Level 0)',
+      wing: 'East Wing',
+      category: 'reception',
+      categoryLabel: 'Reception & Check-In',
+      icon: 'Building2',
+      hours: '9:00 AM – 6:00 PM',
+      distanceMeters: 20,
+      walkTime: '30 sec walk',
+      status: 'Open',
+      directions: '',
+      amenities: 'Wi-Fi, Accessible',
+    });
+    setShowFacilityModal(true);
+  };
+
+  const handleOpenEditFacility = (fac) => {
+    setFacilityModalMode('edit');
+    setFacilityForm({
+      ...fac,
+      amenities: Array.isArray(fac.amenities) ? fac.amenities.join(', ') : (fac.amenities || ''),
+    });
+    setShowFacilityModal(true);
+  };
+
+  const handleSaveFacility = async (e) => {
+    e.preventDefault();
+    try {
+      const amenitiesArray = typeof facilityForm.amenities === 'string'
+        ? facilityForm.amenities.split(',').map((s) => s.trim()).filter(Boolean)
+        : (facilityForm.amenities || []);
+
+      const floorLabel =
+        facilityForm.floor === 'ground' ? 'Ground Floor (Level 0)' :
+        facilityForm.floor === 'first' ? 'First Floor (Level 1)' :
+        facilityForm.floor === 'second' ? 'Second Floor (Level 2)' : 'Outdoor / Campus';
+
+      const payload = {
+        ...facilityForm,
+        floorLabel,
+        amenities: amenitiesArray,
+        distanceMeters: Number(facilityForm.distanceMeters) || 0,
+        sortOrder: facilityForm.sortOrder || facilities.length + 1,
+      };
+
+      if (facilityModalMode === 'add') {
+        await offlineFacilityService.addFacility(payload);
+        showStatus(`Added facility "${payload.name}"`);
+      } else {
+        await offlineFacilityService.updateFacility(payload.id, payload);
+        showStatus(`Updated facility "${payload.name}"`);
+      }
+
+      const refreshed = await offlineFacilityService.getFacilities();
+      setFacilities(refreshed);
+      setShowFacilityModal(false);
+    } catch (err) {
+      showStatus(`Failed saving facility: ${err.message}`);
+    }
+  };
+
+  const handleResetFacilities = async () => {
+    if (!window.confirm('Reset all facilities and directories to factory defaults? Any custom rooms will be reverted.')) return;
+    try {
+      const reset = await offlineFacilityService.restoreDefaultFacilities();
+      setFacilities(reset);
+      showStatus('Restored campus facilities to factory defaults');
+    } catch (err) {
+      showStatus(`Reset failed: ${err.message}`);
+    }
+  };
+
+  const filteredFacilitiesAdmin = facilities.filter((fac) => {
+    const matchesFloor = facilityFloorFilter === 'all' || fac.floor === facilityFloorFilter;
+    const q = facilitySearch.toLowerCase().trim();
+    const matchesQ =
+      !q ||
+      fac.name?.toLowerCase().includes(q) ||
+      fac.title?.toLowerCase().includes(q) ||
+      fac.description?.toLowerCase().includes(q) ||
+      fac.code?.toLowerCase().includes(q) ||
+      fac.wing?.toLowerCase().includes(q) ||
+      fac.categoryLabel?.toLowerCase().includes(q) ||
+      fac.directions?.toLowerCase().includes(q);
+    return matchesFloor && matchesQ;
   });
 
   return (
@@ -1352,6 +1510,14 @@ export default function AdminDashboard({ onNavigate, onClose }) {
             <span>QR Codes & Links</span>
             {weblinks.length > 0 && <span className="adm-nav-badge">{weblinks.length}</span>}
           </button>
+          <button
+            className={`adm-nav-item ${activeTab === 'facilities' ? 'active' : ''}`}
+            onClick={() => setActiveTab('facilities')}
+          >
+            <Building2 size={18} />
+            <span>Campus Facilities & Rooms</span>
+            {facilities.length > 0 && <span className="adm-nav-badge">{facilities.length}</span>}
+          </button>
 
           <div className="adm-menu-group-label">DEVELOPER & SYSTEM</div>
           <button
@@ -1406,6 +1572,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
               {activeTab === 'tour' && 'Guided Robot Tour & Facility Waypoints'}
               {activeTab === 'hardware' && 'Robot Hardware, Servo Poses & Wi-Fi Setup'}
               {activeTab === 'weblinks' && 'QR Codes & Official Portals Manager'}
+              {activeTab === 'facilities' && 'Public Facilities & Room Directory Management'}
               {activeTab === 'developer' && 'Developer Mode, PIN Security & System Toggles'}
               {activeTab === 'backup' && 'Database Backup, JSON Export & Reset'}
             </h1>
@@ -2110,17 +2277,29 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                 </div>
 
                 <div className="adm-form-group" style={{ marginTop: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                     <label>AURRA SYSTEM PERSONA PROMPT (STRICT 35-WORD SPEECH RULE)</label>
-                    <button
-                      type="button"
-                      className="adm-btn-action"
-                      style={{ padding: '4px 10px', fontSize: '11px' }}
-                      onClick={handleResetLlmSystemPrompt}
-                    >
-                      <RotateCcw size={12} />
-                      <span>Reset to Default Prompt</span>
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        className="adm-btn-action"
+                        style={{ padding: '4px 10px', fontSize: '11px', color: '#00ffff', borderColor: 'rgba(0,255,255,0.3)' }}
+                        onClick={handleSyncPromptWithKnowledge}
+                        title="Auto-merge the latest campus rooms, floors, and robot tours directly into this prompt"
+                      >
+                        <RefreshCw size={12} />
+                        <span>Sync Facilities & Tours into Prompt</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="adm-btn-action"
+                        style={{ padding: '4px 10px', fontSize: '11px' }}
+                        onClick={handleResetLlmSystemPrompt}
+                      >
+                        <RotateCcw size={12} />
+                        <span>Reset to Default Prompt</span>
+                      </button>
+                    </div>
                   </div>
                   <textarea
                     className="adm-form-textarea"
@@ -3214,6 +3393,313 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* 10. PUBLIC FACILITIES & ROOM DIRECTORY TAB */}
+          {activeTab === 'facilities' && (
+            <div className="adm-tab-panel">
+              <div className="adm-card-panel">
+                <div className="adm-panel-header-row">
+                  <div>
+                    <h3 className="adm-panel-title">Campus Public Facilities & Room Directory</h3>
+                    <p className="adm-panel-desc">
+                      Manage campus floor rooms, restrooms, cafeterias, robotics labs, boardrooms, and spoken walking directions for kiosk visitors.
+                    </p>
+                  </div>
+                  <div className="adm-actions-btn-group">
+                    <button className="adm-btn-action" onClick={handleOpenAddFacility}>
+                      <Plus size={16} />
+                      <span>Add Facility / Room</span>
+                    </button>
+                    <button className="adm-btn-action" onClick={() => onNavigate?.('/facilities')}>
+                      <ExternalLink size={16} />
+                      <span>View on Kiosk</span>
+                    </button>
+                    <button className="adm-btn-action danger-outline" onClick={handleResetFacilities} title="Reset to default campus facilities">
+                      <RotateCcw size={16} />
+                      <span>Reset Defaults</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter and Search Bar */}
+                <div className="adm-filter-bar-row">
+                  <div className="adm-search-input-wrap">
+                    <Search size={16} />
+                    <input
+                      type="text"
+                      placeholder="Search facility name, room code, wing, or directions..."
+                      value={facilitySearch}
+                      onChange={(e) => setFacilitySearch(e.target.value)}
+                    />
+                    {facilitySearch && (
+                      <button className="adm-search-clear-btn" onClick={() => setFacilitySearch('')}>
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="adm-filter-pill-group">
+                    {['all', 'ground', 'first', 'second'].map((flr) => (
+                      <button
+                        key={flr}
+                        className={`adm-filter-pill ${facilityFloorFilter === flr ? 'active' : ''}`}
+                        onClick={() => setFacilityFloorFilter(flr)}
+                      >
+                        {flr === 'all' ? 'All Floors' :
+                         flr === 'ground' ? 'Ground Floor (L0)' :
+                         flr === 'first' ? 'Level 1 (R&D)' : 'Level 2 (Executive)'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Facilities List Grid */}
+                <div className="adm-weblinks-grid">
+                  {filteredFacilitiesAdmin.length === 0 ? (
+                    <div className="adm-empty-box" style={{ gridColumn: '1 / -1' }}>
+                      <Building2 size={40} color="#00ffff" />
+                      <p>No facilities found matching current filters.</p>
+                      <button className="adm-btn-secondary" onClick={() => { setFacilitySearch(''); setFacilityFloorFilter('all'); }}>
+                        Clear Filters
+                      </button>
+                    </div>
+                  ) : (
+                    filteredFacilitiesAdmin.map((fac) => (
+                      <div key={fac.id} className={`adm-weblink-card ${fac.isEnabled === false ? 'disabled' : ''}`}>
+                        <div className="adm-weblink-card-header">
+                          <div className="adm-weblink-icon-title">
+                            <span className="adm-category-tag">{fac.code}</span>
+                            <span className="adm-weblink-category">{fac.floorLabel}</span>
+                          </div>
+                          <div className="adm-weblink-card-controls">
+                            <button
+                              className={`adm-icon-btn ${fac.isEnabled !== false ? 'active' : ''}`}
+                              onClick={() => handleToggleFacility(fac.id, fac.isEnabled === false)}
+                              title={fac.isEnabled !== false ? 'Enabled (Click to Disable)' : 'Disabled (Click to Enable)'}
+                            >
+                              {fac.isEnabled !== false ? <Eye size={16} /> : <EyeOff size={16} />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="adm-weblink-body">
+                          <h4 className="adm-weblink-title">{fac.name}</h4>
+                          <div style={{ fontSize: '11.5px', color: '#38bdf8', marginBottom: '6px', fontWeight: 600 }}>
+                            📍 {fac.wing} &bull; {fac.distanceMeters}m walk ({fac.hours})
+                          </div>
+                          <p className="adm-weblink-desc" style={{ WebkitLineClamp: 3 }}>
+                            {fac.directions}
+                          </p>
+                          {fac.amenities && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
+                              {(Array.isArray(fac.amenities) ? fac.amenities : []).slice(0, 3).map((a, i) => (
+                                <span key={i} style={{ fontSize: '10px', background: 'rgba(0,255,255,0.08)', color: '#93c5fd', padding: '2px 6px', borderRadius: '4px' }}>
+                                  {a}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="adm-weblink-card-footer">
+                          <button
+                            className="adm-mini-btn"
+                            style={{ color: '#00ffff' }}
+                            onClick={() => speakWithVoice(`${fac.name}, Room ${fac.code}. Directions: ${fac.directions}`)}
+                            title="Test Spoken Audio Guide"
+                          >
+                            <Volume2 size={14} />
+                            <span>Test Voice</span>
+                          </button>
+                          <button
+                            className="adm-mini-btn edit"
+                            onClick={() => handleOpenEditFacility(fac)}
+                            title="Edit Facility Details"
+                          >
+                            <Edit2 size={14} />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            className="adm-mini-btn danger"
+                            onClick={() => handleDeleteFacility(fac.id, fac.name)}
+                            title="Delete Facility"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Add / Edit Facility Modal */}
+              {showFacilityModal && (
+                <div className="adm-modal-overlay" onClick={() => setShowFacilityModal(false)}>
+                  <div className="adm-modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+                    <div className="adm-modal-header">
+                      <h3>{facilityModalMode === 'add' ? 'Add New Campus Facility' : 'Edit Facility & Directions'}</h3>
+                      <button className="adm-modal-close-btn" onClick={() => setShowFacilityModal(false)}>
+                        <X size={20} />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSaveFacility} className="adm-modal-form">
+                      <div className="adm-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+                        <div className="adm-form-group">
+                          <label className="adm-form-label">ROOM CODE *</label>
+                          <input
+                            type="text"
+                            className="adm-form-input"
+                            value={facilityForm.code}
+                            onChange={(e) => setFacilityForm({ ...facilityForm, code: e.target.value })}
+                            placeholder="e.g. G-04, L1-02"
+                            required
+                          />
+                        </div>
+                        <div className="adm-form-group">
+                          <label className="adm-form-label">FACILITY / ROOM NAME *</label>
+                          <input
+                            type="text"
+                            className="adm-form-input"
+                            value={facilityForm.name}
+                            onChange={(e) => setFacilityForm({ ...facilityForm, name: e.target.value })}
+                            placeholder="e.g. Executive Boardroom Alpha"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="adm-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div className="adm-form-group">
+                          <label className="adm-form-label">FLOOR LEVEL *</label>
+                          <select
+                            className="adm-form-input"
+                            value={facilityForm.floor}
+                            onChange={(e) => setFacilityForm({ ...facilityForm, floor: e.target.value })}
+                          >
+                            <option value="ground">Ground Floor (Level 0)</option>
+                            <option value="first">First Floor (Level 1)</option>
+                            <option value="second">Second Floor (Level 2)</option>
+                            <option value="outdoor">Outdoor / Rooftop</option>
+                          </select>
+                        </div>
+                        <div className="adm-form-group">
+                          <label className="adm-form-label">CAMPUS WING *</label>
+                          <input
+                            type="text"
+                            className="adm-form-input"
+                            value={facilityForm.wing}
+                            onChange={(e) => setFacilityForm({ ...facilityForm, wing: e.target.value })}
+                            placeholder="e.g. East Wing, North Courtyard"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="adm-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div className="adm-form-group">
+                          <label className="adm-form-label">CATEGORY *</label>
+                          <select
+                            className="adm-form-input"
+                            value={facilityForm.category}
+                            onChange={(e) => {
+                              const cat = e.target.value;
+                              const label =
+                                cat === 'restroom' ? 'Restroom & Hygiene' :
+                                cat === 'dining' ? 'Cafeteria & Dining' :
+                                cat === 'lab' ? 'Robotics & Demo' :
+                                cat === 'meeting' ? 'Meeting & Boardrooms' :
+                                cat === 'utility' ? 'Utility & Elevators' :
+                                cat === 'medical' ? 'First Aid & Safety' :
+                                cat === 'executive' ? 'Executive & Management' : 'Reception & Check-In';
+                              setFacilityForm({ ...facilityForm, category: cat, categoryLabel: label });
+                            }}
+                          >
+                            <option value="reception">Reception & Check-In</option>
+                            <option value="restroom">Restroom & Hygiene</option>
+                            <option value="dining">Cafeteria & Dining</option>
+                            <option value="lab">Robotics & Demo Bay</option>
+                            <option value="meeting">Meeting & Boardrooms</option>
+                            <option value="utility">Utility & Elevators</option>
+                            <option value="medical">First Aid & Health</option>
+                            <option value="executive">Executive Suite</option>
+                          </select>
+                        </div>
+
+                        <div className="adm-form-group">
+                          <label className="adm-form-label">OPERATIONAL HOURS</label>
+                          <input
+                            type="text"
+                            className="adm-form-input"
+                            value={facilityForm.hours}
+                            onChange={(e) => setFacilityForm({ ...facilityForm, hours: e.target.value })}
+                            placeholder="e.g. 9:00 AM – 6:00 PM / 24/7"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="adm-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div className="adm-form-group">
+                          <label className="adm-form-label">DISTANCE (METERS)</label>
+                          <input
+                            type="number"
+                            className="adm-form-input"
+                            value={facilityForm.distanceMeters}
+                            onChange={(e) => setFacilityForm({ ...facilityForm, distanceMeters: e.target.value })}
+                            placeholder="15"
+                          />
+                        </div>
+                        <div className="adm-form-group">
+                          <label className="adm-form-label">WALK TIME ESTIMATE</label>
+                          <input
+                            type="text"
+                            className="adm-form-input"
+                            value={facilityForm.walkTime}
+                            onChange={(e) => setFacilityForm({ ...facilityForm, walkTime: e.target.value })}
+                            placeholder="e.g. 30 sec walk"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="adm-form-group">
+                        <label className="adm-form-label">SPOKEN WALKING DIRECTIONS FROM KIOSK *</label>
+                        <textarea
+                          rows={3}
+                          className="adm-form-input"
+                          value={facilityForm.directions}
+                          onChange={(e) => setFacilityForm({ ...facilityForm, directions: e.target.value })}
+                          placeholder="e.g. Turn left from reception, walk 15 meters along the West corridor; entrance is on the left opposite the elevator."
+                          required
+                        />
+                      </div>
+
+                      <div className="adm-form-group">
+                        <label className="adm-form-label">AMENITIES (COMMA-SEPARATED)</label>
+                        <input
+                          type="text"
+                          className="adm-form-input"
+                          value={facilityForm.amenities}
+                          onChange={(e) => setFacilityForm({ ...facilityForm, amenities: e.target.value })}
+                          placeholder="e.g. Wheelchair Accessible, Wi-Fi, Touchless Sensor"
+                        />
+                      </div>
+
+                      <div className="adm-modal-actions">
+                        <button type="button" className="adm-btn-secondary" onClick={() => setShowFacilityModal(false)}>
+                          Cancel
+                        </button>
+                        <button type="submit" className="adm-submit-btn">
+                          <Save size={16} />
+                          <span>{facilityModalMode === 'add' ? 'Save Facility' : 'Update Facility'}</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

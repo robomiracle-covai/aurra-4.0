@@ -4,6 +4,7 @@ import { DEFAULT_QA_QUESTIONS } from '../data/defaultQuestions';
 import { OFFICIAL_WEBLINKS } from '../pages/WebLinks/weblinksData';
 import { DEFAULT_TOUR_STOPS } from '../data/defaultTourStops';
 import { DEFAULT_ROBOT_TOURS } from '../data/defaultRobotTours';
+import { DEFAULT_FACILITIES } from '../data/defaultFacilities';
 
 const parseNumericId = (id) => {
   const n = Number(id);
@@ -759,6 +760,12 @@ export const offlineTourService = {
  * Offline Robomiracle Robot Showcase Tours (IndexedDB)
  * Complete management of Robot cards, 5-step interactive presentations, and 3-phase voice
  */
+const notifyKnowledgeUpdated = (source) => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('aurra:knowledge-updated', { detail: { source } }));
+  }
+};
+
 export const offlineRobotTourService = {
   getRobots: async () => {
     let robots = await db.robotTours.orderBy('orderIndex').toArray();
@@ -801,6 +808,7 @@ export const offlineRobotTourService = {
       createdAt: new Date().toISOString(),
     };
     await db.robotTours.put(newRobot);
+    notifyKnowledgeUpdated('tour');
     return newRobot;
   },
 
@@ -813,6 +821,7 @@ export const offlineRobotTourService = {
       updatedAt: new Date().toISOString(),
     };
     await db.robotTours.put(updated);
+    notifyKnowledgeUpdated('tour');
     return updated;
   },
 
@@ -820,6 +829,7 @@ export const offlineRobotTourService = {
     const robot = await offlineRobotTourService.getRobotById(id);
     if (robot) {
       await db.robotTours.delete(robot.id);
+      notifyKnowledgeUpdated('tour');
       return { success: true };
     }
     return { success: false };
@@ -829,6 +839,7 @@ export const offlineRobotTourService = {
     const robot = await offlineRobotTourService.getRobotById(id);
     if (robot) {
       await db.robotTours.update(robot.id, { isEnabled });
+      notifyKnowledgeUpdated('tour');
       return { success: true, isEnabled };
     }
     return { success: false };
@@ -842,6 +853,7 @@ export const offlineRobotTourService = {
         await db.robotTours.update(robot.id, { orderIndex: index });
       }
     }
+    notifyKnowledgeUpdated('tour');
     return await offlineRobotTourService.getRobots();
   },
 
@@ -857,17 +869,89 @@ export const offlineRobotTourService = {
       updatedAt: new Date().toISOString(),
     };
     await db.robotTours.put(updated);
+    notifyKnowledgeUpdated('tour');
     return updated;
   },
 
   restoreDefaultRobots: async () => {
     await db.robotTours.clear();
     await db.robotTours.bulkAdd(DEFAULT_ROBOT_TOURS);
+    notifyKnowledgeUpdated('tour');
     return await db.robotTours.orderBy('orderIndex').toArray();
   },
 };
 
+/**
+ * Offline Public Facilities & Room Directory Services (IndexedDB)
+ */
+export const offlineFacilityService = {
+  getFacilities: async () => {
+    try {
+      const items = await db.facilities.orderBy('sortOrder').toArray();
+      if (!items || items.length === 0) {
+        await db.facilities.bulkAdd(DEFAULT_FACILITIES);
+        return await db.facilities.orderBy('sortOrder').toArray();
+      }
+      return items;
+    } catch (err) {
+      console.warn('Fallback to DEFAULT_FACILITIES:', err);
+      return DEFAULT_FACILITIES;
+    }
+  },
+
+  getFacilityById: async (id) => {
+    return await db.facilities.get(id);
+  },
+
+  addFacility: async (facilityData) => {
+    const id = facilityData.id || `fac-${Date.now()}`;
+    const newFacility = {
+      ...facilityData,
+      id,
+      isEnabled: facilityData.isEnabled !== false,
+      sortOrder: facilityData.sortOrder || Date.now(),
+      createdAt: new Date().toISOString(),
+    };
+    await db.facilities.put(newFacility);
+    notifyKnowledgeUpdated('facilities');
+    return newFacility;
+  },
+
+  updateFacility: async (id, data) => {
+    const existing = await db.facilities.get(id);
+    if (!existing) throw new Error(`Facility not found: ${id}`);
+    const updated = {
+      ...existing,
+      ...data,
+      updatedAt: new Date().toISOString(),
+    };
+    await db.facilities.put(updated);
+    notifyKnowledgeUpdated('facilities');
+    return updated;
+  },
+
+  deleteFacility: async (id) => {
+    await db.facilities.delete(id);
+    notifyKnowledgeUpdated('facilities');
+    return { success: true };
+  },
+
+  toggleFacilityEnabled: async (id, isEnabled) => {
+    await db.facilities.update(id, { isEnabled });
+    notifyKnowledgeUpdated('facilities');
+    return { success: true, isEnabled };
+  },
+
+  restoreDefaultFacilities: async () => {
+    await db.facilities.clear();
+    await db.facilities.bulkAdd(DEFAULT_FACILITIES);
+    notifyKnowledgeUpdated('facilities');
+    return await db.facilities.orderBy('sortOrder').toArray();
+  },
+};
+
 export { chatHistoryService as offlineChatService } from '../services/chatHistoryService';
+
 
 
 

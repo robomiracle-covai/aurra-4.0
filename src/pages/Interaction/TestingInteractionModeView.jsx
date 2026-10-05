@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { offlineCardService, offlineQaService, offlineFaceService } from '../../db/offlineServices';
 import { llmService, DEFAULT_SYSTEM_PROMPT } from '../../services/llmService';
+import { getLiveKnowledgeBlock, mergeKnowledgeIntoPrompt } from '../../services/facilityTourKnowledgeService';
 import { esp32Service } from '../../services/esp32Service';
 import { speakWithVoice, cancelSpeech, isAnySpeaking } from '../../utils/speechSynthesis';
 import { elevenLabsService, DEFAULT_ELEVENLABS_VOICES } from '../../services/elevenLabsService';
@@ -98,6 +99,20 @@ export default function TestingInteractionModeView({ onNavigate }) {
     setPromptSavedNotice(true);
     setTimeout(() => setPromptSavedNotice(false), 3000);
     addLog('LLM', 'Reset Cloud LLM system prompt to Aurra Spec Sheet baseline', 'info');
+  };
+
+  const handleSyncSystemPromptWithKnowledge = async () => {
+    try {
+      const liveBlock = await getLiveKnowledgeBlock(true);
+      const merged = mergeKnowledgeIntoPrompt(systemPromptText || DEFAULT_SYSTEM_PROMPT, liveBlock);
+      llmService.saveConfig({ systemPrompt: merged });
+      setSystemPromptText(merged);
+      setPromptSavedNotice(true);
+      setTimeout(() => setPromptSavedNotice(false), 3000);
+      addLog('LLM', 'Auto-merged latest campus facilities & guided tours into prompt', 'success');
+    } catch (err) {
+      addLog('LLM', `Failed merging live knowledge: ${err.message}`, 'error');
+    }
   };
 
   // ── STT (Voice Recognition) State ──
@@ -851,6 +866,16 @@ export default function TestingInteractionModeView({ onNavigate }) {
                   >
                     <Check size={13} />
                     <span>Save to LLM</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="tia-btn-sm secondary"
+                    style={{ color: '#00ffff', borderColor: 'rgba(0,255,255,0.3)' }}
+                    onClick={handleSyncSystemPromptWithKnowledge}
+                    title="Auto-merge live campus facilities and robot tours into prompt"
+                  >
+                    <RefreshCw size={13} />
+                    <span>Sync Facilities & Tours</span>
                   </button>
                   <button
                     type="button"

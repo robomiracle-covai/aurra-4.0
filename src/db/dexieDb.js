@@ -2,6 +2,7 @@ import Dexie from 'dexie';
 import { DEFAULT_REGISTRATION_CARDS, DEFAULT_SLIDES } from '../data/defaultCards';
 import { DEFAULT_QA_QUESTIONS } from '../data/defaultQuestions';
 import { OFFICIAL_WEBLINKS } from '../pages/WebLinks/weblinksData';
+import { DEFAULT_FACILITIES } from '../data/defaultFacilities';
 
 // Initialize IndexedDB Database for 100% Offline Kiosk Storage
 export const db = new Dexie('AurraOfflineDB');
@@ -220,6 +221,47 @@ db.version(8).stores({
     ]);
   }
 });
+
+// Version 9: Campus Public Facilities & Room Directory for /facilities
+db.version(9).stores({
+  userFaces: '++id, name',
+  cards: '++id, title, href, isEnabled, voiceAccessEnabled',
+  images: '++id, title, isSelected',
+  headers: '++id, headerName',
+  qaQuestions: '++id, question, category',
+  visitors: '++id, name, phone, email, company, purpose, host, badgeType, badgeNumber, checkInTime, checkOutTime, status',
+  weblinks: 'id, title, category, url, isEnabled, sortOrder',
+  tourStops: '++id, name, area, orderIndex, isEnabled',
+  robotTours: 'id, slug, title, orderIndex, isEnabled',
+  chatSessions: 'id, title, createdAt, updatedAt, messageCount',
+  chatMessages: '++id, sessionId, role, text, timestamp, inputType, source, confidence',
+  facilities: 'id, code, name, floor, category, isEnabled, sortOrder',
+}).upgrade(async (tx) => {
+  const facilityCount = await tx.table('facilities').count();
+  if (facilityCount === 0) {
+    await tx.table('facilities').bulkAdd(DEFAULT_FACILITIES);
+  }
+});
+
+// Version 10: Re-seed facilities with exact 9 official facilities from classic Aurra app
+db.version(10).stores({
+  userFaces: '++id, name',
+  cards: '++id, title, href, isEnabled, voiceAccessEnabled',
+  images: '++id, title, isSelected',
+  headers: '++id, headerName',
+  qaQuestions: '++id, question, category',
+  visitors: '++id, name, phone, email, company, purpose, host, badgeType, badgeNumber, checkInTime, checkOutTime, status',
+  weblinks: 'id, title, category, url, isEnabled, sortOrder',
+  tourStops: '++id, name, area, orderIndex, isEnabled',
+  robotTours: 'id, slug, title, orderIndex, isEnabled',
+  chatSessions: 'id, title, createdAt, updatedAt, messageCount',
+  chatMessages: '++id, sessionId, role, text, timestamp, inputType, source, confidence',
+  facilities: 'id, code, name, floor, category, isEnabled, sortOrder',
+}).upgrade(async (tx) => {
+  await tx.table('facilities').clear();
+  await tx.table('facilities').bulkAdd(DEFAULT_FACILITIES);
+});
+
 
 
 

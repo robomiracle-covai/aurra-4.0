@@ -238,6 +238,7 @@ aurra_v/
 │   │   ├── devSettingsService.js        # Diagnostic toggles & developer mode bypass flags
 │   │   ├── elevenLabsService.js         # ElevenLabs Neural Voice API client & audio stream player
 │   │   ├── esp32Service.js              # Non-blocking REST client for motors, servos & radar
+│   │   ├── facilityTourKnowledgeService.js # Zero-latency (<0.1ms) LLM prompt context & directory synchronizer
 │   │   ├── hardwareDispatcher.js        # Abstracted communication bus (Serial/Wi-Fi/Simulated)
 │   │   ├── kioskConfigService.js        # Reactive configuration store with auto-save
 │   │   ├── llmService.js                # Gemini 1.5 & Groq orchestrator with prompt injection
@@ -534,65 +535,3 @@ Aurra 4.0 includes a dedicated diagnostic testing console accessible at route `#
   - *"What are your hardware specs?"* (Validates spec sheet prompt grounding).
 
 ---
-
-## 7. STRUCTURED KT SESSION PLAN WITH SENIOR DEVELOPER
-
-To ensure seamless knowledge transfer and operational continuity, the incoming software engineer must complete the following **5-day structured curriculum**:
-
-```
-+---------------------------------------------------------------------------------------------------+
-|                           5-DAY STRUCTURED KNOWLEDGE TRANSFER CURRICULUM                          |
-+---------------------------------------------------------------------------------------------------+
-| Day   | Focus Area                       | Verification Milestone                                 |
-+-------+----------------------------------+--------------------------------------------------------+
-| Day 1 | Architecture & Hardware Setup    | Power on robot, verify 25.9V battery, connect via ADB  |
-| Day 2 | Frontend Kiosk UI & Admin Portal | Navigate all 9 tiles, test 4-tap admin PIN (2020)      |
-| Day 3 | Real-Time AI, RAG & Voice Engine | Test 0ms clock, live weather, Serper RAG, & ElevenLabs |
-| Day 4 | Kinematics, ESP32 & Face Biomet. | Test dual-stick joystick, emergency brake, enroll face |
-| Day 5 | Android Build Pipeline & Release | Execute full npm build:android + adb install cycle     |
-+---------------------------------------------------------------------------------------------------+
-```
-
-### 7.1 Critical Questions & Edge Cases to Review During KT
-1. **WebView Mixed-Content & CORS Restrictions:** When running inside native Android Capacitor WebView, how does `androidNativeHttp.js` bypass browser CORS when issuing commands to local HTTP IPs like `http://192.168.4.1`?
-2. **Battery Undervoltage Protection:** At what voltage threshold does the ESP32 firmware issue an audio battery warning, and how is the telemetry percentage mapped in `kioskConfigService.js`?
-3. **Face-API WebGL Context Loss:** If the tablet wakes from sleep mode, how does `useCamera.js` tear down and reinitialize the camera stream without freezing the UI?
-4. **ElevenLabs Quota Fallback:** If the monthly character allowance on the ElevenLabs account is exhausted during a trade show, how does the system automatically fail over to browser `speechSynthesis` without throwing uncaught exceptions?
-
----
-
-## 8. FORMAL HR HANDOVER SIGN-OFF MATRIX
-
-This section must be completed, verified, and signed upon the conclusion of the knowledge transfer period.
-
-### 8.1 Technical Competency Matrix
-
-| Competency Dimension | Verification Criteria | Status |
-| :--- | :--- | :---: |
-| **Local Environment** | Candidate can build and run `aurra_v` locally in development mode (`npm run dev`). | [ ] |
-| **Android Toolchain** | Candidate can compile and stream-install debug APKs via Gradle and ADB (`assembleDebug`). | [ ] |
-| **AI Orchestration** | Candidate understands the 3-tier intent pipeline (Clock -> IndexedDB -> Serper/LLM). | [ ] |
-| **System Prompt Mgmt**| Candidate can modify Aurra’s persona and hardware grounding in `llmService.js`. | [ ] |
-| **Hardware Kinematics**| Candidate can test and calibrate the 5-DOF servo angles and ESP32 motor commands. | [ ] |
-| **Biometric Vision** | Candidate can enroll a new user and adjust Face-API matching thresholds in Admin. | [ ] |
-| **Offline Persistence**| Candidate understands Dexie.js Schema v5 and knows how to export/restore visitor CSVs. | [ ] |
-| **Safety Protocols** | Candidate understands ultrasonic emergency braking logic and failsafe motor cutoffs. | [ ] |
-
----
-
-### 8.2 Handover Signatures
-
-**Senior Robotics Software Engineer (KT Provider):**  
-Name: `____________________________________`  
-Signature: `____________________________________`  
-Date: `____________________`  
-
-**Incoming Robotics Software Engineer (Successor):**  
-Name: `____________________________________`  
-Signature: `____________________________________`  
-Date: `____________________`  
-
-**Human Resources Representative (Robomiracle Technologies):**  
-Name: `____________________________________`  
-Signature: `____________________________________`  
-Date: `____________________`  

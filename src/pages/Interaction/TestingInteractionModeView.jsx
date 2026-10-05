@@ -35,7 +35,7 @@ import { offlineCardService, offlineQaService, offlineFaceService } from '../../
 import { llmService, DEFAULT_SYSTEM_PROMPT } from '../../services/llmService';
 import { getLiveKnowledgeBlock, mergeKnowledgeIntoPrompt } from '../../services/facilityTourKnowledgeService';
 import { esp32Service } from '../../services/esp32Service';
-import { speakWithVoice, cancelSpeech, isAnySpeaking } from '../../utils/speechSynthesis';
+import { speakWithVoice, cancelSpeech } from '../../utils/speechSynthesis';
 import { elevenLabsService, DEFAULT_ELEVENLABS_VOICES } from '../../services/elevenLabsService';
 import { useCamera } from '../../hooks/useCamera';
 import { detectFacesInVideo, loadFaceApiModels } from '../../utils/faceApiHelper';
@@ -193,13 +193,16 @@ export default function TestingInteractionModeView({ onNavigate }) {
   const [servoAngles, setServoAngles] = useState([90, 90, 90, 90, 90]);
   const [headTilt, setHeadTilt] = useState(90);
 
-  // ── Live Logs Terminal ──
+  // ── Live Logs Terminal (Batched Queue for 60 FPS Smoothness) ──
   const [logs, setLogs] = useState([]);
+  const [copiedNotice, setCopiedNotice] = useState(false);
   const logContainerRef = useRef(null);
   const chatScrollRef = useRef(null);
   const fpsTextRef = useRef(null);
+  const pendingLogsRef = useRef([]);
+  const logFlushScheduledRef = useRef(false);
 
-  // Append timestamped log entry
+  // Append timestamped log entry without blocking animation or camera
   const addLog = useCallback((source, message, type = 'info', latency = null) => {
     const now = new Date();
     const timeStr = `${now.toTimeString().split(' ')[0]}.${String(now.getMilliseconds()).padStart(3, '0')}`;
@@ -211,8 +214,22 @@ export default function TestingInteractionModeView({ onNavigate }) {
       type, // 'info' | 'success' | 'warn' | 'error' | 'timing'
       latency
     };
-    setLogs((prev) => [...prev.slice(-150), newEntry]);
+
+    // 1. Immediate console log streams straight to Android logcat for backend adb debugging
     console.log(`[TEST-LAB ${timeStr}] [${source}] ${message}${latency !== null ? ` (${latency}ms)` : ''}`);
+
+    // 2. Batch update UI state once per frame so 60 FPS stays perfectly locked
+    pendingLogsRef.current.push(newEntry);
+    if (!logFlushScheduledRef.current) {
+      logFlushScheduledRef.current = true;
+      requestAnimationFrame(() => {
+        if (pendingLogsRef.current.length > 0) {
+          const batch = pendingLogsRef.current.splice(0, pendingLogsRef.current.length);
+          setLogs((prev) => [...prev.slice(-120), ...batch].slice(-150));
+        }
+        logFlushScheduledRef.current = false;
+      });
+    }
   }, []);
 
   // ── FPS Telemetry Loop (Direct DOM - 0 React Re-renders) ──
@@ -410,7 +427,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
         const cooldownMs = (greetingCooldownSecRef.current || 45) * 1000;
         const isCooldownActive = (now - lastGreeted) < cooldownMs;
 
-        const isBusy = isProcessingRef.current || isSpeakingRef.current || isAnySpeaking();
+        const isBusy = isProcessingRef.current || isSpeakingRef.current;
 
         if (!isCooldownActive && !isBusy) {
           lastGreetingTimeRef.current[personKey] = now;
@@ -477,7 +494,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
   // ── SPEECH RECOGNITION (STT) LIFECYCLE & ANTI-ECHO CONTROLLER ──
   const startMicrophone = useCallback(() => {
     if (!enableSttRef.current) return;
-    if (isSpeakingRef.current || isAnySpeaking()) return;
+    if (isSpeakingRef.current) return;
 
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) {
@@ -506,11 +523,17 @@ export default function TestingInteractionModeView({ onNavigate }) {
         addLog('STT', 'Microphone active - listening for voice', 'success');
       };
 
+      rec.onaudiostart = () => {
+        addLog('STT', 'Audio hardware capture active', 'info');
+      };
+
+      rec.onspeechstart = () => {
+        addLog('STT', 'Voice detected by microphone', 'info');
+      };
+
       rec.onresult = (event) => {
-        // Immediate drop: if Aurra is speaking or acoustic settling buffer is active
-        const now = Date.now();
-        const settlingRemaining = 850 - (now - lastSpeechEndTimeRef.current);
-        if (isSpeakingRef.current || isAnySpeaking() || (lastSpeechEndTimeRef.current && settlingRemaining > 0)) {
+        // Drop audio if Aurra is actively vocalizing TTS
+        if (isSpeakingRef.current) {
           return;
         }
 
@@ -523,36 +546,27 @@ export default function TestingInteractionModeView({ onNavigate }) {
         }
 
         if (interim) {
-          if (!isAcousticEcho(interim, lastSpokenTextRef.current)) {
-            setSttInterim(interim);
-          }
+          setSttInterim(interim);
         }
 
         if (final) {
           const cleanFinal = final.trim();
           if (!cleanFinal || cleanFinal.length < 2) return;
 
-          // 1. Acoustic echo filter against SYSTEM_PHRASES and lastSpokenText
-          if (isAcousticEcho(cleanFinal, lastSpokenTextRef.current)) {
+          const now = Date.now();
+
+          // 1. Acoustic echo filter: ONLY applies if Aurra spoke in the last 2000ms AND utterance has >= 4 words
+          const isRecentSpeech = lastSpeechEndTimeRef.current && (now - lastSpeechEndTimeRef.current < 2000);
+          if (isRecentSpeech && isAcousticEcho(cleanFinal, lastSpokenTextRef.current)) {
             addLog('STT', `🛡️ Acoustic Echo Filter: Blocked self-voice loop: "${cleanFinal}"`, 'warn');
             setSttInterim('');
             return;
           }
 
-          // 2. Secondary fuzzy check against last spoken text
-          const normClean = cleanFinal.toLowerCase().replace(/[^a-z0-9]/g, '');
-          const normLast = (lastSpokenTextRef.current || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (normClean.length > 5 && normLast.length > 5 && (normLast.includes(normClean) || normClean.includes(normLast))) {
-            addLog('STT', `🛡️ Acoustic Echo Filter: Matched last spoken response: "${cleanFinal}"`, 'warn');
-            setSttInterim('');
-            return;
-          }
-
-          // 3. Debounce / De-duplicate: ignore duplicate within 3s or any utterance within 1.2s or if pipeline busy
+          // 2. Debounce: ignore exact duplicate within 1.2s or if pipeline is actively querying LLM
           const last = lastSpeechUtteranceRef.current;
           if (
-            (cleanFinal.toLowerCase() === last.text.toLowerCase() && (now - last.time) < 3000) ||
-            ((now - last.time) < 1200) ||
+            (cleanFinal.toLowerCase() === last.text.toLowerCase() && (now - last.time) < 1200) ||
             isProcessingRef.current
           ) {
             addLog('STT', `Suppressed duplicate speech input: "${cleanFinal}" (pipeline busy or debounce)`, 'warn');
@@ -573,7 +587,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
       rec.onerror = (e) => {
         if (e.error !== 'no-speech' && e.error !== 'aborted') {
           setSttError(e.error);
-          addLog('STT', `Recognition error: ${e.error}`, 'warn');
+          addLog('STT', `Recognition event: ${e.error}`, 'warn');
         }
       };
 
@@ -584,13 +598,13 @@ export default function TestingInteractionModeView({ onNavigate }) {
           return;
         }
 
-        // Auto-restart if STT switch is still ON and we are NOT speaking
-        if (enableSttRef.current && !isSpeakingRef.current && !isAnySpeaking()) {
+        // Auto-restart on Android if STT switch is still ON and we are NOT speaking
+        if (enableSttRef.current && !isSpeakingRef.current) {
           setTimeout(() => {
-            if (enableSttRef.current && !isSpeakingRef.current && !isAnySpeaking()) {
+            if (enableSttRef.current && !isSpeakingRef.current) {
               startMicrophone();
             }
-          }, 250);
+          }, 150);
         }
       };
 
@@ -626,24 +640,24 @@ export default function TestingInteractionModeView({ onNavigate }) {
       clearTimeout(acousticResumeTimerRef.current);
       acousticResumeTimerRef.current = null;
     }
-    // Acoustic settling delay (750ms) to ensure room reverberation from speakers has faded
+    // Acoustic settling delay (600ms) to ensure room reverberation from speakers has faded
     acousticResumeTimerRef.current = setTimeout(() => {
       acousticResumeTimerRef.current = null;
-      if (isAnySpeaking()) {
-        safeResumeListeningAfterTts();
-        return;
-      }
       isSpeakingRef.current = false;
       lastSpeechEndTimeRef.current = Date.now();
       if (enableSttRef.current) {
         startMicrophone();
-        addLog('STT', 'Acoustic settling complete (750ms). Microphone resumed listening.', 'info');
+        addLog('STT', 'Speech playback concluded. Microphone resumed listening.', 'info');
       }
-    }, 750);
+    }, 600);
   }, [startMicrophone, addLog]);
 
   useEffect(() => {
     if (enableStt) {
+      cancelSpeech();
+      isSpeakingRef.current = false;
+      isProcessingRef.current = false;
+      lastSpeechEndTimeRef.current = 0;
       startMicrophone();
     } else {
       stopMicrophone(true);
@@ -701,7 +715,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
     }
 
     // Synchronous execution lock to prevent duplicate concurrent queries or interruptions while speaking
-    if (isProcessingRef.current || isSpeakingRef.current || isAnySpeaking()) {
+    if (isProcessingRef.current || isSpeakingRef.current) {
       addLog('PIPELINE', `Discarded overlapping query "${query}" (pipeline busy or currently speaking)`, 'warn');
       return;
     }
@@ -709,6 +723,15 @@ export default function TestingInteractionModeView({ onNavigate }) {
     isProcessingRef.current = true;
     setIsProcessing(true);
     const overallT0 = performance.now();
+
+    // Auto-unlock watchdog: guarantee pipeline never stays locked if network hangs
+    let processingWatchdog = setTimeout(() => {
+      if (isProcessingRef.current) {
+        isProcessingRef.current = false;
+        setIsProcessing(false);
+        addLog('PIPELINE', 'Pipeline processing lock auto-recovered after timeout', 'warn');
+      }
+    }, 8000);
 
     // 1. Add User message
     const userMsg = {
@@ -842,6 +865,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
     } catch (err) {
       addLog('PIPELINE', `Critical pipeline error: ${err.message}`, 'error');
     } finally {
+      if (processingWatchdog) clearTimeout(processingWatchdog);
       isProcessingRef.current = false;
       setIsProcessing(false);
     }
@@ -907,9 +931,6 @@ export default function TestingInteractionModeView({ onNavigate }) {
     const maxTtsDurationMs = Math.max(6000, words * 700 + 4000);
     const watchdogTimer = setTimeout(() => {
       if (!settled && isSpeakingRef.current) {
-        if (isAnySpeaking()) {
-          return;
-        }
         addLog('TTS', `Speech watchdog auto-recovery after ${maxTtsDurationMs}ms`, 'warn');
         handleFinish();
       }
@@ -1614,13 +1635,17 @@ export default function TestingInteractionModeView({ onNavigate }) {
                 className="tia-log-btn"
                 onClick={() => {
                   const txt = logs.map((l) => `[${l.timeStr}] [${l.source}] ${l.message}`).join('\n');
-                  navigator.clipboard.writeText(txt);
-                  alert('Logs copied to clipboard!');
+                  if (navigator?.clipboard?.writeText) {
+                    navigator.clipboard.writeText(txt).catch(() => {});
+                  }
+                  setCopiedNotice(true);
+                  setTimeout(() => setCopiedNotice(false), 2200);
+                  addLog('DIAGNOSTICS', `Copied ${logs.length} telemetry entries to clipboard`, 'success');
                 }}
                 title="Copy Terminal Logs"
               >
-                <Copy size={13} />
-                <span>Copy</span>
+                {copiedNotice ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
+                <span>{copiedNotice ? 'Copied!' : 'Copy'}</span>
               </button>
               <button className="tia-log-btn" onClick={() => setLogs([])} title="Clear Terminal Logs">
                 <Trash2 size={13} />

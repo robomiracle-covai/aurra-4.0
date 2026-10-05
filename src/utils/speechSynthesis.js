@@ -139,9 +139,11 @@ export const isAnySpeaking = () => {
   if (typeof window !== 'undefined' && window.isNativeSpeaking) {
     return true;
   }
-  const synth = getSpeechSynthesis();
-  if (synth && (synth.speaking || synth.pending)) {
-    return true;
+  if (!launcher && !isAndroidApp()) {
+    const synth = getSpeechSynthesis();
+    if (synth && (synth.speaking || synth.pending)) {
+      return true;
+    }
   }
   return false;
 };

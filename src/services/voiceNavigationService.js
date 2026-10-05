@@ -28,7 +28,13 @@ export function isAcousticEcho(heardText, lastSpokenText) {
   const hNorm = normalize(heardText);
   if (!hNorm || hNorm.length < 3) return false;
 
-  // 1. Fixed system phrases that are only ever spoken BY Aurra
+  const wordsH = hNorm.split(' ').filter(w => w.length > 1);
+  // Short human utterances (1 to 3 words like "hello", "hi aurra", "who are you") are NEVER acoustic echoes
+  if (wordsH.length < 4) {
+    return false;
+  }
+
+  // 1. Fixed system phrases that are only ever spoken BY Aurra (heard utterance must contain the full phrase)
   const SYSTEM_PHRASES = [
     'i am aurra',
     'autonomous humanoid',
@@ -37,6 +43,7 @@ export function isAcousticEcho(heardText, lastSpokenText) {
     'assist visitors',
     'manage registrations',
     'welcome to robomiracle',
+    'welcome to robomiracle technologies',
     'returning to home screen',
     'opening action cards',
     'opening admin settings',
@@ -48,46 +55,33 @@ export function isAcousticEcho(heardText, lastSpokenText) {
     'sorry i could not catch that',
     'could not catch that',
     'didn t quite catch',
-    'you can ask me about',
     'access denied voice navigation',
-    'could you please clarify',
-    'sure how can i assist',
-    'hello guest welcome',
-    'what is your query',
-    'welcome to robomiracle technologies',
-    'your ai receptionist',
-    'ai receptionist',
-    'how may i assist you today',
-    'how can i assist you today',
-    'diagnostic mode active',
     'official hardware and software specifications',
-    'tilted robot head',
-    'reset robot head neutral',
   ];
 
   for (const phrase of SYSTEM_PHRASES) {
-    if (hNorm.includes(phrase) || phrase.includes(hNorm)) {
+    if (hNorm.includes(phrase)) {
       return true;
     }
   }
 
-  // 2. Check against last spoken response
+  // 2. Check against last spoken response (only for long echo transcripts with >= 65% token overlap)
   if (lastSpokenText) {
     const sNorm = normalize(lastSpokenText);
     if (sNorm) {
-      if (sNorm.includes(hNorm) || hNorm.includes(sNorm)) {
+      if (hNorm.includes(sNorm)) {
         return true;
       }
 
-      // Check significant word overlap
-      const wordsH = hNorm.split(' ').filter(w => w.length > 2);
+      // Check significant word overlap for long sentences
+      const longWordsH = hNorm.split(' ').filter(w => w.length > 2);
       const wordsS = new Set(sNorm.split(' ').filter(w => w.length > 2));
-      if (wordsH.length >= 2) {
+      if (longWordsH.length >= 4) {
         let matchCount = 0;
-        for (const w of wordsH) {
+        for (const w of longWordsH) {
           if (wordsS.has(w)) matchCount++;
         }
-        if (matchCount / wordsH.length >= 0.5) {
+        if (matchCount / longWordsH.length >= 0.65) {
           return true;
         }
       }

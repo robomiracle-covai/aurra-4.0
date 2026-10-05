@@ -232,7 +232,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
     public boolean isSpeaking() {
-        return isSpeakingNow || (ttsReady && tts != null && tts.isSpeaking());
+        return isSpeakingNow;
     }
 
     public void stopNativeSpeech() {

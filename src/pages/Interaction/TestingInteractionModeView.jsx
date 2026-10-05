@@ -40,7 +40,7 @@ import { elevenLabsService, DEFAULT_ELEVENLABS_VOICES } from '../../services/ele
 import { useCamera } from '../../hooks/useCamera';
 import { detectFacesInVideo, loadFaceApiModels } from '../../utils/faceApiHelper';
 import { kioskConfigService } from '../../services/kioskConfigService';
-import { voiceNavigationService } from '../../services/voiceNavigationService';
+import { voiceNavigationService, isAcousticEcho } from '../../services/voiceNavigationService';
 import './TestingInteractionModeView.css';
 
 export default function TestingInteractionModeView({ onNavigate }) {
@@ -171,9 +171,15 @@ export default function TestingInteractionModeView({ onNavigate }) {
   // ── Synchronization, Anti-Echo & Debounce Refs ──
   const isProcessingRef = useRef(false);
   const isSpeakingRef = useRef(false);
+  const lastSpokenTextRef = useRef('');
+  const lastSpeechEndTimeRef = useRef(0);
+  const acousticResumeTimerRef = useRef(null);
+  const isManuallyAbortedRef = useRef(false);
   const lastSpeechUtteranceRef = useRef({ text: '', time: 0 });
   const handleExecuteQueryRef = useRef(null);
   const playTtsAudioRef = useRef(null);
+  const enableSttRef = useRef(enableStt);
+  enableSttRef.current = enableStt;
   const enableChatRef = useRef(enableChat);
   enableChatRef.current = enableChat;
   const enableTtsRef = useRef(enableTts);
@@ -404,7 +410,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
         const cooldownMs = (greetingCooldownSecRef.current || 45) * 1000;
         const isCooldownActive = (now - lastGreeted) < cooldownMs;
 
-        const isBusy = isProcessingRef.current || isSpeakingRef.current;
+        const isBusy = isProcessingRef.current || isSpeakingRef.current || isAnySpeaking();
 
         if (!isCooldownActive && !isBusy) {
           lastGreetingTimeRef.current[personKey] = now;
@@ -468,108 +474,185 @@ export default function TestingInteractionModeView({ onNavigate }) {
     }
   }, [addLog]);
 
-  // ── SPEECH RECOGNITION (STT) LIFECYCLE ──
-  useEffect(() => {
+  // ── SPEECH RECOGNITION (STT) LIFECYCLE & ANTI-ECHO CONTROLLER ──
+  const startMicrophone = useCallback(() => {
+    if (!enableSttRef.current) return;
+    if (isSpeakingRef.current || isAnySpeaking()) return;
+
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) {
       addLog('STT', 'SpeechRecognition API not available in this WebView', 'error');
       return;
     }
 
-    if (enableStt) {
-      addLog('STT', 'Starting microphone speech listener...');
+    if (recognitionRef.current) {
       try {
-        const rec = new SpeechRec();
-        rec.continuous = true;
-        rec.interimResults = true;
-        rec.lang = 'en-US';
+        isManuallyAbortedRef.current = true;
+        recognitionRef.current.abort();
+      } catch {}
+      recognitionRef.current = null;
+    }
 
-        rec.onstart = () => {
-          setIsSttListening(true);
-          setSttError('');
-          addLog('STT', 'Microphone active - listening for voice', 'success');
-        };
+    try {
+      const rec = new SpeechRec();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'en-US';
 
-        rec.onresult = (event) => {
-          // Anti-echo protection: if Aurra is speaking, drop audio to prevent self-interception loop
-          if (isSpeakingRef.current) {
+      rec.onstart = () => {
+        isManuallyAbortedRef.current = false;
+        setIsSttListening(true);
+        setSttError('');
+        addLog('STT', 'Microphone active - listening for voice', 'success');
+      };
+
+      rec.onresult = (event) => {
+        // Immediate drop: if Aurra is speaking or acoustic settling buffer is active
+        const now = Date.now();
+        const settlingRemaining = 850 - (now - lastSpeechEndTimeRef.current);
+        if (isSpeakingRef.current || isAnySpeaking() || (lastSpeechEndTimeRef.current && settlingRemaining > 0)) {
+          return;
+        }
+
+        let interim = '';
+        let final = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const item = event.results[i];
+          if (item.isFinal) final += item[0].transcript;
+          else interim += item[0].transcript;
+        }
+
+        if (interim) {
+          if (!isAcousticEcho(interim, lastSpokenTextRef.current)) {
+            setSttInterim(interim);
+          }
+        }
+
+        if (final) {
+          const cleanFinal = final.trim();
+          if (!cleanFinal || cleanFinal.length < 2) return;
+
+          // 1. Acoustic echo filter against SYSTEM_PHRASES and lastSpokenText
+          if (isAcousticEcho(cleanFinal, lastSpokenTextRef.current)) {
+            addLog('STT', `🛡️ Acoustic Echo Filter: Blocked self-voice loop: "${cleanFinal}"`, 'warn');
+            setSttInterim('');
             return;
           }
 
-          let interim = '';
-          let final = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const item = event.results[i];
-            if (item.isFinal) final += item[0].transcript;
-            else interim += item[0].transcript;
-          }
-          if (interim) setSttInterim(interim);
-          if (final) {
-            const cleanFinal = final.trim();
-            if (!cleanFinal) return;
-
-            const now = Date.now();
-            const last = lastSpeechUtteranceRef.current;
-
-            // Debounce / De-duplicate: ignore duplicate within 2.5s or any utterance within 1.2s or if pipeline busy
-            if (
-              (cleanFinal.toLowerCase() === last.text.toLowerCase() && (now - last.time) < 2500) ||
-              ((now - last.time) < 1200) ||
-              isProcessingRef.current
-            ) {
-              addLog('STT', `Suppressed duplicate speech input: "${cleanFinal}" (pipeline busy or debounce)`, 'warn');
-              return;
-            }
-
-            lastSpeechUtteranceRef.current = { text: cleanFinal, time: now };
-            setSttFinal(cleanFinal);
+          // 2. Secondary fuzzy check against last spoken text
+          const normClean = cleanFinal.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normLast = (lastSpokenTextRef.current || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (normClean.length > 5 && normLast.length > 5 && (normLast.includes(normClean) || normClean.includes(normLast))) {
+            addLog('STT', `🛡️ Acoustic Echo Filter: Matched last spoken response: "${cleanFinal}"`, 'warn');
             setSttInterim('');
-            addLog('STT', `Heard final utterance: "${cleanFinal}"`, 'timing');
+            return;
+          }
 
-            if (enableChatRef.current && handleExecuteQueryRef.current) {
-              handleExecuteQueryRef.current(cleanFinal, 'voice');
+          // 3. Debounce / De-duplicate: ignore duplicate within 3s or any utterance within 1.2s or if pipeline busy
+          const last = lastSpeechUtteranceRef.current;
+          if (
+            (cleanFinal.toLowerCase() === last.text.toLowerCase() && (now - last.time) < 3000) ||
+            ((now - last.time) < 1200) ||
+            isProcessingRef.current
+          ) {
+            addLog('STT', `Suppressed duplicate speech input: "${cleanFinal}" (pipeline busy or debounce)`, 'warn');
+            return;
+          }
+
+          lastSpeechUtteranceRef.current = { text: cleanFinal, time: now };
+          setSttFinal(cleanFinal);
+          setSttInterim('');
+          addLog('STT', `🎙️ User Speech Captured: "${cleanFinal}"`, 'timing');
+
+          if (enableChatRef.current && handleExecuteQueryRef.current) {
+            handleExecuteQueryRef.current(cleanFinal, 'voice');
+          }
+        }
+      };
+
+      rec.onerror = (e) => {
+        if (e.error !== 'no-speech' && e.error !== 'aborted') {
+          setSttError(e.error);
+          addLog('STT', `Recognition error: ${e.error}`, 'warn');
+        }
+      };
+
+      rec.onend = () => {
+        setIsSttListening(false);
+        // If aborted intentionally for TTS playback or mute, do not restart
+        if (isManuallyAbortedRef.current) {
+          return;
+        }
+
+        // Auto-restart if STT switch is still ON and we are NOT speaking
+        if (enableSttRef.current && !isSpeakingRef.current && !isAnySpeaking()) {
+          setTimeout(() => {
+            if (enableSttRef.current && !isSpeakingRef.current && !isAnySpeaking()) {
+              startMicrophone();
             }
-          }
-        };
+          }, 250);
+        }
+      };
 
-        rec.onerror = (e) => {
-          if (e.error !== 'no-speech') {
-            setSttError(e.error);
-            addLog('STT', `Recognition error: ${e.error}`, 'warn');
-          }
-        };
+      rec.start();
+      recognitionRef.current = rec;
+    } catch (err) {
+      setSttError(err.message);
+      addLog('STT', `Failed to start STT: ${err.message}`, 'error');
+    }
+  }, [addLog]);
 
-        rec.onend = () => {
-          setIsSttListening(false);
-          addLog('STT', 'Recognition session ended', 'info');
-        };
-
-        rec.start();
-        recognitionRef.current = rec;
-      } catch (err) {
-        setSttError(err.message);
-        addLog('STT', `Failed to start STT: ${err.message}`, 'error');
-      }
-    } else {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch {}
-        recognitionRef.current = null;
-      }
-      setIsSttListening(false);
-      setSttInterim('');
+  const stopMicrophone = useCallback((isPermanent = false) => {
+    if (acousticResumeTimerRef.current) {
+      clearTimeout(acousticResumeTimerRef.current);
+      acousticResumeTimerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try {
+        isManuallyAbortedRef.current = true;
+        recognitionRef.current.abort();
+      } catch {}
+      recognitionRef.current = null;
+    }
+    setIsSttListening(false);
+    setSttInterim('');
+    if (isPermanent) {
       addLog('STT', 'Microphone STOPPED & muted', 'warn');
+    }
+  }, [addLog]);
+
+  const safeResumeListeningAfterTts = useCallback(() => {
+    if (acousticResumeTimerRef.current) {
+      clearTimeout(acousticResumeTimerRef.current);
+      acousticResumeTimerRef.current = null;
+    }
+    // Acoustic settling delay (750ms) to ensure room reverberation from speakers has faded
+    acousticResumeTimerRef.current = setTimeout(() => {
+      acousticResumeTimerRef.current = null;
+      if (isAnySpeaking()) {
+        safeResumeListeningAfterTts();
+        return;
+      }
+      isSpeakingRef.current = false;
+      lastSpeechEndTimeRef.current = Date.now();
+      if (enableSttRef.current) {
+        startMicrophone();
+        addLog('STT', 'Acoustic settling complete (750ms). Microphone resumed listening.', 'info');
+      }
+    }, 750);
+  }, [startMicrophone, addLog]);
+
+  useEffect(() => {
+    if (enableStt) {
+      startMicrophone();
+    } else {
+      stopMicrophone(true);
     }
 
     return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch {}
-      }
+      stopMicrophone(false);
     };
-  }, [enableStt, addLog]);
+  }, [enableStt, startMicrophone, stopMicrophone]);
 
   // ── HARDWARE STATUS CHECK ──
   const checkHardwareStatus = useCallback(async () => {
@@ -604,9 +687,22 @@ export default function TestingInteractionModeView({ onNavigate }) {
     const query = (queryText || '').trim();
     if (!query) return;
 
-    // Synchronous execution lock to prevent duplicate concurrent queries
-    if (isProcessingRef.current) {
-      addLog('PIPELINE', `Discarded overlapping query "${query}" (pipeline already processing)`, 'warn');
+    // Urgent voice stop command check
+    const lowerQuery = query.toLowerCase();
+    if (lowerQuery === 'stop' || lowerQuery === 'cancel' || lowerQuery === 'quiet' || lowerQuery === 'shut up') {
+      cancelSpeech();
+      elevenLabsService.cancel();
+      setIsTtsPlaying(false);
+      isSpeakingRef.current = false;
+      lastSpeechEndTimeRef.current = Date.now();
+      addLog('PIPELINE', `Handled urgent voice stop command: "${query}"`, 'warn');
+      safeResumeListeningAfterTts();
+      return;
+    }
+
+    // Synchronous execution lock to prevent duplicate concurrent queries or interruptions while speaking
+    if (isProcessingRef.current || isSpeakingRef.current || isAnySpeaking()) {
+      addLog('PIPELINE', `Discarded overlapping query "${query}" (pipeline busy or currently speaking)`, 'warn');
       return;
     }
 
@@ -784,8 +880,48 @@ export default function TestingInteractionModeView({ onNavigate }) {
     const cleanText = (textToSpeak || '').trim();
     if (!cleanText) return;
 
+    // 1. Immediately lock speaking flag & record spoken text for echo cancellation
     setIsTtsPlaying(true);
     isSpeakingRef.current = true;
+    lastSpokenTextRef.current = cleanText;
+
+    // 2. Clear any pending acoustic resume timer
+    if (acousticResumeTimerRef.current) {
+      clearTimeout(acousticResumeTimerRef.current);
+      acousticResumeTimerRef.current = null;
+    }
+
+    // 3. Hardware-mute microphone: abort active recognition so Chrome captures zero audio from speakers
+    if (recognitionRef.current) {
+      try {
+        isManuallyAbortedRef.current = true;
+        recognitionRef.current.abort();
+        addLog('STT', 'Microphone hardware-muted during TTS speech to prevent echo loop', 'info');
+      } catch {}
+    }
+
+    let settled = false;
+
+    // 4. Safety watchdog in case audio fails to fire onEnd
+    const words = cleanText.split(/\s+/).length;
+    const maxTtsDurationMs = Math.max(6000, words * 700 + 4000);
+    const watchdogTimer = setTimeout(() => {
+      if (!settled && isSpeakingRef.current) {
+        if (isAnySpeaking()) {
+          return;
+        }
+        addLog('TTS', `Speech watchdog auto-recovery after ${maxTtsDurationMs}ms`, 'warn');
+        handleFinish();
+      }
+    }, maxTtsDurationMs);
+
+    const handleFinish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(watchdogTimer);
+      setIsTtsPlaying(false);
+      safeResumeListeningAfterTts();
+    };
 
     if (ttsEngine === 'elevenlabs' && elevenLabsService.isConfigured()) {
       const activeVoice = elevenLabsService.getActiveVoiceId();
@@ -797,13 +933,11 @@ export default function TestingInteractionModeView({ onNavigate }) {
           addLog('TTS', `[ElevenLabs] Audio streaming & playback active`, 'success');
         },
         onEnd: () => {
-          setIsTtsPlaying(false);
           const elapsed = Math.round(performance.now() - t0);
-          setTimeout(() => { isSpeakingRef.current = false; }, 600);
           addLog('TTS', `[ElevenLabs] Audio playback finished (took ${elapsed}ms)`, 'timing', elapsed);
+          handleFinish();
         },
         onError: (err) => {
-          setIsTtsPlaying(false);
           addLog('TTS', `[ElevenLabs] Playback error: ${err.message || err}. Falling back to Browser TTS...`, 'warn');
           speakWithVoice(cleanText, {
             voiceURI: selectedBrowserVoice,
@@ -812,19 +946,16 @@ export default function TestingInteractionModeView({ onNavigate }) {
             gender: 'female',
             onStart: () => { isSpeakingRef.current = true; },
             onEnd: () => {
-              setIsTtsPlaying(false);
-              setTimeout(() => { isSpeakingRef.current = false; }, 600);
+              handleFinish();
             },
             onError: () => {
-              setIsTtsPlaying(false);
-              isSpeakingRef.current = false;
+              handleFinish();
             }
           });
         },
       });
 
       if (!res.success) {
-        setIsTtsPlaying(false);
         addLog('TTS', `[ElevenLabs] Synthesis failed: ${res.error}. Speaking via Browser TTS...`, 'warn');
         speakWithVoice(cleanText, {
           voiceURI: selectedBrowserVoice,
@@ -833,12 +964,10 @@ export default function TestingInteractionModeView({ onNavigate }) {
           gender: 'female',
           onStart: () => { isSpeakingRef.current = true; },
           onEnd: () => {
-            setIsTtsPlaying(false);
-            setTimeout(() => { isSpeakingRef.current = false; }, 600);
+            handleFinish();
           },
           onError: () => {
-            setIsTtsPlaying(false);
-            isSpeakingRef.current = false;
+            handleFinish();
           }
         });
       }
@@ -855,18 +984,17 @@ export default function TestingInteractionModeView({ onNavigate }) {
           addLog('TTS', `[Browser TTS] Audio speech output started (+${Math.round(performance.now() - t0)}ms)`, 'timing');
         },
         onEnd: () => {
-          setIsTtsPlaying(false);
-          setTimeout(() => { isSpeakingRef.current = false; }, 600);
-          addLog('TTS', `[Browser TTS] Speech completed in ${Math.round(performance.now() - t0)}ms`, 'success');
+          const elapsed = Math.round(performance.now() - t0);
+          addLog('TTS', `[Browser TTS] Speech completed in ${elapsed}ms`, 'success');
+          handleFinish();
         },
         onError: (err) => {
-          setIsTtsPlaying(false);
-          isSpeakingRef.current = false;
           addLog('TTS', `[Browser TTS] Speech error: ${err}`, 'error');
+          handleFinish();
         },
       });
     }
-  }, [ttsEngine, selectedBrowserVoice, ttsSpeed, ttsPitch, addLog]);
+  }, [ttsEngine, selectedBrowserVoice, ttsSpeed, ttsPitch, addLog, safeResumeListeningAfterTts]);
   playTtsAudioRef.current = playTtsAudio;
 
   // Handle ElevenLabs config save
@@ -893,7 +1021,9 @@ export default function TestingInteractionModeView({ onNavigate }) {
     elevenLabsService.cancel();
     setIsTtsPlaying(false);
     isSpeakingRef.current = false;
+    lastSpeechEndTimeRef.current = Date.now();
     addLog('TTS', 'Speech synthesis audio STOPPED by user', 'warn');
+    safeResumeListeningAfterTts();
   };
 
   return (

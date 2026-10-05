@@ -53,8 +53,16 @@ export function isAcousticEcho(heardText, lastSpokenText) {
     'could you please clarify',
     'sure how can i assist',
     'hello guest welcome',
-    'hello visitor welcome',
     'what is your query',
+    'welcome to robomiracle technologies',
+    'your ai receptionist',
+    'ai receptionist',
+    'how may i assist you today',
+    'how can i assist you today',
+    'diagnostic mode active',
+    'official hardware and software specifications',
+    'tilted robot head',
+    'reset robot head neutral',
   ];
 
   for (const phrase of SYSTEM_PHRASES) {

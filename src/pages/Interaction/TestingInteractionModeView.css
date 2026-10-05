@@ -325,7 +325,6 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
-  transform: scaleX(-1);
 }
 
 .tia-video-placeholder {
@@ -690,6 +689,11 @@
 
 .tia-source-tag.system {
   color: #f59e0b;
+}
+
+.tia-source-tag.face-greeting {
+  color: #c084fc;
+  background: rgba(192, 132, 252, 0.15);
 }
 
 .tia-latency-tag {

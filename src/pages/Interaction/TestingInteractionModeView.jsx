@@ -40,12 +40,24 @@ import { elevenLabsService, DEFAULT_ELEVENLABS_VOICES } from '../../services/ele
 import { useCamera } from '../../hooks/useCamera';
 import { detectFacesInVideo, loadFaceApiModels } from '../../utils/faceApiHelper';
 import { kioskConfigService } from '../../services/kioskConfigService';
+import { voiceNavigationService } from '../../services/voiceNavigationService';
 import './TestingInteractionModeView.css';
 
 export default function TestingInteractionModeView({ onNavigate }) {
   // ── Active Test Module Tab ──
   // 'all' | 'chat' | 'voice' | 'tts' | 'vision' | 'hardware'
   const [activeTab, setActiveTab] = useState('all');
+
+  const handleTabClick = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'vision' && !enableVision) {
+      setEnableVision(true);
+      addLog('SWITCHBOARD', 'Auto-enabled Camera & Vision for Vision PiP inspection', 'info');
+    } else if (tab === 'voice' && !enableStt) {
+      setEnableStt(true);
+      addLog('SWITCHBOARD', 'Auto-enabled Microphone STT for Voice testing', 'info');
+    }
+  };
 
   // ── Master Feature Switches (Isolate features one-by-one) ──
   const [enableChat, setEnableChat] = useState(true);
@@ -143,11 +155,32 @@ export default function TestingInteractionModeView({ onNavigate }) {
   // ── Vision State ──
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [detectedFaces, setDetectedFaces] = useState([]);
+  const [enrolledFaces, setEnrolledFaces] = useState([]);
   const [visionInferenceMs, setVisionInferenceMs] = useState(0);
   const [visionIntervalMs, setVisionIntervalMs] = useState(1500);
+  const [greetingCooldownSec, setGreetingCooldownSec] = useState(45); // Cooldown buffer in seconds
   const canvasRef = useRef(null);
   const detectionLoopRef = useRef(null);
   const isDetectingRef = useRef(false);
+  const enrolledFacesRef = useRef([]);
+  const lastGreetingTimeRef = useRef({});
+  const noFaceTimerRef = useRef(null);
+  const greetingCooldownSecRef = useRef(45);
+  greetingCooldownSecRef.current = greetingCooldownSec;
+
+  // ── Synchronization, Anti-Echo & Debounce Refs ──
+  const isProcessingRef = useRef(false);
+  const isSpeakingRef = useRef(false);
+  const lastSpeechUtteranceRef = useRef({ text: '', time: 0 });
+  const handleExecuteQueryRef = useRef(null);
+  const playTtsAudioRef = useRef(null);
+  const enableChatRef = useRef(enableChat);
+  enableChatRef.current = enableChat;
+  const enableTtsRef = useRef(enableTts);
+  enableTtsRef.current = enableTts;
+  const enableHardwareRef = useRef(enableHardware);
+  enableHardwareRef.current = enableHardware;
+  const lastEspStatusRef = useRef(null);
 
   // ── Hardware State ──
   const [espOnline, setEspOnline] = useState(false);
@@ -244,7 +277,26 @@ export default function TestingInteractionModeView({ onNavigate }) {
     }
   }, [enableVision, startCamera, stopCamera, addLog]);
 
-  // Face Detection Loop
+  // Load Enrolled Faces from Dexie DB
+  useEffect(() => {
+    async function loadFaces() {
+      try {
+        const users = await offlineFaceService.getUsers();
+        setEnrolledFaces(users || []);
+        enrolledFacesRef.current = users || [];
+        if (users && users.length > 0) {
+          addLog('VISION', `Loaded ${users.length} enrolled VIP face profile(s) from database`, 'info');
+        } else {
+          addLog('VISION', 'No enrolled VIP faces in database (all detected will be Guest)', 'info');
+        }
+      } catch (err) {
+        addLog('VISION', `Failed loading enrolled faces: ${err.message}`, 'error');
+      }
+    }
+    loadFaces();
+  }, [addLog]);
+
+  // Face Detection Loop with Descriptor Matching & Cooldown Buffer Greeting
   const runVisionInference = useCallback(async () => {
     if (!enableVision || isDetectingRef.current || !videoRef.current || !canvasRef.current || !isStreaming) return;
     const video = videoRef.current;
@@ -262,28 +314,131 @@ export default function TestingInteractionModeView({ onNavigate }) {
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // Detect faces with descriptors so we can match enrolled faces
       const detections = await detectFacesInVideo(video, 'tinyFace', {
-        withDescriptors: false,
-        inputSize: 224
+        withDescriptors: true,
+        inputSize: 224,
+        scoreThreshold: 0.5,
       });
 
       const inferenceMs = Math.round(performance.now() - t0);
       setVisionInferenceMs(inferenceMs);
       setDetectedFaces(detections || []);
 
-      if (detections && detections.length > 0) {
-        addLog('VISION', `Detected ${detections.length} face(s)`, 'timing', inferenceMs);
-        for (const det of detections) {
-          const box = det.detection ? det.detection.box : det.box || det;
-          if (box) {
-            ctx.strokeStyle = '#00ffff';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(box.x, box.y, box.width, box.height);
-            ctx.fillStyle = 'rgba(0, 255, 255, 0.85)';
-            ctx.fillRect(box.x, Math.max(0, box.y - 20), Math.max(90, box.width), 20);
-            ctx.fillStyle = '#031127';
-            ctx.font = 'bold 11px sans-serif';
-            ctx.fillText(`FACE (${inferenceMs}ms)`, box.x + 4, Math.max(14, box.y - 6));
+      if (!detections || detections.length === 0) {
+        // Departure check: reset greeting cooldown after 15s of empty frame
+        if (!noFaceTimerRef.current) {
+          noFaceTimerRef.current = setTimeout(() => {
+            lastGreetingTimeRef.current = {};
+            noFaceTimerRef.current = null;
+            addLog('VISION', 'No faces seen for 15s — visitor departed, greeting buffer reset', 'info');
+          }, 15000);
+        }
+        return;
+      }
+
+      // Face present: clear departure reset timer
+      if (noFaceTimerRef.current) {
+        clearTimeout(noFaceTimerRef.current);
+        noFaceTimerRef.current = null;
+      }
+
+      const currentEnrolled = enrolledFacesRef.current || [];
+
+      for (const det of detections) {
+        const box = det.detection ? det.detection.box : det.box || det;
+        if (!box) continue;
+
+        // Biometric Match against enrolled faces
+        let matchedFace = null;
+        let bestDistance = 1.0;
+
+        if (currentEnrolled.length > 0 && det.descriptor) {
+          for (const enrolled of currentEnrolled) {
+            const emb = enrolled.faceEmbedding || enrolled.descriptor;
+            if (emb && emb.length) {
+              const descA = Array.from(det.descriptor);
+              const descB = Array.from(emb);
+              const dist = Math.sqrt(descA.reduce((sum, val, i) => sum + Math.pow(val - (descB[i] || 0), 2), 0));
+              if (dist < 0.55 && dist < bestDistance) {
+                bestDistance = dist;
+                matchedFace = enrolled;
+              }
+            }
+          }
+        }
+
+        // Draw on unmirrored canvas with mirrored coordinates (so text is NOT inverted!)
+        const drawX = canvas.width - (box.x + box.width);
+        const drawY = box.y;
+        const drawW = box.width;
+        const drawH = box.height;
+
+        ctx.strokeStyle = matchedFace ? '#10b981' : '#00ffff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(drawX, drawY, drawW, drawH);
+
+        // Cyber Corner Accents
+        const cl = Math.min(drawW, drawH) * 0.2;
+        ctx.strokeStyle = matchedFace ? '#34d399' : '#38bdf8';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(drawX, drawY + cl); ctx.lineTo(drawX, drawY); ctx.lineTo(drawX + cl, drawY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(drawX + drawW - cl, drawY); ctx.lineTo(drawX + drawW, drawY); ctx.lineTo(drawX + drawW, drawY + cl); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(drawX, drawY + drawH - cl); ctx.lineTo(drawX, drawY + drawH); ctx.lineTo(drawX + cl, drawY + drawH); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(drawX + drawW - cl, drawY + drawH); ctx.lineTo(drawX + drawW, drawY + drawH); ctx.lineTo(drawX + drawW, drawY + drawH - cl); ctx.stroke();
+
+        const badgeText = matchedFace ? `VIP: ${matchedFace.name.toUpperCase()}` : `GUEST (${inferenceMs}ms)`;
+        ctx.font = 'bold 11px sans-serif';
+        const textMetrics = ctx.measureText(badgeText);
+        const badgeWidth = Math.max(textMetrics.width + 16, drawW);
+
+        ctx.fillStyle = matchedFace ? 'rgba(16, 185, 129, 0.9)' : 'rgba(0, 255, 255, 0.85)';
+        ctx.fillRect(drawX, Math.max(0, drawY - 22), badgeWidth, 22);
+        ctx.fillStyle = '#031127';
+        ctx.fillText(badgeText, drawX + 6, Math.max(15, drawY - 6));
+
+        // ── GREETING TRIGGER WITH CONFIGURABLE BUFFER COOLDOWN ──
+        const personKey = matchedFace ? `vip_${matchedFace.id || matchedFace.name}` : 'guest';
+        const now = Date.now();
+        const lastGreeted = lastGreetingTimeRef.current[personKey] || 0;
+        const cooldownMs = (greetingCooldownSecRef.current || 45) * 1000;
+        const isCooldownActive = (now - lastGreeted) < cooldownMs;
+
+        const isBusy = isProcessingRef.current || isSpeakingRef.current;
+
+        if (!isCooldownActive && !isBusy) {
+          lastGreetingTimeRef.current[personKey] = now;
+
+          const greetingMsg = matchedFace
+            ? `Hello ${matchedFace.name}! Welcome to Robomiracle Technologies. I am Aurra, your AI receptionist.`
+            : 'Hello! Welcome to Robomiracle Technologies. I am Aurra, an autonomous humanoid receptionist. How may I assist you today?';
+
+          addLog('VISION', `🎯 GREETING TRIGGERED: "${greetingMsg}" [${matchedFace ? 'VIP: ' + matchedFace.name : 'GUEST'}] (Cooldown buffer: ${greetingCooldownSecRef.current}s)`, 'success');
+
+          // Append to messages stream
+          const greetingChatMsg = {
+            id: Date.now(),
+            role: 'assistant',
+            text: greetingMsg,
+            timestamp: Date.now(),
+            source: 'face-greeting',
+            confidence: matchedFace ? Math.round((1 - bestDistance) * 100) : 100,
+            matchedPerson: matchedFace ? matchedFace.name : 'Guest',
+            latencyMs: inferenceMs,
+          };
+          setMessages((prev) => [...prev, greetingChatMsg]);
+
+          // Animate hardware head gesture if enabled
+          if (enableHardwareRef.current) {
+            esp32Service.setHeadTilt(105).catch(() => {});
+            setTimeout(() => {
+              esp32Service.setHeadTilt(90).catch(() => {});
+            }, 1800);
+          }
+
+          // Spoken audio greeting if TTS switch is ON
+          if (enableTtsRef.current && playTtsAudioRef.current) {
+            playTtsAudioRef.current(greetingMsg);
           }
         }
       }
@@ -304,6 +459,14 @@ export default function TestingInteractionModeView({ onNavigate }) {
       if (detectionLoopRef.current) clearInterval(detectionLoopRef.current);
     };
   }, [enableVision, visionIntervalMs, runVisionInference]);
+
+  // Disconnect global background voice listener while in isolated testing lab
+  useEffect(() => {
+    if (voiceNavigationService?.stopListening) {
+      voiceNavigationService.stopListening(true);
+      addLog('SYSTEM', 'Isolated Testing Lab active: Global VoiceAssistantBar listener paused', 'info');
+    }
+  }, [addLog]);
 
   // ── SPEECH RECOGNITION (STT) LIFECYCLE ──
   useEffect(() => {
@@ -328,6 +491,11 @@ export default function TestingInteractionModeView({ onNavigate }) {
         };
 
         rec.onresult = (event) => {
+          // Anti-echo protection: if Aurra is speaking, drop audio to prevent self-interception loop
+          if (isSpeakingRef.current) {
+            return;
+          }
+
           let interim = '';
           let final = '';
           for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -337,11 +505,29 @@ export default function TestingInteractionModeView({ onNavigate }) {
           }
           if (interim) setSttInterim(interim);
           if (final) {
-            setSttFinal(final);
+            const cleanFinal = final.trim();
+            if (!cleanFinal) return;
+
+            const now = Date.now();
+            const last = lastSpeechUtteranceRef.current;
+
+            // Debounce / De-duplicate: ignore duplicate within 2.5s or any utterance within 1.2s or if pipeline busy
+            if (
+              (cleanFinal.toLowerCase() === last.text.toLowerCase() && (now - last.time) < 2500) ||
+              ((now - last.time) < 1200) ||
+              isProcessingRef.current
+            ) {
+              addLog('STT', `Suppressed duplicate speech input: "${cleanFinal}" (pipeline busy or debounce)`, 'warn');
+              return;
+            }
+
+            lastSpeechUtteranceRef.current = { text: cleanFinal, time: now };
+            setSttFinal(cleanFinal);
             setSttInterim('');
-            addLog('STT', `Heard final utterance: "${final.trim()}"`, 'timing');
-            if (enableChat) {
-              handleExecuteQuery(final.trim(), 'voice');
+            addLog('STT', `Heard final utterance: "${cleanFinal}"`, 'timing');
+
+            if (enableChatRef.current && handleExecuteQueryRef.current) {
+              handleExecuteQueryRef.current(cleanFinal, 'voice');
             }
           }
         };
@@ -383,7 +569,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
         } catch {}
       }
     };
-  }, [enableStt, enableChat, addLog]);
+  }, [enableStt, addLog]);
 
   // ── HARDWARE STATUS CHECK ──
   const checkHardwareStatus = useCallback(async () => {
@@ -392,10 +578,16 @@ export default function TestingInteractionModeView({ onNavigate }) {
       const isOnline = await esp32Service.checkConnection();
       const latency = Math.round(performance.now() - t0);
       setEspOnline(Boolean(isOnline));
-      addLog('HARDWARE', `ESP32 connection check: ${isOnline ? 'ONLINE' : 'OFFLINE'}`, isOnline ? 'success' : 'warn', latency);
+      if (lastEspStatusRef.current !== isOnline) {
+        lastEspStatusRef.current = isOnline;
+        addLog('HARDWARE', `ESP32 connection status: ${isOnline ? 'ONLINE' : 'OFFLINE (SIMULATION)'}`, isOnline ? 'success' : 'warn', latency);
+      }
     } catch (err) {
       setEspOnline(false);
-      addLog('HARDWARE', `ESP32 check error: ${err.message}`, 'error');
+      if (lastEspStatusRef.current !== false) {
+        lastEspStatusRef.current = false;
+        addLog('HARDWARE', `ESP32 check error: ${err.message}`, 'error');
+      }
     }
   }, [addLog]);
 
@@ -410,8 +602,15 @@ export default function TestingInteractionModeView({ onNavigate }) {
   // ── CORE PIPELINE: EXECUTE QUERY (TEXT OR VOICE) WITH DETAILED LATENCY ──
   const handleExecuteQuery = async (queryText, inputSource = 'text') => {
     const query = (queryText || '').trim();
-    if (!query || isProcessing) return;
+    if (!query) return;
 
+    // Synchronous execution lock to prevent duplicate concurrent queries
+    if (isProcessingRef.current) {
+      addLog('PIPELINE', `Discarded overlapping query "${query}" (pipeline already processing)`, 'warn');
+      return;
+    }
+
+    isProcessingRef.current = true;
     setIsProcessing(true);
     const overallT0 = performance.now();
 
@@ -435,7 +634,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
 
     try {
       // 2. Hardware intent evaluation
-      if (enableHardware) {
+      if (enableHardwareRef.current) {
         const hwT0 = performance.now();
         const lower = query.toLowerCase();
         if (lower.includes('head up') || lower.includes('tilt up')) {
@@ -540,16 +739,18 @@ export default function TestingInteractionModeView({ onNavigate }) {
       addLog('PIPELINE', `[Step 6] Response rendered to UI in ${totalLatency}ms total`, 'timing', totalLatency);
 
       // 7. Optional TTS Audio Playback (Unified Browser or ElevenLabs)
-      if (enableTts && replyText) {
+      if (enableTtsRef.current && replyText) {
         addLog('TTS', `Triggering audio speech playback...`);
         playTtsAudio(replyText);
       }
     } catch (err) {
       addLog('PIPELINE', `Critical pipeline error: ${err.message}`, 'error');
     } finally {
+      isProcessingRef.current = false;
       setIsProcessing(false);
     }
   };
+  handleExecuteQueryRef.current = handleExecuteQuery;
 
   // Load Browser Voices on Mount
   useEffect(() => {
@@ -584,16 +785,22 @@ export default function TestingInteractionModeView({ onNavigate }) {
     if (!cleanText) return;
 
     setIsTtsPlaying(true);
+    isSpeakingRef.current = true;
 
     if (ttsEngine === 'elevenlabs' && elevenLabsService.isConfigured()) {
       const activeVoice = elevenLabsService.getActiveVoiceId();
       addLog('TTS', `[ElevenLabs] Synthesizing speech with voice [${activeVoice}]...`, 'info');
       const t0 = performance.now();
       const res = await elevenLabsService.speak(cleanText, {
-        onStart: () => addLog('TTS', `[ElevenLabs] Audio streaming & playback active`, 'success'),
+        onStart: () => {
+          isSpeakingRef.current = true;
+          addLog('TTS', `[ElevenLabs] Audio streaming & playback active`, 'success');
+        },
         onEnd: () => {
           setIsTtsPlaying(false);
-          addLog('TTS', `[ElevenLabs] Audio playback finished (API took ${res?.latencyMs || 0}ms)`, 'timing', res?.latencyMs);
+          const elapsed = Math.round(performance.now() - t0);
+          setTimeout(() => { isSpeakingRef.current = false; }, 600);
+          addLog('TTS', `[ElevenLabs] Audio playback finished (took ${elapsed}ms)`, 'timing', elapsed);
         },
         onError: (err) => {
           setIsTtsPlaying(false);
@@ -603,7 +810,15 @@ export default function TestingInteractionModeView({ onNavigate }) {
             rate: ttsSpeed,
             pitch: ttsPitch,
             gender: 'female',
-            onEnd: () => setIsTtsPlaying(false),
+            onStart: () => { isSpeakingRef.current = true; },
+            onEnd: () => {
+              setIsTtsPlaying(false);
+              setTimeout(() => { isSpeakingRef.current = false; }, 600);
+            },
+            onError: () => {
+              setIsTtsPlaying(false);
+              isSpeakingRef.current = false;
+            }
           });
         },
       });
@@ -616,7 +831,15 @@ export default function TestingInteractionModeView({ onNavigate }) {
           rate: ttsSpeed,
           pitch: ttsPitch,
           gender: 'female',
-          onEnd: () => setIsTtsPlaying(false),
+          onStart: () => { isSpeakingRef.current = true; },
+          onEnd: () => {
+            setIsTtsPlaying(false);
+            setTimeout(() => { isSpeakingRef.current = false; }, 600);
+          },
+          onError: () => {
+            setIsTtsPlaying(false);
+            isSpeakingRef.current = false;
+          }
         });
       }
     } else {
@@ -627,18 +850,24 @@ export default function TestingInteractionModeView({ onNavigate }) {
         rate: ttsSpeed,
         pitch: ttsPitch,
         gender: 'female',
-        onStart: () => addLog('TTS', `[Browser TTS] Audio speech output started (+${Math.round(performance.now() - t0)}ms)`, 'timing'),
+        onStart: () => {
+          isSpeakingRef.current = true;
+          addLog('TTS', `[Browser TTS] Audio speech output started (+${Math.round(performance.now() - t0)}ms)`, 'timing');
+        },
         onEnd: () => {
           setIsTtsPlaying(false);
+          setTimeout(() => { isSpeakingRef.current = false; }, 600);
           addLog('TTS', `[Browser TTS] Speech completed in ${Math.round(performance.now() - t0)}ms`, 'success');
         },
         onError: (err) => {
           setIsTtsPlaying(false);
+          isSpeakingRef.current = false;
           addLog('TTS', `[Browser TTS] Speech error: ${err}`, 'error');
         },
       });
     }
   }, [ttsEngine, selectedBrowserVoice, ttsSpeed, ttsPitch, addLog]);
+  playTtsAudioRef.current = playTtsAudio;
 
   // Handle ElevenLabs config save
   const handleSaveElevenLabs = (key, voiceId, customId) => {
@@ -663,6 +892,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
     cancelSpeech();
     elevenLabsService.cancel();
     setIsTtsPlaying(false);
+    isSpeakingRef.current = false;
     addLog('TTS', 'Speech synthesis audio STOPPED by user', 'warn');
   };
 
@@ -789,22 +1019,22 @@ export default function TestingInteractionModeView({ onNavigate }) {
           {/* Subsystem Quick Nav Tabs & Model Switcher */}
           <div className="tia-nav-row">
             <div className="tia-tab-bar">
-              <button className={`tia-tab ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>
+              <button className={`tia-tab ${activeTab === 'all' ? 'active' : ''}`} onClick={() => handleTabClick('all')}>
                 All-In-One Arena
               </button>
-              <button className={`tia-tab ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>
+              <button className={`tia-tab ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => handleTabClick('chat')}>
                 Text & LLM
               </button>
-              <button className={`tia-tab ${activeTab === 'tts' ? 'active' : ''}`} onClick={() => setActiveTab('tts')}>
+              <button className={`tia-tab ${activeTab === 'tts' ? 'active' : ''}`} onClick={() => handleTabClick('tts')}>
                 Audio TTS
               </button>
-              <button className={`tia-tab ${activeTab === 'voice' ? 'active' : ''}`} onClick={() => setActiveTab('voice')}>
+              <button className={`tia-tab ${activeTab === 'voice' ? 'active' : ''}`} onClick={() => handleTabClick('voice')}>
                 Mic STT
               </button>
-              <button className={`tia-tab ${activeTab === 'vision' ? 'active' : ''}`} onClick={() => setActiveTab('vision')}>
+              <button className={`tia-tab ${activeTab === 'vision' ? 'active' : ''}`} onClick={() => handleTabClick('vision')}>
                 Vision PiP
               </button>
-              <button className={`tia-tab ${activeTab === 'hardware' ? 'active' : ''}`} onClick={() => setActiveTab('hardware')}>
+              <button className={`tia-tab ${activeTab === 'hardware' ? 'active' : ''}`} onClick={() => handleTabClick('hardware')}>
                 Hardware
               </button>
             </div>
@@ -903,6 +1133,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
                 </div>
                 <div className="tia-vision-stats">
                   <span>Faces: <strong>{detectedFaces.length}</strong></span>
+                  <span>VIPs: <strong>{enrolledFaces.length}</strong></span>
                   <span>Inference: <strong>{visionInferenceMs}ms</strong></span>
                   <select
                     className="tia-interval-select"
@@ -913,6 +1144,19 @@ export default function TestingInteractionModeView({ onNavigate }) {
                     <option value={800}>800ms (Fast)</option>
                     <option value={1500}>1500ms (Balanced)</option>
                     <option value={3000}>3000ms (Low CPU)</option>
+                  </select>
+                  <select
+                    className="tia-interval-select"
+                    style={{ borderColor: 'rgba(192, 132, 252, 0.4)', color: '#c084fc' }}
+                    value={greetingCooldownSec}
+                    onChange={(e) => setGreetingCooldownSec(Number(e.target.value))}
+                    title="Greeting Buffer Cooldown Time"
+                  >
+                    <option value={15}>Buffer: 15s</option>
+                    <option value={30}>Buffer: 30s</option>
+                    <option value={45}>Buffer: 45s</option>
+                    <option value={60}>Buffer: 60s</option>
+                    <option value={90}>Buffer: 90s</option>
                   </select>
                 </div>
               </div>
@@ -1042,6 +1286,8 @@ export default function TestingInteractionModeView({ onNavigate }) {
                               ? 'CUSTOMIZED FAQ'
                               : msg.source === 'local-clock'
                               ? 'LOCAL CLOCK (0ms)'
+                              : msg.source === 'face-greeting'
+                              ? 'FACE RECOGNITION GREETING'
                               : msg.llmInfo?.ragDetails
                               ? `CLOUD LLM + ${msg.llmInfo.ragDetails.source.toUpperCase()} RAG`
                               : msg.source === 'groq-llm'
@@ -1057,6 +1303,29 @@ export default function TestingInteractionModeView({ onNavigate }) {
                       <p className="tia-bubble-text">{msg.text}</p>
 
                       {/* Diagnostic Source Inspector Box */}
+                      {!isUser && msg.source === 'face-greeting' && (
+                        <div className="tia-source-card vision-card" style={{ borderLeftColor: '#c084fc' }}>
+                          <div className="source-card-header">
+                            <Sparkles size={13} color="#c084fc" />
+                            <strong>SOURCE: BIOMETRIC FACE GREETING</strong>
+                          </div>
+                          <div className="source-card-body">
+                            <div className="source-meta-row">
+                              <span className="meta-key">Detected Person:</span>
+                              <span className="meta-val highlight" style={{ color: '#c084fc' }}>
+                                {msg.matchedPerson || 'Visitor'}
+                              </span>
+                              <span className="meta-divider">•</span>
+                              <span className="meta-key">Profile:</span>
+                              <span className="meta-val">{msg.matchedPerson && msg.matchedPerson !== 'Guest' ? 'Enrolled VIP' : 'Visitor (Guest)'}</span>
+                              <span className="meta-divider">•</span>
+                              <span className="meta-key">Buffer Cooldown:</span>
+                              <span className="meta-val speed">{greetingCooldownSec}s</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {!isUser && msg.source === 'local-clock' && (
                         <div className="tia-source-card clock-card" style={{ borderLeftColor: '#38bdf8' }}>
                           <div className="source-card-header">

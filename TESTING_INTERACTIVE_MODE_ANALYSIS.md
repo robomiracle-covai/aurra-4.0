@@ -247,3 +247,16 @@ sequenceDiagram
 4. **Departure Detection**: When no face is in view for 15 seconds, greeting buffers automatically reset so the next visitor arrival is promptly welcomed.
 5. **Non-Mirrored Text Overlay**: Removed `scaleX(-1)` from `.tia-canvas-overlay` and mapped canvas coordinates `canvas.width - (box.x + box.width)` to keep cyber reticles aligned while ensuring all text badges (`VIP: NAME`, `GUEST`) are rendered in crisp, un-mirrored orientation.
 6. **Unified Greeting Output**: Greeted visitors trigger chat stream entries with the `FACE RECOGNITION GREETING` tag, optional spoken voice welcoming, and head tilt animatronics.
+
+### Fix 3: Elimination of Never-Ending STT-TTS Loop (Acoustic Echo Suppression & Hardware Muting)
+1. **Root Cause Identified**: When STT was active with `continuous = true`, the PC microphone physically captured Aurra's own spoken TTS output coming from speakers. Web Speech API buffered this audio and fired `onresult` immediately upon completion, which passed through debounce checks because Aurra's own words differed from the user's previous word ("hello"). This fed Aurra's own greeting back into the Groq LLM / FAQ pipeline, which synthesized a reply, triggering an infinite self-conversation loop.
+2. **Layer 1 - Immediate Hardware Recognizer Abort**:
+   - The moment `playTtsAudio` begins, `rec.abort()` is called immediately. This flushes the browser's audio input buffer and prevents Web Speech API from processing speaker audio.
+3. **Layer 2 - Multi-Phrase Algorithmic Echo Cancellation (`isAcousticEcho`)**:
+   - Integrated `isAcousticEcho` from `voiceNavigationService.js`, comparing heard utterances against fixed Aurra system phrases and computing word overlap against `lastSpokenTextRef.current`.
+   - Expanded system phrase list to cover testing diagnostics, campus welcome greetings, and spec sheet replies.
+4. **Layer 3 - 750ms Acoustic Settling Buffer**:
+   - After TTS audio playback concludes, a 750ms settling timer blocks microphone reactivation to guarantee that room reverberation and speaker resonance have dissipated.
+5. **Layer 4 - Speech Watchdog & Emergency Voice Interrupt**:
+   - Added safety watchdog to auto-recover microphone state if audio playback halts unexpectedly.
+   - Added urgent voice interrupt barge-in for commands (`"stop"`, `"cancel"`, `"quiet"`), instantly killing audio playback and resetting the pipeline.

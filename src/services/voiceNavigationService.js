@@ -29,6 +29,12 @@ export function isAcousticEcho(heardText, lastSpokenText) {
   if (!hNorm || hNorm.length < 3) return false;
 
   const wordsH = hNorm.split(' ').filter(w => w.length > 1);
+
+  // Self-voice echo guard: Phrases that a user talking to Aurra would never say, but robot begins answers with
+  if (hNorm === 'i am' || hNorm === 'i am i am' || hNorm === 'i am aurra' || hNorm.startsWith('i am aurra')) {
+    return true;
+  }
+
   // Short human utterances (1 to 3 words like "hello", "hi aurra", "who are you") are NEVER acoustic echoes
   if (wordsH.length < 4) {
     return false;

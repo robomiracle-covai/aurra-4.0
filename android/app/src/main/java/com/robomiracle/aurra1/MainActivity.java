@@ -202,6 +202,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         return ttsReady && tts != null;
     }
 
+    private volatile boolean isSpeakingNow = false;
+    private volatile String currentUtteranceId = null;
+
     public void speakNative(String text, String gender) {
         runOnUiThread(() -> {
             if (!ttsReady || tts == null) {
@@ -211,21 +214,27 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 return;
             }
             applyVoiceSettings();
+            String uId = "AURRA_TTS_" + System.currentTimeMillis();
+            currentUtteranceId = uId;
+            isSpeakingNow = true;
+            if (webView != null) {
+                webView.post(() -> webView.evaluateJavascript("window.isNativeSpeaking = true;", null));
+            }
             int result;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                result = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null,
-                        "AURRA_TTS_" + System.currentTimeMillis());
+                result = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, uId);
             } else {
                 result = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null);
             }
-            Log.i(TAG, "TTS speak result=" + result + " textLen=" + text.length());
+            Log.i(TAG, "TTS speak result=" + result + " textLen=" + text.length() + " id=" + uId);
         });
     }
 
-    private volatile boolean isSpeakingNow = false;
-
     public void setNativeSpeakingFlag(boolean speaking) {
         this.isSpeakingNow = speaking;
+        if (!speaking) {
+            this.currentUtteranceId = null;
+        }
         if (webView != null) {
             webView.post(() -> webView.evaluateJavascript("window.isNativeSpeaking = " + speaking + ";", null));
         }
@@ -236,12 +245,17 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
     public void stopNativeSpeech() {
+        this.currentUtteranceId = null;
         this.isSpeakingNow = false;
         runOnUiThread(() -> {
             if (tts != null) {
                 tts.stop();
             }
-            notifyNativeSpeechEnd();
+            if (webView != null) {
+                webView.post(() -> webView.evaluateJavascript(
+                        "window.isNativeSpeaking = false;",
+                        null));
+            }
         });
     }
 
@@ -367,17 +381,27 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     @Override
                     public void onStart(String utteranceId) {
                         Log.d(TAG, "TTS started: " + utteranceId);
-                        notifyNativeSpeechStart();
+                        if (currentUtteranceId != null && currentUtteranceId.equals(utteranceId)) {
+                            notifyNativeSpeechStart();
+                        }
                     }
 
                     @Override
                     public void onDone(String utteranceId) {
-                        notifyNativeSpeechEnd();
+                        Log.d(TAG, "TTS done: " + utteranceId);
+                        if (currentUtteranceId != null && currentUtteranceId.equals(utteranceId)) {
+                            notifyNativeSpeechEnd();
+                        } else {
+                            Log.d(TAG, "Ignored stale onDone for " + utteranceId + " (active is " + currentUtteranceId + ")");
+                        }
                     }
 
                     @Override
                     public void onError(String utteranceId) {
-                        notifyNativeSpeechEnd();
+                        Log.d(TAG, "TTS error: " + utteranceId);
+                        if (currentUtteranceId != null && currentUtteranceId.equals(utteranceId)) {
+                            notifyNativeSpeechEnd();
+                        }
                     }
                 });
             }
@@ -398,6 +422,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
     private void notifyNativeSpeechEnd() {
         this.isSpeakingNow = false;
+        this.currentUtteranceId = null;
         if (webView == null) return;
         webView.post(() -> webView.evaluateJavascript(
                 "window.isNativeSpeaking = false; if(window.onNativeSpeechEnd){window.onNativeSpeechEnd();}",

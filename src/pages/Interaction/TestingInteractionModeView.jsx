@@ -43,6 +43,47 @@ import { kioskConfigService } from '../../services/kioskConfigService';
 import { voiceNavigationService, isAcousticEcho } from '../../services/voiceNavigationService';
 import './TestingInteractionModeView.css';
 
+/**
+ * Merges incremental and multi-clause speech utterances cleanly:
+ * - Prevents repetitive accumulation of prefixes (e.g. "who" + "who are" + "who are you" -> "who are you")
+ * - Merges overlapping words
+ * - Seamlessly appends distinct separate clauses
+ */
+export function mergeSpeechUtterances(prevText, nextText) {
+  const prev = (prevText || '').trim();
+  const next = (nextText || '').trim();
+  if (!prev) return next;
+  if (!next) return prev;
+
+  const prevLower = prev.toLowerCase();
+  const nextLower = next.toLowerCase();
+
+  // 1. If next is an extension of prev (e.g. prev="who are", next="who are you")
+  if (nextLower.startsWith(prevLower)) {
+    return next;
+  }
+
+  // 2. If prev already contains next or ends with next
+  if (prevLower.endsWith(nextLower) || prevLower.includes(nextLower)) {
+    return prev;
+  }
+
+  // 3. Word-level overlap: match trailing words of prev with leading words of next
+  const prevWords = prev.split(/\s+/);
+  const nextWords = next.split(/\s+/);
+
+  for (let k = Math.min(prevWords.length, nextWords.length); k > 0; k--) {
+    const prevSuffix = prevWords.slice(-k).join(' ').toLowerCase();
+    const nextPrefix = nextWords.slice(0, k).join(' ').toLowerCase();
+    if (prevSuffix === nextPrefix) {
+      return [...prevWords, ...nextWords.slice(k)].join(' ');
+    }
+  }
+
+  // 4. Truly disjoint separate clauses (e.g. "what is your name" + "what are your features")
+  return `${prev} ${next}`;
+}
+
 export default function TestingInteractionModeView({ onNavigate }) {
   // ── Active Test Module Tab ──
   // 'all' | 'chat' | 'voice' | 'tts' | 'vision' | 'hardware'
@@ -59,19 +100,70 @@ export default function TestingInteractionModeView({ onNavigate }) {
     }
   };
 
+  // ── Display Mode: 'customer' (Clean UI) vs 'developer' (Full Diagnostic Lab) ──
+  const [uiMode, setUiMode] = useState(() => {
+    try {
+      return localStorage.getItem('aurra_testing_ui_mode') || 'customer';
+    } catch {
+      return 'customer';
+    }
+  });
+
+  const handleToggleUiMode = (newMode) => {
+    setUiMode(newMode);
+    try {
+      localStorage.setItem('aurra_testing_ui_mode', newMode);
+    } catch {}
+    if (newMode === 'customer') {
+      if (!enableChat) setEnableChat(true);
+      if (!enableTts) setEnableTts(true);
+      // Strictly respect user's STT switch! If switched OFF in developer mode, it stays OFF in customer mode.
+      addLog('UI_MODE', `Switched to Customer Mode: Clean conversation interface active (STT: ${enableStt ? 'ON' : 'OFF'})`, 'info');
+    } else {
+      addLog('UI_MODE', 'Switched to Developer Mode: Full diagnostic workbench active', 'info');
+    }
+  };
+
   // ── Master Feature Switches (Isolate features one-by-one) ──
   const [enableChat, setEnableChat] = useState(true);
   const [enableTts, setEnableTts] = useState(true);
-  const [enableStt, setEnableStt] = useState(false); // Default OFF for clean isolated testing
+  const [enableStt, setEnableStt] = useState(() => {
+    try {
+      const saved = localStorage.getItem('aurra_testing_stt_enabled');
+      if (saved !== null) return saved === 'true';
+      return false; // Default OFF for safety
+    } catch {
+      return false;
+    }
+  });
   const [enableVision, setEnableVision] = useState(false); // Default OFF for clean isolated testing
   const [enableHardware, setEnableHardware] = useState(false); // Default OFF for clean isolated testing
 
+  // Helper to toggle STT and persist user's choice across modes
+  const handleToggleStt = (val) => {
+    const nextVal = typeof val === 'boolean' ? val : !enableStt;
+    setEnableStt(nextVal);
+    try {
+      localStorage.setItem('aurra_testing_stt_enabled', String(nextVal));
+    } catch {}
+  };
+
+  // Ensure Chat & TTS are ready in Customer Mode without overriding user's STT setting
+  useEffect(() => {
+    if (uiMode === 'customer') {
+      if (!enableChat) setEnableChat(true);
+      if (!enableTts) setEnableTts(true);
+    }
+  }, [uiMode, enableChat, enableTts]);
+
   // ── Chat State ──
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState(() => [
     {
       id: 1,
       role: 'assistant',
-      text: 'Diagnostic Mode Active. Aurra is loaded with official hardware & software specifications from Robomiracle Technologies (Coimbatore).',
+      text: (typeof window !== 'undefined' && localStorage.getItem('aurra_testing_ui_mode') === 'developer')
+        ? 'Diagnostic Mode Active. Aurra is loaded with official hardware & software specifications from Robomiracle Technologies (Coimbatore).'
+        : 'Hello! Welcome to Robomiracle Technologies. I am Aurra, an intelligent AI humanoid receptionist. How may I assist you today?',
       timestamp: Date.now(),
       source: 'system',
       latencyMs: 0
@@ -127,6 +219,23 @@ export default function TestingInteractionModeView({ onNavigate }) {
     }
   };
 
+  const handleBrainProviderToggle = (newProvider) => {
+    llmService.saveConfig({ provider: newProvider });
+    setBrainProvider(newProvider);
+    if (newProvider === 'gemini') {
+      setSelectedLlmModel(llmService.getConfig().geminiModel || 'gemini-1.5-flash');
+    } else {
+      setSelectedLlmModel(llmService.getConfig().model || 'qwen/qwen3.8-27b');
+    }
+    addLog('LLM', `Brain Engine switched to: ${newProvider === 'gemini' ? 'Google Gemini' : 'Groq Cloud'}`, 'success');
+  };
+
+  const handleVoiceStyleToggle = (newStyle) => {
+    kioskConfigService.updateConfig({ voiceInteractionStyle: newStyle });
+    setVoiceInteractionStyle(newStyle);
+    addLog('STT', `Voice Architecture changed to: ${newStyle === 'phone-call' ? 'Phone Call (LiveKit Full-Duplex)' : 'Walkie-Talkie (750ms Patience Buffer)'}`, 'success');
+  };
+
   // ── STT (Voice Recognition) State ──
   const [isSttListening, setIsSttListening] = useState(false);
   const [sttInterim, setSttInterim] = useState('');
@@ -176,8 +285,14 @@ export default function TestingInteractionModeView({ onNavigate }) {
   const acousticResumeTimerRef = useRef(null);
   const isManuallyAbortedRef = useRef(false);
   const lastSpeechUtteranceRef = useRef({ text: '', time: 0 });
+  const speechAccumulatorRef = useRef('');
+  const speechDebounceTimerRef = useRef(null);
   const handleExecuteQueryRef = useRef(null);
   const playTtsAudioRef = useRef(null);
+
+  // ── Brain Provider & Voice Interaction Architecture State ──
+  const [brainProvider, setBrainProvider] = useState(() => llmService.getConfig().provider || 'groq');
+  const [voiceInteractionStyle, setVoiceInteractionStyle] = useState(() => kioskConfigService.getConfig().voiceInteractionStyle || 'walkie-talkie');
   const enableSttRef = useRef(enableStt);
   enableSttRef.current = enableStt;
   const enableChatRef = useRef(enableChat);
@@ -532,8 +647,13 @@ export default function TestingInteractionModeView({ onNavigate }) {
       };
 
       rec.onresult = (event) => {
-        // Drop audio if Aurra is actively vocalizing TTS
-        if (isSpeakingRef.current) {
+        // Drop audio if Aurra is actively vocalizing TTS or Android native speech is active
+        const isDeviceSpeaking = isSpeakingRef.current ||
+          (typeof window !== 'undefined' && (
+            window.isNativeSpeaking ||
+            (window.AndroidLauncher && typeof window.AndroidLauncher.isSpeaking === 'function' && window.AndroidLauncher.isSpeaking())
+          ));
+        if (isDeviceSpeaking) {
           return;
         }
 
@@ -555,32 +675,60 @@ export default function TestingInteractionModeView({ onNavigate }) {
 
           const now = Date.now();
 
-          // 1. Acoustic echo filter: ONLY applies if Aurra spoke in the last 2000ms AND utterance has >= 4 words
-          const isRecentSpeech = lastSpeechEndTimeRef.current && (now - lastSpeechEndTimeRef.current < 2000);
-          if (isRecentSpeech && isAcousticEcho(cleanFinal, lastSpokenTextRef.current)) {
+          // 1. Acoustic echo filter: Blocks self-voice echo loop
+          const hLower = cleanFinal.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+          const sLower = (lastSpokenTextRef.current || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+          const isRecentSpeech = lastSpeechEndTimeRef.current && (now - lastSpeechEndTimeRef.current < 2500);
+
+          if (isRecentSpeech && (
+            isAcousticEcho(cleanFinal, lastSpokenTextRef.current) ||
+            hLower === 'i am' ||
+            hLower === 'i am i am' ||
+            (sLower && hLower.length >= 4 && sLower.startsWith(hLower))
+          )) {
             addLog('STT', `🛡️ Acoustic Echo Filter: Blocked self-voice loop: "${cleanFinal}"`, 'warn');
             setSttInterim('');
             return;
           }
 
-          // 2. Debounce: ignore exact duplicate within 1.2s or if pipeline is actively querying LLM
-          const last = lastSpeechUtteranceRef.current;
-          if (
-            (cleanFinal.toLowerCase() === last.text.toLowerCase() && (now - last.time) < 1200) ||
-            isProcessingRef.current
-          ) {
-            addLog('STT', `Suppressed duplicate speech input: "${cleanFinal}" (pipeline busy or debounce)`, 'warn');
-            return;
+          // 2. Accumulate speech into End-of-Thought patience buffer using mergeSpeechUtterances to eliminate duplicate prefixes
+          const accumulated = mergeSpeechUtterances(speechAccumulatorRef.current, cleanFinal);
+          speechAccumulatorRef.current = accumulated;
+
+          // Instant visual feedback showing speech tokens being accumulated
+          setSttInterim(accumulated);
+
+          // Reset existing debounce timer
+          if (speechDebounceTimerRef.current) {
+            clearTimeout(speechDebounceTimerRef.current);
           }
 
-          lastSpeechUtteranceRef.current = { text: cleanFinal, time: now };
-          setSttFinal(cleanFinal);
-          setSttInterim('');
-          addLog('STT', `🎙️ User Speech Captured: "${cleanFinal}"`, 'timing');
+          // 3. 750ms End-of-Thought Patience Window (Waits for full user thought before dispatching)
+          speechDebounceTimerRef.current = setTimeout(() => {
+            const fullUtterance = speechAccumulatorRef.current.trim();
+            speechAccumulatorRef.current = '';
+            setSttInterim('');
 
-          if (enableChatRef.current && handleExecuteQueryRef.current) {
-            handleExecuteQueryRef.current(cleanFinal, 'voice');
-          }
+            if (!fullUtterance || fullUtterance.length < 2) return;
+
+            const tNow = Date.now();
+            const last = lastSpeechUtteranceRef.current;
+            if (
+              (fullUtterance.toLowerCase() === last.text.toLowerCase() && (tNow - last.time) < 1500) ||
+              isProcessingRef.current
+            ) {
+              addLog('STT', `Suppressed duplicate speech input: "${fullUtterance}" (pipeline busy or debounce)`, 'warn');
+              return;
+            }
+
+            lastSpeechUtteranceRef.current = { text: fullUtterance, time: tNow };
+            setSttFinal(fullUtterance);
+            addLog('STT', `🎙️ Full Utterance Captured: "${fullUtterance}"`, 'timing');
+
+            if (enableChatRef.current && handleExecuteQueryRef.current) {
+              handleExecuteQueryRef.current(fullUtterance, 'voice');
+            }
+          }, 750);
         }
       };
 
@@ -617,6 +765,12 @@ export default function TestingInteractionModeView({ onNavigate }) {
   }, [addLog]);
 
   const stopMicrophone = useCallback((isPermanent = false) => {
+    if (speechDebounceTimerRef.current) {
+      clearTimeout(speechDebounceTimerRef.current);
+      speechDebounceTimerRef.current = null;
+    }
+    speechAccumulatorRef.current = '';
+
     if (acousticResumeTimerRef.current) {
       clearTimeout(acousticResumeTimerRef.current);
       acousticResumeTimerRef.current = null;
@@ -640,16 +794,32 @@ export default function TestingInteractionModeView({ onNavigate }) {
       clearTimeout(acousticResumeTimerRef.current);
       acousticResumeTimerRef.current = null;
     }
-    // Acoustic settling delay (600ms) to ensure room reverberation from speakers has faded
-    acousticResumeTimerRef.current = setTimeout(() => {
-      acousticResumeTimerRef.current = null;
-      isSpeakingRef.current = false;
-      lastSpeechEndTimeRef.current = Date.now();
-      if (enableSttRef.current) {
-        startMicrophone();
-        addLog('STT', 'Speech playback concluded. Microphone resumed listening.', 'info');
+
+    const checkAndResume = () => {
+      // If native Android TTS is still speaking, poll until speaker is silent
+      const isNativeStillSpeaking = typeof window !== 'undefined' && (
+        window.isNativeSpeaking ||
+        (window.AndroidLauncher && typeof window.AndroidLauncher.isSpeaking === 'function' && window.AndroidLauncher.isSpeaking())
+      );
+
+      if (isNativeStillSpeaking) {
+        acousticResumeTimerRef.current = setTimeout(checkAndResume, 150);
+        return;
       }
-    }, 600);
+
+      // Acoustic settling buffer (850ms) to ensure room reverberation from speakers has completely dissipated
+      acousticResumeTimerRef.current = setTimeout(() => {
+        acousticResumeTimerRef.current = null;
+        isSpeakingRef.current = false;
+        lastSpeechEndTimeRef.current = Date.now();
+        if (enableSttRef.current) {
+          startMicrophone();
+          addLog('STT', 'Speech playback concluded. Microphone resumed listening.', 'info');
+        }
+      }, 850);
+    };
+
+    checkAndResume();
   }, [startMicrophone, addLog]);
 
   useEffect(() => {
@@ -909,6 +1079,12 @@ export default function TestingInteractionModeView({ onNavigate }) {
     isSpeakingRef.current = true;
     lastSpokenTextRef.current = cleanText;
 
+    if (speechDebounceTimerRef.current) {
+      clearTimeout(speechDebounceTimerRef.current);
+      speechDebounceTimerRef.current = null;
+    }
+    speechAccumulatorRef.current = '';
+
     // 2. Clear any pending acoustic resume timer
     if (acousticResumeTimerRef.current) {
       clearTimeout(acousticResumeTimerRef.current);
@@ -1049,7 +1225,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
 
   return (
     <div className="tia-root">
-      {/* ── Top Diagnostic Header ── */}
+      {/* ── Top Diagnostic Header with Customer / Developer Mode Toggle ── */}
       <header className="tia-header">
         <div className="tia-header-left">
           <button className="tia-back-btn" onClick={() => onNavigate('/')} title="Return to Main Menu">
@@ -1058,18 +1234,51 @@ export default function TestingInteractionModeView({ onNavigate }) {
           </button>
           <div className="tia-title-group">
             <div className="tia-badge">
-              <FlaskConical size={14} color="#f59e0b" />
-              <span>TESTING & DIAGNOSTIC LAB</span>
+              {uiMode === 'customer' ? (
+                <>
+                  <User size={14} color="#10b981" />
+                  <span style={{ color: '#10b981' }}>CUSTOMER INTERACTION MODE</span>
+                </>
+              ) : (
+                <>
+                  <FlaskConical size={14} color="#f59e0b" />
+                  <span>TESTING & DIAGNOSTIC LAB</span>
+                </>
+              )}
             </div>
-            <h1>Interactive Mode Feature Isolator</h1>
+            <h1>{uiMode === 'customer' ? 'Aurra AI Receptionist' : 'Interactive Mode Feature Isolator'}</h1>
           </div>
         </div>
 
+        {/* Center: Customer Mode vs Developer Mode Toggle */}
+        <div className="tia-mode-toggle-group">
+          <button
+            type="button"
+            className={`tia-mode-btn ${uiMode === 'customer' ? 'active-customer' : ''}`}
+            onClick={() => handleToggleUiMode('customer')}
+            title="Clean Presentation UI for talking to customers - only text input and output visible"
+          >
+            <User size={14} />
+            <span>Customer Mode</span>
+          </button>
+          <button
+            type="button"
+            className={`tia-mode-btn ${uiMode === 'developer' ? 'active-dev' : ''}`}
+            onClick={() => handleToggleUiMode('developer')}
+            title="Developer Mode - all diagnostic switches, tabs & telemetry logs visible"
+          >
+            <Sliders size={14} />
+            <span>Developer Mode</span>
+          </button>
+        </div>
+
         <div className="tia-header-right">
-          <div className="tia-telemetry-pill">
-            <span className="tia-fps-dot" />
-            <strong ref={fpsTextRef}>60 FPS</strong>
-          </div>
+          {uiMode === 'developer' && (
+            <div className="tia-telemetry-pill">
+              <span className="tia-fps-dot" />
+              <strong ref={fpsTextRef}>60 FPS</strong>
+            </div>
+          )}
           <button
             className="tia-btn-icon"
             onClick={() => {
@@ -1077,15 +1286,19 @@ export default function TestingInteractionModeView({ onNavigate }) {
                 {
                   id: Date.now(),
                   role: 'assistant',
-                  text: 'Chat and telemetry reset. Ready for next test.',
+                  text: uiMode === 'customer'
+                    ? 'Hello! Welcome to Robomiracle Technologies. I am Aurra, an intelligent AI humanoid receptionist. How may I assist you today?'
+                    : 'Chat and telemetry reset. Ready for next test.',
                   timestamp: Date.now(),
                   source: 'system'
                 }
               ]);
-              setLogs([]);
-              addLog('SYSTEM', 'Cleared chat history and diagnostic logs');
+              if (uiMode === 'developer') {
+                setLogs([]);
+                addLog('SYSTEM', 'Cleared chat history and diagnostic logs');
+              }
             }}
-            title="Reset Chat & Logs"
+            title="Reset Chat & Telemetry"
           >
             <RotateCcw size={16} />
             <span>Reset</span>
@@ -1093,78 +1306,254 @@ export default function TestingInteractionModeView({ onNavigate }) {
         </div>
       </header>
 
-      {/* ── Master Feature Isolation Switchboard ── */}
-      <section className="tia-switchboard-card">
-        <div className="tia-switchboard-title">
-          <Sliders size={16} color="#00ffff" />
-          <span>FEATURE MODULE ISOLATION SWITCHES (Toggle on/off to isolate bugs)</span>
+      {/* ── Master Feature Isolation Switchboard (Visible only in Developer Mode) ── */}
+      {uiMode === 'developer' && (
+        <section className="tia-switchboard-card">
+          <div className="tia-switchboard-title">
+            <Sliders size={16} color="#00ffff" />
+            <span>FEATURE MODULE ISOLATION SWITCHES (Toggle on/off to isolate bugs)</span>
+          </div>
+
+          <div className="tia-switches-grid">
+            {/* Switch 1: Chat Engine */}
+            <div className={`tia-switch-item ${enableChat ? 'active' : ''}`} onClick={() => setEnableChat(!enableChat)}>
+              <div className="tia-switch-info">
+                <MessageSquare size={18} color={enableChat ? '#00ffff' : '#64748b'} />
+                <div>
+                  <strong>Text Chat & LLM</strong>
+                  <p>Intent matching & Groq API</p>
+                </div>
+              </div>
+              <span className={`tia-toggle-pill ${enableChat ? 'on' : 'off'}`}>{enableChat ? 'ON' : 'OFF'}</span>
+            </div>
+
+            {/* Switch 2: TTS Audio */}
+            <div className={`tia-switch-item ${enableTts ? 'active' : ''}`} onClick={() => setEnableTts(!enableTts)}>
+              <div className="tia-switch-info">
+                {enableTts ? <Volume2 size={18} color="#10b981" /> : <VolumeX size={18} color="#64748b" />}
+                <div>
+                  <strong>TTS Speech Audio</strong>
+                  <p>Voice playback answers</p>
+                </div>
+              </div>
+              <span className={`tia-toggle-pill ${enableTts ? 'on' : 'off'}`}>{enableTts ? 'ON' : 'OFF'}</span>
+            </div>
+
+            {/* Switch 3: STT Microphone */}
+            <div className={`tia-switch-item ${enableStt ? 'active' : ''}`} onClick={() => handleToggleStt(!enableStt)}>
+              <div className="tia-switch-info">
+                {enableStt ? <Mic size={18} color="#f59e0b" /> : <MicOff size={18} color="#64748b" />}
+                <div>
+                  <strong>Speech Input (STT)</strong>
+                  <p>Live microphone recognizer</p>
+                </div>
+              </div>
+              <span className={`tia-toggle-pill ${enableStt ? 'on' : 'off'}`}>{enableStt ? 'ON' : 'OFF'}</span>
+            </div>
+
+            {/* Switch 4: Camera & Vision */}
+            <div className={`tia-switch-item ${enableVision ? 'active' : ''}`} onClick={() => setEnableVision(!enableVision)}>
+              <div className="tia-switch-info">
+                {enableVision ? <Video size={18} color="#c084fc" /> : <VideoOff size={18} color="#64748b" />}
+                <div>
+                  <strong>Camera & Vision</strong>
+                  <p>Face detection neural net</p>
+                </div>
+              </div>
+              <span className={`tia-toggle-pill ${enableVision ? 'on' : 'off'}`}>{enableVision ? 'ON' : 'OFF'}</span>
+            </div>
+
+            {/* Switch 5: Hardware & ESP32 */}
+            <div className={`tia-switch-item ${enableHardware ? 'active' : ''}`} onClick={() => setEnableHardware(!enableHardware)}>
+              <div className="tia-switch-info">
+                <Cpu size={18} color={enableHardware ? '#38bdf8' : '#64748b'} />
+                <div>
+                  <strong>ESP32 Hardware</strong>
+                  <p>Robot servo tilt & Wi-Fi</p>
+                </div>
+              </div>
+              <span className={`tia-toggle-pill ${enableHardware ? 'on' : 'off'}`}>{enableHardware ? 'ON' : 'OFF'}</span>
+            </div>
+
+            {/* Switch 6: Voice Interaction Architecture Style */}
+            <div
+              className={`tia-switch-item ${voiceInteractionStyle === 'phone-call' ? 'active' : ''}`}
+              onClick={() => handleVoiceStyleToggle(voiceInteractionStyle === 'phone-call' ? 'walkie-talkie' : 'phone-call')}
+              title="Toggle between Walkie-Talkie (750ms buffer) and Phone Call (LiveKit Full-Duplex)"
+              style={{ cursor: 'pointer' }}
+            >
+              <div className="tia-switch-info">
+                <Activity size={18} color={voiceInteractionStyle === 'phone-call' ? '#10b981' : '#00ffff'} />
+                <div>
+                  <strong>{voiceInteractionStyle === 'phone-call' ? 'Phone Call Style' : 'Walkie-Talkie'}</strong>
+                  <p>{voiceInteractionStyle === 'phone-call' ? 'LiveKit Full-Duplex' : '750ms Patience Buffer'}</p>
+                </div>
+              </div>
+              <span className={`tia-toggle-pill ${voiceInteractionStyle === 'phone-call' ? 'on' : 'off'}`} style={{ fontSize: '10px' }}>
+                {voiceInteractionStyle === 'phone-call' ? 'LIVEKIT' : 'BUFFER'}
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── WORKSPACE VIEW: CUSTOMER KIOSK VIEW vs DEVELOPER DIAGNOSTIC LAB ── */}
+      {uiMode === 'customer' ? (
+        <div className="tia-customer-workspace">
+          <div className="tia-customer-chat-card">
+            {/* Customer Header Bar inside Card */}
+            <div className="tia-customer-card-header">
+              <div className="tia-customer-avatar-col">
+                <div className={`tia-customer-avatar ${isTtsPlaying ? 'speaking' : isSttListening ? 'listening' : ''}`}>
+                  <Sparkles size={22} color="#00ffff" />
+                </div>
+                <div>
+                  <h3>Aurra Humanoid Receptionist</h3>
+                  <div className="tia-customer-status-line">
+                    <span className={`tia-status-dot ${isTtsPlaying ? 'speaking' : isProcessing ? 'thinking' : isSttListening ? 'listening' : 'ready'}`} />
+                    <span>
+                      {isTtsPlaying
+                        ? 'Aurra is speaking...'
+                        : isProcessing
+                        ? 'Aurra is thinking...'
+                        : isSttListening
+                        ? 'Listening to your voice... (Speak freely)'
+                        : 'Ready to assist'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Controls shortcut for customer kiosk */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {enableVision && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 10px',
+                      borderRadius: '16px',
+                      background: 'rgba(192, 132, 252, 0.15)',
+                      border: '1px solid rgba(192, 132, 252, 0.35)',
+                      color: '#c084fc',
+                      fontSize: '11px',
+                      fontWeight: 700
+                    }}
+                    title="Camera Vision & VIP Face Greeting active in background"
+                  >
+                    <Video size={13} />
+                    <span>VIP Vision Active</span>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className={`tia-customer-mic-pill ${enableStt ? 'active' : ''}`}
+                  onClick={() => handleToggleStt(!enableStt)}
+                  title={enableStt ? 'Mute Microphone' : 'Enable Microphone'}
+                >
+                  {enableStt ? <Mic size={15} /> : <MicOff size={15} />}
+                  <span>{enableStt ? (isSttListening ? 'Mic Live' : 'Mic Active') : 'Mic Off'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Background Video Capture: Keeps Face Recognition & VIP Greeting active in Customer Mode if Vision is Enabled */}
+            {enableVision && (
+              <div style={{ position: 'fixed', width: 1, height: 1, opacity: 0.001, pointerEvents: 'none', zIndex: -100, overflow: 'hidden' }}>
+                <video ref={videoRef} autoPlay playsInline muted width={640} height={480} />
+                <canvas ref={canvasRef} width={640} height={480} />
+              </div>
+            )}
+
+            {/* Live speech transcription ticker if speaking */}
+            {enableStt && (sttInterim || sttFinal) && (
+              <div className="tia-customer-transcription-ticker">
+                <span className="ticker-label">Listening:</span>
+                <span className="ticker-text">"{sttInterim || sttFinal}"</span>
+              </div>
+            )}
+
+            {/* Conversation Messages Stream (Only Text Output & Input Visible) */}
+            <div ref={chatScrollRef} className="tia-customer-messages-list">
+              {messages.map((msg) => {
+                const isUser = msg.role === 'user';
+                return (
+                  <div key={msg.id} className={`tia-message-row ${isUser ? 'user-side' : 'assistant-side'}`}>
+                    <div className="tia-message-bubble customer-bubble">
+                      <div className="tia-bubble-meta">
+                        <span className="tia-bubble-sender">{isUser ? 'You' : 'Aurra'}</span>
+                      </div>
+                      <p className="tia-bubble-text">{msg.text}</p>
+                    </div>
+                  </div>
+                );
+              })}
+              {isProcessing && (
+                <div className="tia-message-row assistant-side">
+                  <div className="tia-message-bubble customer-bubble thinking">
+                    <Sparkles size={16} className="pulse-icon" />
+                    <span>Thinking and preparing response...</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Inquiries for Visitors */}
+            <div className="tia-customer-chips-bar">
+              <span className="chips-label">Quick Inquiries:</span>
+              <div className="chips-scroll">
+                <button type="button" onClick={() => handleExecuteQuery('Who are you?', 'text')}>"Who are you?"</button>
+                <button type="button" onClick={() => handleExecuteQuery('Where is Robomiracle located?', 'text')}>"Where is Robomiracle located?"</button>
+                <button type="button" onClick={() => handleExecuteQuery('What are your main features?', 'text')}>"What can you do?"</button>
+                <button type="button" onClick={() => handleExecuteQuery('What is the current time?', 'text')}>"What time is it?"</button>
+              </div>
+            </div>
+
+            {/* Customer Input Dock (Clean Text Input + Mic + Send) */}
+            <form
+              className="tia-customer-input-dock"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (inputText.trim()) {
+                  const q = inputText.trim();
+                  setInputText('');
+                  handleExecuteQuery(q, 'text');
+                }
+              }}
+            >
+              <button
+                type="button"
+                className={`tia-customer-mic-btn ${enableStt ? 'active' : ''}`}
+                onClick={() => handleToggleStt(!enableStt)}
+                title={enableStt ? 'Mute Microphone' : 'Turn on Microphone'}
+              >
+                {enableStt ? <Mic size={20} /> : <MicOff size={20} />}
+              </button>
+
+              <input
+                type="text"
+                className="tia-customer-text-input"
+                placeholder={enableStt ? "Ask Aurra anything (or speak into microphone)..." : "Type your question here..."}
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                disabled={isProcessing}
+              />
+
+              <button
+                type="submit"
+                className="tia-customer-send-btn"
+                disabled={!inputText.trim() || isProcessing}
+              >
+                <Send size={18} />
+                <span>Ask</span>
+              </button>
+            </form>
+          </div>
         </div>
-
-        <div className="tia-switches-grid">
-          {/* Switch 1: Chat Engine */}
-          <div className={`tia-switch-item ${enableChat ? 'active' : ''}`} onClick={() => setEnableChat(!enableChat)}>
-            <div className="tia-switch-info">
-              <MessageSquare size={18} color={enableChat ? '#00ffff' : '#64748b'} />
-              <div>
-                <strong>Text Chat & LLM</strong>
-                <p>Intent matching & Groq API</p>
-              </div>
-            </div>
-            <span className={`tia-toggle-pill ${enableChat ? 'on' : 'off'}`}>{enableChat ? 'ON' : 'OFF'}</span>
-          </div>
-
-          {/* Switch 2: TTS Audio */}
-          <div className={`tia-switch-item ${enableTts ? 'active' : ''}`} onClick={() => setEnableTts(!enableTts)}>
-            <div className="tia-switch-info">
-              {enableTts ? <Volume2 size={18} color="#10b981" /> : <VolumeX size={18} color="#64748b" />}
-              <div>
-                <strong>TTS Speech Audio</strong>
-                <p>Voice playback answers</p>
-              </div>
-            </div>
-            <span className={`tia-toggle-pill ${enableTts ? 'on' : 'off'}`}>{enableTts ? 'ON' : 'OFF'}</span>
-          </div>
-
-          {/* Switch 3: STT Microphone */}
-          <div className={`tia-switch-item ${enableStt ? 'active' : ''}`} onClick={() => setEnableStt(!enableStt)}>
-            <div className="tia-switch-info">
-              {enableStt ? <Mic size={18} color="#f59e0b" /> : <MicOff size={18} color="#64748b" />}
-              <div>
-                <strong>Speech Input (STT)</strong>
-                <p>Live microphone recognizer</p>
-              </div>
-            </div>
-            <span className={`tia-toggle-pill ${enableStt ? 'on' : 'off'}`}>{enableStt ? 'ON' : 'OFF'}</span>
-          </div>
-
-          {/* Switch 4: Camera & Vision */}
-          <div className={`tia-switch-item ${enableVision ? 'active' : ''}`} onClick={() => setEnableVision(!enableVision)}>
-            <div className="tia-switch-info">
-              {enableVision ? <Video size={18} color="#c084fc" /> : <VideoOff size={18} color="#64748b" />}
-              <div>
-                <strong>Camera & Vision</strong>
-                <p>Face detection neural net</p>
-              </div>
-            </div>
-            <span className={`tia-toggle-pill ${enableVision ? 'on' : 'off'}`}>{enableVision ? 'ON' : 'OFF'}</span>
-          </div>
-
-          {/* Switch 5: Hardware & ESP32 */}
-          <div className={`tia-switch-item ${enableHardware ? 'active' : ''}`} onClick={() => setEnableHardware(!enableHardware)}>
-            <div className="tia-switch-info">
-              <Cpu size={18} color={enableHardware ? '#38bdf8' : '#64748b'} />
-              <div>
-                <strong>ESP32 Hardware</strong>
-                <p>Robot servo tilt & Wi-Fi</p>
-              </div>
-            </div>
-            <span className={`tia-toggle-pill ${enableHardware ? 'on' : 'off'}`}>{enableHardware ? 'ON' : 'OFF'}</span>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Main Testing Split Workspace ── */}
-      <div className="tia-workspace-grid">
+      ) : (
+        /* ── DEVELOPER MODE: Full Diagnostic Split Workspace ── */
+        <div className="tia-workspace-grid">
         {/* LEFT COLUMN: Interactive Chat & Test Controls */}
         <div className="tia-left-panel">
           {/* Subsystem Quick Nav Tabs & Model Switcher */}
@@ -1191,18 +1580,63 @@ export default function TestingInteractionModeView({ onNavigate }) {
             </div>
 
             <div className="tia-model-selector-bar">
+              {/* Brain Provider Toggle Chips */}
+              <div style={{ display: 'flex', gap: '4px', marginRight: '6px' }}>
+                <button
+                  type="button"
+                  style={{
+                    padding: '3px 8px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    borderRadius: '5px',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    background: brainProvider === 'groq' ? '#0284c7' : 'rgba(30, 41, 59, 0.7)',
+                    color: brainProvider === 'groq' ? '#fff' : '#94a3b8',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => handleBrainProviderToggle('groq')}
+                >
+                  ⚡ Groq
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    padding: '3px 8px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    borderRadius: '5px',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    background: brainProvider === 'gemini' ? '#8b5cf6' : 'rgba(30, 41, 59, 0.7)',
+                    color: brainProvider === 'gemini' ? '#fff' : '#94a3b8',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => handleBrainProviderToggle('gemini')}
+                >
+                  🧠 Gemini
+                </button>
+              </div>
+
               <Sparkles size={13} color="#c084fc" />
               <span className="tia-model-label">Model:</span>
               <select
                 className="tia-model-dropdown"
                 value={selectedLlmModel}
                 onChange={(e) => handleModelChange(e.target.value)}
-                title="Active Cloud LLM Model on Groq"
+                title="Active Cloud LLM Model"
               >
-                <option value="qwen/qwen3.8-27b">qwen/qwen3.8-27b (Fast 27B)</option>
-                <option value="openai/gpt-oss-20b">openai/gpt-oss-20b (Reasoning 20B)</option>
-                <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (Large 120B)</option>
-                <option value="allam-2-7b">allam-2-7b (7B)</option>
+                {brainProvider === 'gemini' ? (
+                  <>
+                    <option value="gemini-1.5-flash">gemini-1.5-flash (Fast & Multilingual)</option>
+                    <option value="gemini-2.0-flash">gemini-2.0-flash (Next-Gen Fast)</option>
+                    <option value="gemini-flash-latest">gemini-flash-latest (Latest Flash)</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="qwen/qwen3.8-27b">qwen/qwen3.8-27b (Fast 27B)</option>
+                    <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (70B)</option>
+                    <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (Sub-200ms)</option>
+                  </>
+                )}
               </select>
               <button
                 type="button"
@@ -1370,7 +1804,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
                 </div>
                 <button
                   className={`tia-mic-toggle-btn ${enableStt ? 'active' : ''}`}
-                  onClick={() => setEnableStt(!enableStt)}
+                  onClick={() => handleToggleStt(!enableStt)}
                 >
                   {enableStt ? <Mic size={14} /> : <MicOff size={14} />}
                   <span>{enableStt ? 'Mute Mic' : 'Start Mic'}</span>
@@ -1686,6 +2120,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

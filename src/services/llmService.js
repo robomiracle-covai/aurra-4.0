@@ -70,13 +70,18 @@ CONVERSATIONAL RULES:
 
 const STORAGE_KEY = 'aurra_llm_config_v3';
 
-const DEFAULT_API_KEY = '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';
+export const DEFAULT_GROQ_API_KEY = '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';
+export const DEFAULT_GEMINI_API_KEY = 'AQ.Ab8RN6IVrEIKjCLjNw6QjOtaIlmnH4RsvHtMn_6Ay6Tp39LxNw';
 
 export const getDefaultLlmConfig = () => ({
   enabled: true,
+  provider: 'groq', // 'groq' | 'gemini'
   apiUrl: 'https://api.groq.com/openai/v1',
-  apiKey: import.meta.env.VITE_LLM_API_KEY || DEFAULT_API_KEY,
+  apiKey: import.meta.env.VITE_LLM_API_KEY || DEFAULT_GROQ_API_KEY,
   model: 'qwen/qwen3.8-27b',
+  geminiApiKey: DEFAULT_GEMINI_API_KEY,
+  geminiModel: 'gemini-1.5-flash',
+  geminiApiUrl: 'https://generativelanguage.googleapis.com/v1beta',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   temperature: 0.6,
   maxTokens: 300,
@@ -95,12 +100,20 @@ class LlmService {
       if (raw) {
         const parsed = JSON.parse(raw);
         const merged = { ...defaults, ...parsed };
-        // Auto-heal missing API key or invalid/deprecated model
         if (!merged.apiKey || !merged.apiKey.trim()) {
           merged.apiKey = defaults.apiKey;
         }
+        if (!merged.geminiApiKey || !merged.geminiApiKey.trim()) {
+          merged.geminiApiKey = defaults.geminiApiKey;
+        }
+        if (!merged.provider) {
+          merged.provider = 'groq';
+        }
         if (!merged.model || merged.model.includes('llama-3.3-70b')) {
           merged.model = 'qwen/qwen3.8-27b';
+        }
+        if (!merged.geminiModel) {
+          merged.geminiModel = defaults.geminiModel;
         }
         if (!merged.maxTokens || merged.maxTokens < 200) {
           merged.maxTokens = 300;
@@ -134,8 +147,12 @@ class LlmService {
   }
 
   isConfigured() {
-    const key = (this.config.apiKey || DEFAULT_API_KEY).trim();
-    return Boolean(this.config.enabled && key);
+    if (!this.config.enabled) return false;
+    if (this.config.provider === 'gemini') {
+      return Boolean((this.config.geminiApiKey || '').trim());
+    }
+    const key = (this.config.apiKey || DEFAULT_GROQ_API_KEY).trim();
+    return Boolean(key);
   }
 
   /**
@@ -213,12 +230,6 @@ class LlmService {
       };
     }
 
-    const apiKey = (this.config.apiKey || DEFAULT_API_KEY).trim();
-    if (!apiKey) {
-      logger.warn('LLM', 'No Groq API key configured.');
-      return { success: false, reason: 'NO_KEY' };
-    }
-
     // 2. Real-Time RAG Context Retrieval (Live Weather / Serper Google Search)
     let liveRAG = null;
     try {
@@ -229,9 +240,6 @@ class LlmService {
     } catch (ragErr) {
       logger.warn('RAG', `Context retrieval error: ${ragErr.message}`);
     }
-
-    let rawUrl = (this.config.apiUrl || 'https://api.groq.com/openai/v1').trim().replace(/\/+$/, '');
-    let targetUrl = rawUrl.endsWith('/chat/completions') ? rawUrl : `${rawUrl}/chat/completions`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeoutMs || 8000);
@@ -257,6 +265,104 @@ class LlmService {
       dynamicSystemPrompt += `\n\n${liveRAG.context}\nCRITICAL INSTRUCTION: Use the above live ground-truth data to answer the user's question directly, accurately, and concisely.`;
     }
 
+    const isGemini = this.config.provider === 'gemini';
+    const startTime = Date.now();
+
+    // ── 3A. GOOGLE GEMINI PROVIDER DISPATCH ──
+    if (isGemini) {
+      const gKey = (this.config.geminiApiKey || DEFAULT_GEMINI_API_KEY).trim();
+      if (!gKey) {
+        logger.warn('LLM', 'No Gemini API key configured.');
+        clearTimeout(timeoutId);
+        return { success: false, reason: 'NO_KEY', error: 'No Gemini API Key provided.' };
+      }
+
+      const gModel = this.config.geminiModel || 'gemini-1.5-flash';
+      const cleanModel = gModel.replace(/^models\//, '');
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${gKey}`;
+
+      const geminiBody = {
+        system_instruction: {
+          parts: [{ text: dynamicSystemPrompt }]
+        },
+        contents: [
+          ...(conversationHistory || []).slice(-4).map((h) => ({
+            role: h.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: h.text || h.content || '' }]
+          })),
+          {
+            role: 'user',
+            parts: [{ text: userQuery }]
+          }
+        ],
+        generationConfig: {
+          temperature: this.config.temperature || 0.6,
+          maxOutputTokens: this.config.maxTokens || 300,
+        }
+      };
+
+      try {
+        logger.speech('LLM', `Calling Google Gemini (${cleanModel}) for: "${userQuery}"`);
+
+        const response = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(geminiBody),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+        if (!response.ok || data.error) {
+          const errMsg = data.error?.message || `HTTP ${response.status}`;
+          throw new Error(`Gemini API Error: ${errMsg}`);
+        }
+
+        const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const cleaned = this.cleanResponseText(candidateText);
+        const latency = Date.now() - startTime;
+
+        if (!cleaned) {
+          throw new Error('Empty response received from Gemini endpoint.');
+        }
+
+        logger.info('LLM', `Gemini response received in ${latency}ms: "${cleaned}"`);
+        return {
+          success: true,
+          text: cleaned,
+          latencyMs: latency,
+          model: `Gemini (${cleanModel})`,
+          provider: liveRAG ? `Gemini + ${liveRAG.source.toUpperCase()} RAG` : 'Google Gemini AI',
+          tokens: data.usageMetadata?.totalTokenCount || null,
+          ragDetails: liveRAG,
+        };
+      } catch (err) {
+        clearTimeout(timeoutId);
+        const latency = Date.now() - startTime;
+        const isAbort = err.name === 'AbortError';
+
+        logger.error('LLM', `Gemini call failed: ${err.message}`);
+        return {
+          success: false,
+          reason: isAbort ? 'TIMEOUT' : 'ERROR',
+          error: err.message,
+          latencyMs: latency,
+        };
+      }
+    }
+
+    // ── 3B. GROQ CLOUD PROVIDER DISPATCH (DEFAULT) ──
+    const apiKey = (this.config.apiKey || DEFAULT_GROQ_API_KEY).trim();
+    if (!apiKey) {
+      logger.warn('LLM', 'No Groq API key configured.');
+      clearTimeout(timeoutId);
+      return { success: false, reason: 'NO_KEY' };
+    }
+
+    let rawUrl = (this.config.apiUrl || 'https://api.groq.com/openai/v1').trim().replace(/\/+$/, '');
+    let targetUrl = rawUrl.endsWith('/chat/completions') ? rawUrl : `${rawUrl}/chat/completions`;
+
     const messages = [
       { role: 'system', content: dynamicSystemPrompt },
       ...(conversationHistory || []).slice(-4), // Keep last 4 turns for context
@@ -274,8 +380,6 @@ class LlmService {
       max_tokens: this.config.maxTokens || 300,
     };
 
-    const startTime = Date.now();
-
     try {
       logger.speech('LLM', `Calling Groq LLM (${body.model}) for: "${userQuery}"`);
 
@@ -283,7 +387,7 @@ class LlmService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.config.apiKey.trim()}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(body),
         signal: controller.signal,

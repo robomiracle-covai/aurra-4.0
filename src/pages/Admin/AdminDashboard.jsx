@@ -169,8 +169,10 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   const [llmConfig, setLlmConfig] = useState(() => llmService.getConfig());
   const [llmApiKeyInput, setLlmApiKeyInput] = useState(() => llmService.getConfig().apiKey || '');
   const [llmApiUrlInput, setLlmApiUrlInput] = useState(() => llmService.getConfig().apiUrl || 'https://api.groq.com/openai/v1');
+  const [llmGeminiApiKeyInput, setLlmGeminiApiKeyInput] = useState(() => llmService.getConfig().geminiApiKey || '');
   const [llmSystemPromptInput, setLlmSystemPromptInput] = useState(() => llmService.getConfig().systemPrompt || '');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showGeminiApiKey, setShowGeminiApiKey] = useState(false);
   const [testAiLoading, setTestAiLoading] = useState(false);
   const [testAiResult, setTestAiResult] = useState(null);
   const [testAiCustomQuery, setTestAiCustomQuery] = useState('Who created you and what is your purpose?');
@@ -1187,10 +1189,22 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     showStatus(`Real AI LLM: ${updated ? 'ENABLED' : 'DISABLED'}`);
   };
 
+  const handleSelectBrainProvider = (provider) => {
+    const next = llmService.saveConfig({ provider });
+    setLlmConfig(next);
+    showStatus(`Brain Provider switched to ${provider === 'gemini' ? 'Google Gemini' : 'Groq Cloud'}`);
+  };
+
   const handleSaveLlmApiKey = (newKey) => {
     const next = llmService.saveConfig({ apiKey: newKey.trim() });
     setLlmConfig(next);
-    showStatus('LLM API Key saved successfully');
+    showStatus('Groq API Key saved successfully');
+  };
+
+  const handleSaveGeminiApiKey = (newKey) => {
+    const next = llmService.saveConfig({ geminiApiKey: newKey.trim() });
+    setLlmConfig(next);
+    showStatus('Gemini API Key saved successfully');
   };
 
   const handleSaveLlmApiUrl = (newUrl) => {
@@ -1203,6 +1217,12 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     const next = llmService.saveConfig({ model: newModel });
     setLlmConfig(next);
     showStatus(`AI Model changed to "${newModel}"`);
+  };
+
+  const handleSelectGeminiModel = (newModel) => {
+    const next = llmService.saveConfig({ geminiModel: newModel });
+    setLlmConfig(next);
+    showStatus(`Gemini Model set to "${newModel}"`);
   };
 
   const handleSaveLlmSystemPrompt = (newPrompt) => {
@@ -2007,6 +2027,37 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                 </div>
 
                 <div className="adm-dev-toggles-list">
+                  {/* Voice Interaction Architecture */}
+                  <div className="adm-dev-toggle-row highlight">
+                    <div className="adm-dev-info">
+                      <div className="adm-dev-badge">CONVERSATION STYLE</div>
+                      <strong>Voice Interaction Architecture</strong>
+                      <p>
+                        <strong>Walkie-Talkie Style (Recommended):</strong> Device-free turn-based listening with 750ms End-of-Thought patience buffer and acoustic safety mute (₹0 Free & Unlimited).
+                        <br />
+                        <strong>Phone Call Style:</strong> Full-Duplex WebRTC LiveKit architecture with continuous background listening and live barge-in interruption.
+                      </p>
+                    </div>
+                    <div className="adm-choice-pills">
+                      <button
+                        type="button"
+                        className={`adm-choice-pill ${(!kioskConfig.voiceInteractionStyle || kioskConfig.voiceInteractionStyle === 'walkie-talkie') ? 'active' : ''}`}
+                        onClick={() => handleUpdateKioskConfig({ voiceInteractionStyle: 'walkie-talkie' })}
+                      >
+                        <span>📻 Walkie-Talkie (Turn-Based + Buffer)</span>
+                        {(!kioskConfig.voiceInteractionStyle || kioskConfig.voiceInteractionStyle === 'walkie-talkie') && <Check size={14} />}
+                      </button>
+                      <button
+                        type="button"
+                        className={`adm-choice-pill ${kioskConfig.voiceInteractionStyle === 'phone-call' ? 'active' : ''}`}
+                        onClick={() => handleUpdateKioskConfig({ voiceInteractionStyle: 'phone-call' })}
+                      >
+                        <span>📞 Phone Call (LiveKit Full-Duplex)</span>
+                        {kioskConfig.voiceInteractionStyle === 'phone-call' && <Check size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Voice Gender */}
                   <div className="adm-dev-toggle-row">
                     <div className="adm-dev-info">
@@ -2171,87 +2222,180 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                 </div>
               </div>
 
-              {/* 2. API BASE URL & CREDENTIALS PANEL */}
+              {/* 2. BRAIN PROVIDER & CREDENTIALS PANEL */}
               <div className="adm-card-panel">
                 <h3 className="adm-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Key size={18} color="#00ffff" />
-                  <span>API Base URL & Access Credentials</span>
+                  <span>AI Brain Provider & Credentials</span>
                 </h3>
                 <p className="adm-panel-desc">
-                  Configure the target API endpoint and API secret token. Compatible with Groq Cloud, OpenAI, or xAI Grok endpoints.
+                  Select whether Aurra uses ultra-fast Groq Cloud or Google Gemini for answering conversational questions.
                 </p>
 
-                <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '14px' }}>
-                  {/* API Base URL */}
-                  <div className="adm-form-group">
-                    <label>API BASE ENDPOINT URL</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input
-                        type="text"
-                        className="adm-form-input"
-                        style={{ flex: 1, fontFamily: 'monospace' }}
-                        value={llmApiUrlInput}
-                        onChange={(e) => setLlmApiUrlInput(e.target.value)}
-                        placeholder="https://api.groq.com/openai/v1"
-                      />
-                      <button
-                        type="button"
-                        className="adm-submit-btn"
-                        onClick={() => handleSaveLlmApiUrl(llmApiUrlInput)}
-                      >
-                        <Save size={16} />
-                        <span>Save URL</span>
-                      </button>
-                    </div>
-                    <span className="adm-help-text" style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
-                      Default Groq Endpoint: <code>https://api.groq.com/openai/v1</code>
-                    </span>
+                {/* Provider Selector Tabs */}
+                <div className="adm-dev-toggle-row highlight" style={{ marginTop: '12px' }}>
+                  <div className="adm-dev-info">
+                    <div className="adm-dev-badge">ACTIVE BRAIN ENGINE</div>
+                    <strong>Select AI Intelligence Provider</strong>
+                    <p>Choose between ultra-low latency Groq (300ms) or Google Gemini for rich Indian language & knowledge support.</p>
                   </div>
+                  <div className="adm-choice-pills">
+                    <button
+                      type="button"
+                      className={`adm-choice-pill ${llmConfig.provider !== 'gemini' ? 'active' : ''}`}
+                      onClick={() => handleSelectBrainProvider('groq')}
+                    >
+                      <span>⚡ Groq Cloud (Ultra-Fast 300ms)</span>
+                      {llmConfig.provider !== 'gemini' && <Check size={14} />}
+                    </button>
+                    <button
+                      type="button"
+                      className={`adm-choice-pill ${llmConfig.provider === 'gemini' ? 'active' : ''}`}
+                      onClick={() => handleSelectBrainProvider('gemini')}
+                    >
+                      <span>🧠 Google Gemini (Multilingual)</span>
+                      {llmConfig.provider === 'gemini' && <Check size={14} />}
+                    </button>
+                  </div>
+                </div>
 
-                  {/* API Key Input */}
-                  <div className="adm-form-group">
-                    <label>GROQ / GROK API TOKEN</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <div style={{ position: 'relative', flex: 1 }}>
+                {/* Gemini Credentials View */}
+                {llmConfig.provider === 'gemini' ? (
+                  <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '14px' }}>
+                    <div className="adm-form-group">
+                      <label>GOOGLE GEMINI API TOKEN</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ position: 'relative', flex: 1 }}>
+                          <input
+                            type={showGeminiApiKey ? 'text' : 'password'}
+                            className="adm-form-input"
+                            style={{ width: '100%', fontFamily: 'monospace', paddingRight: '40px' }}
+                            value={llmGeminiApiKeyInput}
+                            onChange={(e) => setLlmGeminiApiKeyInput(e.target.value)}
+                            placeholder="AIzaSy... or AQ..."
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowGeminiApiKey((p) => !p)}
+                            style={{
+                              position: 'absolute',
+                              right: '8px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#8da4be',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {showGeminiApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          className="adm-submit-btn"
+                          onClick={() => handleSaveGeminiApiKey(llmGeminiApiKeyInput)}
+                        >
+                          <Save size={16} />
+                          <span>Save Key</span>
+                        </button>
+                      </div>
+                      <span className="adm-help-text" style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+                        Get free unlimited keys from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{ color: '#00ffff' }}>Google AI Studio</a>
+                      </span>
+                    </div>
+
+                    <div className="adm-form-group">
+                      <label>GEMINI MODEL SELECTION</label>
+                      <select
+                        className="adm-form-select"
+                        style={{ width: '100%' }}
+                        value={llmConfig.geminiModel || 'gemini-1.5-flash'}
+                        onChange={(e) => handleSelectGeminiModel(e.target.value)}
+                      >
+                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Recommended — Fast & Multilingual)</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Next-Gen Preview)</option>
+                        <option value="gemini-flash-latest">Gemini Flash Latest</option>
+                      </select>
+                      <span className="adm-help-text" style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+                        Endpoint: <code>https://generativelanguage.googleapis.com/v1beta</code>
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  /* Groq Credentials View */
+                  <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '14px' }}>
+                    {/* API Base URL */}
+                    <div className="adm-form-group">
+                      <label>GROQ BASE ENDPOINT URL</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
                         <input
-                          type={showApiKey ? 'text' : 'password'}
+                          type="text"
                           className="adm-form-input"
-                          style={{ width: '100%', fontFamily: 'monospace', paddingRight: '40px' }}
-                          value={llmApiKeyInput}
-                          onChange={(e) => setLlmApiKeyInput(e.target.value)}
-                          placeholder="gsk_..."
+                          style={{ flex: 1, fontFamily: 'monospace' }}
+                          value={llmApiUrlInput}
+                          onChange={(e) => setLlmApiUrlInput(e.target.value)}
+                          placeholder="https://api.groq.com/openai/v1"
                         />
                         <button
                           type="button"
-                          onClick={() => setShowApiKey((p) => !p)}
-                          style={{
-                            position: 'absolute',
-                            right: '8px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#8da4be',
-                            cursor: 'pointer',
-                          }}
+                          className="adm-submit-btn"
+                          onClick={() => handleSaveLlmApiUrl(llmApiUrlInput)}
                         >
-                          {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                          <Save size={16} />
+                          <span>Save URL</span>
                         </button>
                       </div>
-                      <button
-                        type="button"
-                        className="adm-submit-btn"
-                        onClick={() => handleSaveLlmApiKey(llmApiKeyInput)}
-                      >
-                        <Save size={16} />
-                        <span>Save Key</span>
-                      </button>
+                      <span className="adm-help-text" style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+                        Default Groq Endpoint: <code>https://api.groq.com/openai/v1</code>
+                      </span>
                     </div>
-                    <span className="adm-help-text" style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
-                      Key format: <code>gsk_...</code> (Ported directly from Aurra 1.0)
-                    </span>
+
+                    {/* API Key Input */}
+                    <div className="adm-form-group">
+                      <label>GROQ API TOKEN</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ position: 'relative', flex: 1 }}>
+                          <input
+                            type={showApiKey ? 'text' : 'password'}
+                            className="adm-form-input"
+                            style={{ width: '100%', fontFamily: 'monospace', paddingRight: '40px' }}
+                            value={llmApiKeyInput}
+                            onChange={(e) => setLlmApiKeyInput(e.target.value)}
+                            placeholder="gsk_..."
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowApiKey((p) => !p)}
+                            style={{
+                              position: 'absolute',
+                              right: '8px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#8da4be',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          className="adm-submit-btn"
+                          onClick={() => handleSaveLlmApiKey(llmApiKeyInput)}
+                        >
+                          <Save size={16} />
+                          <span>Save Key</span>
+                        </button>
+                      </div>
+                      <span className="adm-help-text" style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+                        Key format: <code>gsk_...</code> (Ultra-fast 300ms inference)
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* 3. AI MODEL SELECTOR & SYSTEM PERSONA PROMPT */}

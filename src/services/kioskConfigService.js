@@ -16,6 +16,7 @@ export const DEFAULT_KIOSK_CONFIG = {
   speechRate: 1.0,       // 0.8 to 1.3
   speechPitch: 1.05,     // 0.8 to 1.3
   autoListenOnBoot: true,
+  voiceInteractionStyle: 'walkie-talkie', // 'walkie-talkie' | 'phone-call'
 
   // 2. Face Recognition & Vision
   faceGreetingTemplate: 'Hello {name}! Welcome to Robomiracle Technologies.',

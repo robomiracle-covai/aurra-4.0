@@ -1,0 +1,257 @@
+/* Aurra GPU-Accelerated Chest Portal Splash CSS */
+
+.aurra-portal-splash-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: transparent !important;
+  background-color: transparent !important;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  opacity: 1;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity;
+}
+
+.aurra-portal-splash-root.splash-fading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Fullscreen Canvas Wrapper for Edge-to-Edge Display */
+.splash-aspect-wrapper {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  background-color: transparent !important;
+  overflow: hidden;
+}
+
+/* Full Approved Aurra Robot Background Image - Edge-to-Edge 100vw x 100vh */
+.splash-bg-image {
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  opacity: 1;
+  transition: clip-path 0.6s ease, transform 1.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 1.2s ease;
+  transform: scale(1);
+  will-change: clip-path, transform, opacity;
+}
+
+.splash-bg-image.splash-has-aperture {
+  /* Cuts out tilted aperture window matching --chest-tilt over Aurra's chest display to expose underlying app */
+  clip-path: var(--chest-clip-path, polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, 66.58% 61.37%, 78.36% 62.09%, 79.22% 74.83%, 67.44% 74.11%, 66.58% 61.37%));
+  -webkit-clip-path: var(--chest-clip-path, polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 100%, 0% 0%, 66.58% 61.37%, 78.36% 62.09%, 79.22% 74.83%, 67.44% 74.11%, 66.58% 61.37%));
+}
+
+.splash-bg-image.splash-scale-out {
+  transform: scale(1.06);
+  opacity: 0;
+}
+
+/* Dynamic Progress Overlay (Left Side under Tagline) */
+.splash-loading-overlay {
+  position: absolute;
+  left: 13.6%;
+  top: 61.2%;
+  width: 27.2%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transition: opacity 0.7s ease;
+  z-index: 10;
+}
+
+.splash-loading-overlay.fade-fast {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.splash-progress-track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  overflow: visible;
+}
+
+.splash-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(0, 180, 255, 0.4) 0%, #00d2ff 70%, #00ffff 100%);
+  border-radius: 4px;
+  transition: width 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+  position: relative;
+}
+
+.splash-progress-dot {
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 11px;
+  height: 11px;
+  background: #00ffff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #00ffff, 0 0 18px rgba(0, 255, 255, 0.9);
+  border: 1.5px solid #ffffff;
+}
+
+.splash-loading-text {
+  margin-top: 14px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #8a99ad;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Chest Display Portal Frame & Glowing Bezel */
+.chest-portal-bezel {
+  position: absolute;
+  left: var(--chest-x, 71.0%);
+  top: var(--chest-y, 62.5%);
+  width: var(--chest-w, 11.5%);
+  height: var(--chest-h, 14.5%);
+  border-radius: var(--chest-radius, 14px);
+  border: 2px solid transparent;
+  pointer-events: none;
+  z-index: 20;
+  transform: rotate(var(--chest-tilt, 3.5deg));
+  transition: all 3.0s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.chest-portal-bezel.bezel-glow {
+  border-color: #00ffff;
+  box-shadow: 0 0 25px #00ffff, inset 0 0 15px rgba(0, 255, 255, 0.6);
+}
+
+.chest-portal-bezel.portal-fullscreen {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  border-color: transparent;
+  box-shadow: none;
+  transform: rotate(0deg);
+}
+
+/* Centered Black Percentage Counter Inside Chest Screen */
+.chest-loading-counter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  pointer-events: none;
+}
+
+.chest-percentage-text {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: clamp(16px, 2.2vw, 28px);
+  font-weight: 900;
+  color: #000000;
+  letter-spacing: 1px;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.5), 0 0 20px rgba(0, 255, 255, 0.3);
+  user-select: none;
+}
+
+/* REAL APPLICATION VIEWPORT PORTAL EXPANSION WRAPPER */
+.portal-app-wrapper {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  transform-origin: calc(var(--chest-x, 71.0%) + (var(--chest-w, 11.5%) / 2)) calc(var(--chest-y, 62.5%) + (var(--chest-h, 14.5%) / 2));
+  will-change: transform, opacity;
+  transition: transform 3.0s cubic-bezier(0.16, 1, 0.3, 1), opacity 1.6s ease;
+}
+
+.portal-app-wrapper.phase-loading {
+  /* Real application UI visible inside transparent chest aperture from cold start */
+  opacity: 1;
+  transform: scale(calc((var(--chest-w, 11.5%) / 100) * var(--chest-scale-factor, 1))) rotate(var(--chest-tilt, 3.5deg));
+  pointer-events: none;
+  background: transparent !important;
+}
+
+.portal-app-wrapper.phase-glowing {
+  /* Real application UI scaled to fit inside Aurra's chest display screen */
+  opacity: 1;
+  transform: scale(calc((var(--chest-w, 11.5%) / 100) * var(--chest-scale-factor, 1))) rotate(var(--chest-tilt, 3.5deg));
+  z-index: 10;
+  pointer-events: none;
+  background: transparent !important;
+}
+
+.portal-app-wrapper.phase-loading .aurra-app-root,
+.portal-app-wrapper.phase-glowing .aurra-app-root,
+.portal-app-wrapper.phase-loading .home-container,
+.portal-app-wrapper.phase-glowing .home-container {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.portal-app-wrapper.phase-loading .global-floating-voice-bar,
+.portal-app-wrapper.phase-glowing .global-floating-voice-bar,
+.portal-app-wrapper.phase-loading .kiosk-top-bar,
+.portal-app-wrapper.phase-glowing .kiosk-top-bar,
+.portal-app-wrapper.phase-loading .hud-corner-tag,
+.portal-app-wrapper.phase-glowing .hud-corner-tag {
+  display: none !important;
+}
+
+.portal-app-wrapper.phase-expanding {
+  /* Real application UI expands outward from chest screen to fullscreen */
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  z-index: 1000000;
+  pointer-events: auto;
+}
+
+.portal-app-wrapper.phase-completed {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform: none;
+  transform-origin: center center;
+  opacity: 1;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+/* Reduced motion accessibility support */
+@media (prefers-reduced-motion: reduce) {
+  .aurra-portal-splash-root,
+  .portal-app-wrapper {
+    transition: opacity 0.3s ease !important;
+    transform: none !important;
+  }
+  .splash-bg-image,
+  .chest-portal-bezel {
+    transition: none !important;
+  }
+}

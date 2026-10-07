@@ -85,3 +85,8 @@ export const logger = {
     return () => listeners.delete(listener);
   },
 };
+
+if (typeof window !== 'undefined') {
+  window.aurraLogger = logger;
+  window.__AURRA_GET_LOGS__ = () => logger.getLogs();
+}

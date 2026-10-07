@@ -17,11 +17,7 @@ function androidWebViewPlugin() {
           .replace(/ crossorigin/g, '')
           .replace(/<link[^>]*rel="modulepreload"[^>]*>\s*/gi, '')
           .replace(/<link[^>]*fonts\.googleapis\.com[^>]*>\s*/gi, '')
-          .replace(/<link[^>]*fonts\.gstatic\.com[^>]*>\s*/gi, '')
-          .replace(
-            /<div id="root"><\/div>/,
-            '<div id="root"><p style="color:#0ff;text-align:center;padding-top:40vh;font-family:sans-serif">Loading Testing App...</p></div>'
-          );
+          .replace(/<link[^>]*fonts\.gstatic\.com[^>]*>\s*/gi, '');
       },
     },
   };

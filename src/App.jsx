@@ -13,9 +13,12 @@ import GuidedTourView from './pages/GuidedTour/GuidedTourView';
 import PublicFacilitiesView from './pages/Facilities/PublicFacilitiesView';
 import VoiceAssistantBar from './components/VoiceAssistantBar';
 import AdminDashboard from './pages/Admin/AdminDashboard';
+import AurraStartupSplashScreen from './components/AurraStartupSplashScreen';
 import './App.css';
 
 function App() {
+  const [showBootScreen, setShowBootScreen] = useState(true);
+  const [bootPhase, setBootPhase] = useState('loading'); // 'loading' | 'glowing' | 'expanding' | 'completed'
   const [currentRoute, setCurrentRoute] = useState('/');
   const [selectedCard, setSelectedCard] = useState(null);
   const [showCardsView, setShowCardsView] = useState(false);
@@ -58,8 +61,19 @@ function App() {
   };
 
   return (
-    <div className="aurra-app-root">
-      <div className="aurra-view-container">
+    <>
+      {showBootScreen && (
+        <AurraStartupSplashScreen
+          bootPhase={bootPhase}
+          onPhaseChange={setBootPhase}
+          onComplete={() => {
+            setBootPhase('completed');
+            setShowBootScreen(false);
+          }}
+        />
+      )}
+      <div className={`aurra-app-root portal-app-wrapper phase-${bootPhase}`} id="main-app-container">
+        <div className="aurra-view-container">
         {currentRoute === '/form' ? (
           <VisitorRegistration onNavigate={handleNavigate} />
         ) : currentRoute === '/interaction' ? (
@@ -105,8 +119,8 @@ function App() {
         />
       )}
 
-      {/* Globally Floating Persistent Voice Assistant Bar (hidden while in Admin, Interaction Mode, and Testing Lab) */}
-      {!isAdminOpen && currentRoute !== '/interaction' && currentRoute !== '/testing-interaction' && (
+      {/* Globally Floating Persistent Voice Assistant Bar (hidden while in Admin, Form, Interaction Mode, and Testing Lab) */}
+      {!isAdminOpen && currentRoute !== '/form' && currentRoute !== '/interaction' && currentRoute !== '/testing-interaction' && (
         <div className="global-floating-voice-bar">
           <VoiceAssistantBar
             onNavigate={handleNavigate}
@@ -116,6 +130,7 @@ function App() {
         </div>
       )}
     </div>
+    </>
   );
 }
 

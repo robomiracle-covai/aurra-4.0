@@ -81,21 +81,26 @@ export const startSpeakingAnimatronics = () => {
  * and resets all 5 servos to neutral position (90°).
  */
 export const stopSpeakingAnimatronics = () => {
+  if (!isSpeakingAnimatronicsActive) return;
   isSpeakingAnimatronicsActive = false;
   if (animatronicTimer) {
     clearInterval(animatronicTimer);
     animatronicTimer = null;
   }
 
-  // Dispatch 'idle' expression to Raspberry Pi HDMI display
-  raspberryPiService.sendExpression('idle');
+  // Dispatch 'idle' expression to Raspberry Pi HDMI display only if online
+  if (raspberryPiService.online) {
+    raspberryPiService.sendExpression('idle');
+  }
 
-  // Smoothly return all 5 servos to neutral position (90°)
-  try {
-    [90, 90, 90, 90, 90].forEach((angle, index) => {
-      esp32Service.setServoAngle(index, angle);
-    });
-  } catch {
-    /* non-blocking */
+  // Smoothly return all 5 servos to neutral position (90°) only if online
+  if (esp32Service.online) {
+    try {
+      [90, 90, 90, 90, 90].forEach((angle, index) => {
+        esp32Service.setServoAngle(index, angle);
+      });
+    } catch {
+      /* non-blocking */
+    }
   }
 };

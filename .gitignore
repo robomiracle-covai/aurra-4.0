@@ -12,6 +12,7 @@ dist-ssr/
 # Scratch & Temporary
 scratch/
 *.log
+screen*.png
 
 # Large Binaries / APKs
 *.apk

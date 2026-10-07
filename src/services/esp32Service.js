@@ -14,21 +14,31 @@ const DEFAULT_ESP32_IP = '192.168.4.1'; // Aurra SoftAP Default
 const fetchWithTimeout = async (url, options = {}, timeoutMs = 800) => {
   const method = (options.method || 'GET').toUpperCase();
 
-  // 1. Android Native HTTP (Preferred on Tablet)
+  // 1. Android Native HTTP (Preferred on Tablet - executed non-blockingly)
   if (hasNativeHttp()) {
-    const native = method === 'POST' 
-      ? nativeHttpPost(url, options.body || '')
-      : nativeHttpGet(url);
-    if (native) {
-      return {
-        ok: Boolean(native.ok),
-        status: native.status || 0,
-        text: async () => native.body || '',
-        json: async () => {
-          try { return JSON.parse(native.body || '{}'); } catch { return {}; }
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        try {
+          const native = method === 'POST' 
+            ? nativeHttpPost(url, options.body || '')
+            : nativeHttpGet(url);
+          if (native) {
+            resolve({
+              ok: Boolean(native.ok),
+              status: native.status || 0,
+              text: async () => native.body || '',
+              json: async () => {
+                try { return JSON.parse(native.body || '{}'); } catch { return {}; }
+              }
+            });
+            return;
+          }
+        } catch {
+          /* fallback */
         }
-      };
-    }
+        resolve({ ok: false, status: 0, text: async () => '', json: async () => ({}) });
+      }, 0);
+    });
   }
 
   // 2. Standard Browser Fetch Fallback
@@ -217,9 +227,11 @@ class Esp32Service {
     this.currentMotorDir = cmd;
     logger.info('HARDWARE', `[TestingApp:MOTOR] Command: ${cmd.toUpperCase()} | Speed: ${this.motorSpeed}`);
 
-    // Fire-and-forget HTTP command to ESP32
-    const base = this.getBaseUrl();
-    fetchWithTimeout(`${base}/motor?cmd=${encodeURIComponent(cmd)}`, { method: 'GET' }, 400).catch(() => {});
+    // Fire-and-forget HTTP command to ESP32 only if online
+    if (this.online) {
+      const base = this.getBaseUrl();
+      fetchWithTimeout(`${base}/motor?cmd=${encodeURIComponent(cmd)}`, { method: 'GET' }, 400).catch(() => {});
+    }
 
     this.notify();
     return { success: true, direction: cmd };
@@ -230,9 +242,11 @@ class Esp32Service {
     this.motorSpeedLeft = val;
     this.motorSpeed = Math.round((this.motorSpeedLeft + this.motorSpeedRight) / 2);
 
-    const base = this.getBaseUrl();
-    fetchWithTimeout(`${base}/speed?left=${encodeURIComponent(val)}`, { method: 'GET' }, 400).catch(() => {});
-    fetchWithTimeout(`${base}/speed/left?value=${encodeURIComponent(val)}`, { method: 'GET' }, 400).catch(() => {});
+    if (this.online) {
+      const base = this.getBaseUrl();
+      fetchWithTimeout(`${base}/speed?left=${encodeURIComponent(val)}`, { method: 'GET' }, 400).catch(() => {});
+      fetchWithTimeout(`${base}/speed/left?value=${encodeURIComponent(val)}`, { method: 'GET' }, 400).catch(() => {});
+    }
 
     this.notify();
   }
@@ -242,9 +256,11 @@ class Esp32Service {
     this.motorSpeedRight = val;
     this.motorSpeed = Math.round((this.motorSpeedLeft + this.motorSpeedRight) / 2);
 
-    const base = this.getBaseUrl();
-    fetchWithTimeout(`${base}/speed?right=${encodeURIComponent(val)}`, { method: 'GET' }, 400).catch(() => {});
-    fetchWithTimeout(`${base}/speed/right?value=${encodeURIComponent(val)}`, { method: 'GET' }, 400).catch(() => {});
+    if (this.online) {
+      const base = this.getBaseUrl();
+      fetchWithTimeout(`${base}/speed?right=${encodeURIComponent(val)}`, { method: 'GET' }, 400).catch(() => {});
+      fetchWithTimeout(`${base}/speed/right?value=${encodeURIComponent(val)}`, { method: 'GET' }, 400).catch(() => {});
+    }
 
     this.notify();
   }
@@ -255,8 +271,10 @@ class Esp32Service {
     this.motorSpeedRight = val;
     this.motorSpeed = val;
 
-    const base = this.getBaseUrl();
-    fetchWithTimeout(`${base}/speed?value=${encodeURIComponent(val)}`, { method: 'GET' }, 400).catch(() => {});
+    if (this.online) {
+      const base = this.getBaseUrl();
+      fetchWithTimeout(`${base}/speed?value=${encodeURIComponent(val)}`, { method: 'GET' }, 400).catch(() => {});
+    }
 
     this.notify();
   }
@@ -272,9 +290,11 @@ class Esp32Service {
 
     logger.info('HARDWARE', `[TestingApp:SERVO] S${sIdx + 1} -> ${clampedAngle}°`);
 
-    // Fire-and-forget to ESP32
-    const base = this.getBaseUrl();
-    fetchWithTimeout(`${base}/servo?num=${sIdx + 1}&angle=${clampedAngle}`, { method: 'GET' }, 400).catch(() => {});
+    // Fire-and-forget to ESP32 only if online
+    if (this.online) {
+      const base = this.getBaseUrl();
+      fetchWithTimeout(`${base}/servo?num=${sIdx + 1}&angle=${clampedAngle}`, { method: 'GET' }, 400).catch(() => {});
+    }
 
     this.notify();
     return { servo: sIdx + 1, angle: clampedAngle };
@@ -290,8 +310,10 @@ class Esp32Service {
 
     logger.info('HARDWARE', `[TestingApp:RGB] Set: RGB(${this.rgb.r}, ${this.rgb.g}, ${this.rgb.b})`);
 
-    const base = this.getBaseUrl();
-    fetchWithTimeout(`${base}/rgb?r=${this.rgb.r}&g=${this.rgb.g}&b=${this.rgb.b}`, { method: 'GET' }, 400).catch(() => {});
+    if (this.online) {
+      const base = this.getBaseUrl();
+      fetchWithTimeout(`${base}/rgb?r=${this.rgb.r}&g=${this.rgb.g}&b=${this.rgb.b}`, { method: 'GET' }, 400).catch(() => {});
+    }
 
     this.notify();
   }
@@ -312,8 +334,10 @@ class Esp32Service {
     const target = presets[presetId] || presets.neon;
     this.rgb = { ...target };
 
-    const base = this.getBaseUrl();
-    fetchWithTimeout(`${base}/led?color=${encodeURIComponent(presetId)}`, { method: 'GET' }, 400).catch(() => {});
+    if (this.online) {
+      const base = this.getBaseUrl();
+      fetchWithTimeout(`${base}/led?color=${encodeURIComponent(presetId)}`, { method: 'GET' }, 400).catch(() => {});
+    }
 
     this.notify();
   }

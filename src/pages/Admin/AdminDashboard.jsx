@@ -76,7 +76,7 @@ import {
 import { devSettingsService } from '../../services/devSettingsService';
 import { esp32Service } from '../../services/esp32Service';
 import { raspberryPiService } from '../../services/raspberryPiService';
-import { kioskConfigService } from '../../services/kioskConfigService';
+import { kioskConfigService, DEFAULT_FORM_FIELDS } from '../../services/kioskConfigService';
 import { speakWithVoice } from '../../utils/speechSynthesis';
 import { assetUrl } from '../../utils/platform';
 import { logger } from '../../services/logger';
@@ -110,6 +110,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   const [newAnswer, setNewAnswer] = useState('');
   const [newCategory, setNewCategory] = useState('General');
   const [showAddQaForm, setShowAddQaForm] = useState(false);
+  const [editingQaItem, setEditingQaItem] = useState(null); // { id, question, answer, category }
 
   // Faces state
   const [faces, setFaces] = useState([]);
@@ -243,6 +244,16 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     directions: '',
     amenities: 'Wi-Fi, Accessible',
   });
+
+  // Dynamic Visitor Form Fields management state
+  const [showAddFieldModal, setShowAddFieldModal] = useState(false);
+  const [newFieldKey, setNewFieldKey] = useState('');
+  const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [newFieldPrompt, setNewFieldPrompt] = useState('');
+  const [newFieldRetryPrompt, setNewFieldRetryPrompt] = useState('');
+  const [newFieldType, setNewFieldType] = useState('text');
+  const [newFieldPlaceholder, setNewFieldPlaceholder] = useState('');
+  const [newFieldRequired, setNewFieldRequired] = useState(true);
 
   const showStatus = (msg) => {
     setStatusMsg(msg);
@@ -397,14 +408,43 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     if (window.confirm('Delete this question from knowledge base?')) {
       await offlineQaService.deleteQuestion(id);
       setQuestions((prev) => prev.filter((q) => q.id !== id));
+      if (editingQaItem?.id === id) setEditingQaItem(null);
       showStatus('Question deleted');
     }
+  };
+
+  const handleStartEditQa = (item) => {
+    setEditingQaItem({
+      id: item.id,
+      question: item.question,
+      answer: item.answer,
+      category: item.category || 'General',
+    });
+  };
+
+  const handleCancelEditQa = () => {
+    setEditingQaItem(null);
+  };
+
+  const handleSaveEditQa = async (e) => {
+    e.preventDefault();
+    if (!editingQaItem || !editingQaItem.question.trim() || !editingQaItem.answer.trim()) return;
+    await offlineQaService.updateQuestion(editingQaItem.id, {
+      question: editingQaItem.question.trim(),
+      answer: editingQaItem.answer.trim(),
+      category: editingQaItem.category || 'General',
+    });
+    setEditingQaItem(null);
+    const updated = await offlineQaService.getQuestions();
+    setQuestions(updated);
+    showStatus('Question & answer updated successfully');
   };
 
   const handleResetQa = async () => {
     if (window.confirm('Reset Q&A knowledge base to default questions?')) {
       const reset = await offlineQaService.restoreDefaultQuestions();
       setQuestions(reset);
+      setEditingQaItem(null);
       showStatus('Q&A knowledge base reset to defaults');
     }
   };
@@ -537,6 +577,85 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     esp32Service.sendServoAngle(2, Number(kioskConfig.defaultHeadTiltAngle || 90));
     raspberryPiService.triggerAction('nod');
     showStatus('Sent resting pose & gestures to robot');
+  };
+
+  // ── Form Fields & Compulsory Handlers ──
+  const handleToggleFieldRequired = (fieldKey) => {
+    const currentFields = kioskConfig.formFields || DEFAULT_FORM_FIELDS;
+    const updated = currentFields.map((f) =>
+      f.key.toLowerCase() === fieldKey.toLowerCase()
+        ? { ...f, required: !f.required }
+        : f
+    );
+    handleUpdateKioskConfig({ formFields: updated });
+    showStatus(`Updated compulsory requirement for ${fieldKey}`);
+  };
+
+  const handleToggleFieldEnabled = (fieldKey) => {
+    const currentFields = kioskConfig.formFields || DEFAULT_FORM_FIELDS;
+    const updated = currentFields.map((f) =>
+      f.key.toLowerCase() === fieldKey.toLowerCase()
+        ? { ...f, enabled: f.enabled === false ? true : false }
+        : f
+    );
+    handleUpdateKioskConfig({ formFields: updated });
+    showStatus(`Toggled active status for ${fieldKey}`);
+  };
+
+  const handleDeleteField = (fieldKey) => {
+    if (!window.confirm(`Are you sure you want to remove the field "${fieldKey}" from visitor registration?`)) return;
+    const currentFields = kioskConfig.formFields || DEFAULT_FORM_FIELDS;
+    const updated = currentFields.filter((f) => f.key.toLowerCase() !== fieldKey.toLowerCase());
+    handleUpdateKioskConfig({ formFields: updated });
+    showStatus(`Removed field ${fieldKey}`);
+  };
+
+  const handleResetFormFields = () => {
+    if (!window.confirm('Reset all registration form fields back to default (Name, Mobile, Email, Visit, Place)?')) return;
+    handleUpdateKioskConfig({ formFields: [...DEFAULT_FORM_FIELDS] });
+    showStatus('Restored default form fields');
+  };
+
+  const handleAddCustomField = (e) => {
+    e?.preventDefault();
+    if (!newFieldKey.trim() || !newFieldLabel.trim()) {
+      alert('Field Key and Display Label are required.');
+      return;
+    }
+
+    const currentFields = kioskConfig.formFields || DEFAULT_FORM_FIELDS;
+    const cleanKey = newFieldKey.trim().replace(/\s+/g, '_');
+    const exists = currentFields.some((f) => f.key.toLowerCase() === cleanKey.toLowerCase());
+    if (exists) {
+      alert(`A field with key "${cleanKey}" already exists.`);
+      return;
+    }
+
+    const newFieldObj = {
+      id: `field_${Date.now()}`,
+      key: cleanKey,
+      label: newFieldLabel.trim(),
+      prompt: newFieldPrompt.trim() || `Please tell me your ${newFieldLabel.trim()}.`,
+      retryPrompt: newFieldRetryPrompt.trim() || `Please provide your ${newFieldLabel.trim()}.`,
+      required: newFieldRequired,
+      enabled: true,
+      type: newFieldType,
+      placeholder: newFieldPlaceholder.trim() || `Enter ${newFieldLabel.trim()}`,
+    };
+
+    const updated = [...currentFields, newFieldObj];
+    handleUpdateKioskConfig({ formFields: updated });
+    showStatus(`Added custom field "${newFieldObj.label}"`);
+
+    // Reset modal
+    setNewFieldKey('');
+    setNewFieldLabel('');
+    setNewFieldPrompt('');
+    setNewFieldRetryPrompt('');
+    setNewFieldType('text');
+    setNewFieldPlaceholder('');
+    setNewFieldRequired(true);
+    setShowAddFieldModal(false);
   };
 
   // ── Developer Settings Handlers ──
@@ -1438,7 +1557,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
             onClick={() => setActiveTab('branding')}
           >
             <LayoutTemplate size={18} />
-            <span>Header & Branding</span>
+            <span>Branding</span>
           </button>
           <button
             className={`adm-nav-item ${activeTab === 'cards' ? 'active' : ''}`}
@@ -1452,7 +1571,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
             onClick={() => setActiveTab('slides')}
           >
             <ImageIcon size={18} />
-            <span>Slideshow Banners</span>
+            <span>Ads & Banners</span>
           </button>
 
           <div className="adm-menu-group-label">AI & ROBOT CONFIG</div>
@@ -1469,7 +1588,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
             onClick={() => setActiveTab('ai-llm')}
           >
             <Sparkles size={18} color="#c084fc" />
-            <span>Real AI Grok LLM & API</span>
+            <span>Brain</span>
           </button>
           <button
             className={`adm-nav-item dev-highlight ${activeTab === 'chat-history' ? 'active' : ''}`}
@@ -1579,11 +1698,11 @@ export default function AdminDashboard({ onNavigate, onClose }) {
             <span className="adm-badge-role">ADMINISTRATOR MODE</span>
             <h1 className="adm-topbar-title">
               {activeTab === 'overview' && 'System Overview & Telemetry'}
-              {activeTab === 'branding' && 'Kiosk Header & Organization Branding'}
+              {activeTab === 'branding' && 'Branding & Kiosk Identity'}
               {activeTab === 'cards' && 'Action Cards & Voice Access Matrix'}
-              {activeTab === 'slides' && 'Home Screen Slideshow Banners'}
+              {activeTab === 'slides' && 'Ads & Banners'}
               {activeTab === 'voice' && 'Universal Voice Assistant & Audio Customization'}
-              {activeTab === 'ai-llm' && 'Real AI Grok Cloud API & LLM Intelligence Settings'}
+              {activeTab === 'ai-llm' && 'Brain — AI Intelligence & API Configuration'}
               {activeTab === 'chat-history' && 'AI Chat Transcripts & Interaction History'}
               {activeTab === 'questions' && 'Q&A Knowledge Base for Voice & Text'}
               {activeTab === 'faces' && 'Face Recognition, Vision & Greeting Setup'}
@@ -1641,7 +1760,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                   </div>
                   <div className="adm-metric-data">
                     <span className="adm-metric-num">{slides.length}</span>
-                    <span className="adm-metric-label">Banner Slides</span>
+                    <span className="adm-metric-label">Ads & Banners</span>
                   </div>
                   <span className="adm-metric-sub">{slides.filter((s) => s.isSelected).length} rotating</span>
                 </div>
@@ -1718,7 +1837,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                   </div>
                   <div className="adm-metric-data">
                     <span className="adm-metric-num">{llmConfig.enabled ? 'GROK AI' : 'OFFLINE'}</span>
-                    <span className="adm-metric-label">Real AI LLM Engine</span>
+                    <span className="adm-metric-label">AI Brain Engine</span>
                   </div>
                   <span className="adm-metric-sub">{llmConfig.enabled ? `Active • ${llmConfig.model || 'Llama 70B'}` : 'Tap to Configure Key'}</span>
                 </div>
@@ -1768,7 +1887,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                   </button>
                   <button className="adm-btn-action" onClick={() => setActiveTab('branding')}>
                     <LayoutTemplate size={18} />
-                    <span>Edit Header Title</span>
+                    <span>Edit Branding</span>
                   </button>
                   <button className="adm-btn-action" onClick={() => setActiveTab('questions')}>
                     <Plus size={18} />
@@ -1787,7 +1906,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
           {activeTab === 'branding' && (
             <div className="adm-tab-panel">
               <div className="adm-card-panel">
-                <h3 className="adm-panel-title">Header Organization Name</h3>
+                <h3 className="adm-panel-title">Branding & Organization Title</h3>
                 <p className="adm-panel-desc">
                   This title is displayed on the prominent cyber-holographic banner at the top of the Home screen.
                 </p>
@@ -1797,6 +1916,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                     <label>ORGANIZATION / KIOSK TITLE</label>
                     <input
                       type="text"
+                      className="adm-form-input"
                       value={headerName}
                       onChange={(e) => setHeaderName(e.target.value)}
                       placeholder="e.g. Robomiracle Technologies Private Limited"
@@ -1811,10 +1931,12 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                     </div>
                   </div>
 
-                  <button type="submit" className="adm-submit-btn" disabled={isSavingHeader}>
-                    <Save size={18} />
-                    <span>{isSavingHeader ? 'Saving...' : 'Save Header Title'}</span>
-                  </button>
+                  <div className="adm-branding-actions">
+                    <button type="submit" className="adm-submit-btn" disabled={isSavingHeader}>
+                      <Save size={18} />
+                      <span>{isSavingHeader ? 'Saving...' : 'Save Header Title'}</span>
+                    </button>
+                  </div>
                 </form>
               </div>
             </div>
@@ -1889,9 +2011,9 @@ export default function AdminDashboard({ onNavigate, onClose }) {
               <div className="adm-card-panel">
                 <div className="adm-panel-header-row">
                   <div>
-                    <h3 className="adm-panel-title">Banner Slideshow</h3>
+                    <h3 className="adm-panel-title">Ads & Banners</h3>
                     <p className="adm-panel-desc">
-                      Manage rotating high-resolution promotional banners displayed on the home screen.
+                      Manage rotating high-resolution promotional ads and banners displayed on the home screen.
                     </p>
                   </div>
                   <button className="adm-reset-btn" onClick={handleResetSlides}>
@@ -1903,7 +2025,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                 {/* Add Slide Form */}
                 <form onSubmit={handleAddSlide} className="adm-add-slide-form">
                   <div className="adm-slide-form-head">
-                    <h4>Add New Slide Banner</h4>
+                    <h4>Add New Ad / Banner Slide</h4>
                     <button
                       type="button"
                       className="adm-gallery-pick-btn"
@@ -2185,7 +2307,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                   <div>
                     <h3 className="adm-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#c084fc' }}>
                       <Sparkles size={22} color="#c084fc" />
-                      <span>REAL AI GROK CLOUD INFERENCE & INTELLIGENCE</span>
+                      <span>BRAIN — REAL AI CLOUD INFERENCE & INTELLIGENCE</span>
                     </h3>
                     <p className="adm-panel-desc">
                       Powers conversational visitor queries that don't match local navigation intents or offline FAQs. Uses Groq / Grok ultra-fast cloud inference.
@@ -2675,18 +2797,81 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                 <div className="adm-qa-list">
                   {filteredQuestions.map((item) => (
                     <div key={item.id} className="adm-qa-card">
-                      <div className="adm-qa-header">
-                        <span className="adm-qa-cat-badge">{item.category || 'General'}</span>
-                        <h4 className="adm-qa-q">{item.question}</h4>
-                        <button
-                          className="adm-icon-btn danger"
-                          onClick={() => handleDeleteQa(item.id)}
-                          title="Delete entry"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                      <p className="adm-qa-a">{item.answer}</p>
+                      {editingQaItem && editingQaItem.id === item.id ? (
+                        <form onSubmit={handleSaveEditQa} className="adm-edit-qa-form">
+                          <div className="adm-qa-edit-header">
+                            <span className="adm-qa-cat-badge">EDITING KNOWLEDGE ENTRY</span>
+                            <div className="adm-qa-edit-btns">
+                              <button type="submit" className="adm-mini-btn save" title="Save changes">
+                                <Save size={14} />
+                                <span>Save Changes</span>
+                              </button>
+                              <button type="button" className="adm-mini-btn cancel" onClick={handleCancelEditQa} title="Cancel editing">
+                                <X size={14} />
+                                <span>Cancel</span>
+                              </button>
+                            </div>
+                          </div>
+                          <div className="adm-form-group">
+                            <label>QUESTION PROMPT</label>
+                            <input
+                              type="text"
+                              className="adm-form-input"
+                              value={editingQaItem.question}
+                              onChange={(e) => setEditingQaItem({ ...editingQaItem, question: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div className="adm-form-group">
+                            <label>AI RESPONSE ANSWER</label>
+                            <textarea
+                              rows={3}
+                              className="adm-form-textarea"
+                              value={editingQaItem.answer}
+                              onChange={(e) => setEditingQaItem({ ...editingQaItem, answer: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div className="adm-form-group">
+                            <label>CATEGORY</label>
+                            <select
+                              className="adm-form-select"
+                              value={editingQaItem.category}
+                              onChange={(e) => setEditingQaItem({ ...editingQaItem, category: e.target.value })}
+                            >
+                              <option value="General">General</option>
+                              <option value="College">College</option>
+                              <option value="Robot">Robot</option>
+                              <option value="Facilities">Facilities</option>
+                              <option value="Admissions">Admissions</option>
+                            </select>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <div className="adm-qa-header">
+                            <span className="adm-qa-cat-badge">{item.category || 'General'}</span>
+                            <h4 className="adm-qa-q">{item.question}</h4>
+                            <div className="adm-qa-actions-group">
+                              <button
+                                className="adm-icon-btn edit"
+                                onClick={() => handleStartEditQa(item)}
+                                title="Edit Question & Answer"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
+                                className="adm-icon-btn danger"
+                                onClick={() => handleDeleteQa(item.id)}
+                                title="Delete entry"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                          <p className="adm-qa-a">{item.answer}</p>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -3202,9 +3387,10 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                             </span>
                           </div>
                           <div className="adm-visitor-meta">
-                            <span><strong>Company:</strong> {v.company || 'Independent'}</span>
-                            <span><strong>Purpose:</strong> {v.purpose || 'General Inquiry'}</span>
-                            <span><strong>Host:</strong> {v.host || 'Reception Desk'}</span>
+                            {v.gender && <span><strong>Gender:</strong> {v.gender}</span>}
+                            {(v.phone || v.mobile) && <span><strong>Phone:</strong> {v.phone || v.mobile}</span>}
+                            <span><strong>Place / Org:</strong> {v.place || v.company || 'Independent'}</span>
+                            <span><strong>Purpose:</strong> {v.purpose || v.visit || 'General Inquiry'}</span>
                             <span><strong>In:</strong> {formatTime(v.checkInTime)}</span>
                             {v.checkOutTime && (
                               <span><strong>Out:</strong> {formatTime(v.checkOutTime)}</span>
@@ -3376,6 +3562,160 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                         <span className="adm-token-pill">{'{host}'}</span>
                         <span className="adm-token-pill">{'{company}'}</span>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Form Fields & Compulsory Rules */}
+                  <div className="adm-dev-toggle-row highlight" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                      <div className="adm-dev-info" style={{ margin: 0 }}>
+                        <div className="adm-dev-badge">FORM BUILDER & VALIDATION</div>
+                        <strong style={{ fontSize: '15px' }}>Visitor Form Fields & Compulsory Rules</strong>
+                        <p style={{ margin: '4px 0 0 0' }}>
+                          Configure required/compulsory validation rules, spoken prompts, retry prompts, and add custom fields.
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          type="button"
+                          className="adm-btn-action"
+                          onClick={() => setShowAddFieldModal(true)}
+                          style={{ padding: '6px 14px', fontSize: '12px' }}
+                        >
+                          <Plus size={14} />
+                          <span>Add Custom Field</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="adm-btn-action danger-outline"
+                          onClick={handleResetFormFields}
+                          title="Restore default fields (Name, Mobile, Email, Visit, Place)"
+                          style={{ padding: '6px 12px', fontSize: '12px' }}
+                        >
+                          <RotateCcw size={14} />
+                          <span>Reset Fields</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* List of configured fields */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {(kioskConfig.formFields || DEFAULT_FORM_FIELDS).map((field, idx) => {
+                        const isRequired = field.required !== false;
+                        const isEnabled = field.enabled !== false;
+                        return (
+                          <div
+                            key={field.id || field.key}
+                            style={{
+                              background: 'rgba(10, 22, 40, 0.7)',
+                              border: `1px solid ${isRequired ? 'rgba(0, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                              borderRadius: '10px',
+                              padding: '14px 16px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '16px',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <div style={{ flex: '1 1 300px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ color: '#00ffff', fontWeight: 'bold', fontSize: '13px' }}>
+                                  #{idx + 1}
+                                </span>
+                                <strong style={{ color: '#ffffff', fontSize: '14px' }}>{field.label}</strong>
+                                <span
+                                  style={{
+                                    background: 'rgba(0, 255, 255, 0.1)',
+                                    color: '#00ffff',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '11px',
+                                    fontFamily: 'monospace',
+                                  }}
+                                >
+                                  {field.key} ({field.type || 'text'})
+                                </span>
+                                {isRequired ? (
+                                  <span
+                                    style={{
+                                      background: 'rgba(255, 85, 102, 0.2)',
+                                      color: '#ff5566',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      fontSize: '10px',
+                                      fontWeight: '700',
+                                    }}
+                                  >
+                                    COMPULSORY *
+                                  </span>
+                                ) : (
+                                  <span
+                                    style={{
+                                      background: 'rgba(141, 164, 190, 0.15)',
+                                      color: '#8da4be',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      fontSize: '10px',
+                                    }}
+                                  >
+                                    OPTIONAL
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#8da4be', lineHeight: '1.4' }}>
+                                <div><strong>Spoken Prompt:</strong> "{field.prompt}"</div>
+                                {field.retryPrompt && (
+                                  <div style={{ color: '#6889a8' }}>
+                                    <strong>Retry Prompt:</strong> "{field.retryPrompt}"
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Control switches */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                              {/* Compulsory Toggle */}
+                              <button
+                                type="button"
+                                className={`adm-switch-btn ${isRequired ? 'active' : ''}`}
+                                onClick={() => handleToggleFieldRequired(field.key)}
+                                title={isRequired ? 'Field is compulsory (cannot be empty)' : 'Field is optional'}
+                              >
+                                <div className="adm-switch-thumb" />
+                                <span className="adm-switch-text">
+                                  {isRequired ? 'COMPULSORY' : 'OPTIONAL'}
+                                </span>
+                              </button>
+
+                              {/* Active/Enabled Toggle */}
+                              <button
+                                type="button"
+                                className={`adm-switch-btn ${isEnabled ? 'active' : ''}`}
+                                onClick={() => handleToggleFieldEnabled(field.key)}
+                                title={isEnabled ? 'Visible on form' : 'Hidden from form'}
+                                style={{ minWidth: '100px' }}
+                              >
+                                <div className="adm-switch-thumb" />
+                                <span className="adm-switch-text">
+                                  {isEnabled ? 'ACTIVE' : 'HIDDEN'}
+                                </span>
+                              </button>
+
+                              {/* Delete button (for custom or non-primary fields) */}
+                              <button
+                                type="button"
+                                className="adm-btn-action danger-outline"
+                                onClick={() => handleDeleteField(field.key)}
+                                title={`Delete field ${field.label}`}
+                                style={{ padding: '6px 10px' }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -4660,7 +5000,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                 <Compass size={22} color="#00ffff" />
                 <h3>{tourModalMode === 'add' ? 'Add Facility Tour Waypoint' : 'Edit Tour Waypoint'}</h3>
               </div>
-              <button className="adm-modal-close" onClick={() => setShowTourModal(false)}>
+              <button className="adm-modal-close-btn" onClick={() => setShowTourModal(false)}>
                 <X size={18} />
               </button>
             </div>
@@ -4905,7 +5245,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                 <Bot size={20} color="#00ffff" />
                 <h3>{robotModalMode === 'add' ? 'Add Robot Showcase Tour' : 'Edit Robot Details'}</h3>
               </div>
-              <button className="adm-modal-close" onClick={() => setShowRobotModal(false)}>
+              <button className="adm-modal-close-btn" onClick={() => setShowRobotModal(false)}>
                 <X size={18} />
               </button>
             </div>
@@ -4999,7 +5339,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                     : `Edit Step ${stepFormIndex !== null ? stepFormIndex + 1 : ''} (${stepFormName})`}
                 </h3>
               </div>
-              <button className="adm-modal-close" onClick={() => setShowStepModal(false)}>
+              <button className="adm-modal-close-btn" onClick={() => setShowStepModal(false)}>
                 <X size={18} />
               </button>
             </div>
@@ -5111,13 +5451,141 @@ export default function AdminDashboard({ onNavigate, onClose }) {
         </div>
       )}
 
+      {/* ── ADD CUSTOM FORM FIELD MODAL ── */}
+      {showAddFieldModal && (
+        <div className="adm-modal-overlay" onClick={() => setShowAddFieldModal(false)}>
+          <div className="adm-modal-content" style={{ maxWidth: '560px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="adm-modal-header">
+              <div className="adm-modal-title-wrap">
+                <Plus size={20} color="#00ffff" />
+                <h3>Add New Registration Field</h3>
+              </div>
+              <button
+                type="button"
+                className="adm-modal-close-btn"
+                onClick={() => setShowAddFieldModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCustomField} className="adm-modal-form">
+              <div className="adm-form-group">
+                <label className="adm-form-label">Field Key (Identifier) *</label>
+                <input
+                  type="text"
+                  className="adm-form-input"
+                  placeholder="e.g. Company, GovtId, HostPerson"
+                  value={newFieldKey}
+                  onChange={(e) => setNewFieldKey(e.target.value)}
+                  required
+                />
+                <span className="adm-form-hint">Unique alphanumeric variable name (no spaces)</span>
+              </div>
+
+              <div className="adm-form-group">
+                <label className="adm-form-label">Display Label *</label>
+                <input
+                  type="text"
+                  className="adm-form-input"
+                  placeholder="e.g. Organization / Company Name"
+                  value={newFieldLabel}
+                  onChange={(e) => setNewFieldLabel(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="adm-form-group">
+                <label className="adm-form-label">Input Type</label>
+                <select
+                  className="adm-form-input"
+                  value={newFieldType}
+                  onChange={(e) => setNewFieldType(e.target.value)}
+                >
+                  <option value="text">Text</option>
+                  <option value="tel">Telephone / Phone Number</option>
+                  <option value="email">Email Address</option>
+                  <option value="number">Numeric</option>
+                </select>
+              </div>
+
+              <div className="adm-form-group">
+                <label className="adm-form-label">Spoken Voice Prompt</label>
+                <input
+                  type="text"
+                  className="adm-form-input"
+                  placeholder="e.g. Which company are you representing today?"
+                  value={newFieldPrompt}
+                  onChange={(e) => setNewFieldPrompt(e.target.value)}
+                />
+                <span className="adm-form-hint">Aurra will speak this question aloud to the visitor</span>
+              </div>
+
+              <div className="adm-form-group">
+                <label className="adm-form-label">Retry Voice Prompt (When missed/invalid)</label>
+                <input
+                  type="text"
+                  className="adm-form-input"
+                  placeholder="e.g. Please tell me your company name."
+                  value={newFieldRetryPrompt}
+                  onChange={(e) => setNewFieldRetryPrompt(e.target.value)}
+                />
+                <span className="adm-form-hint">Aurra will re-prompt this if input is invalid or missed</span>
+              </div>
+
+              <div className="adm-form-group">
+                <label className="adm-form-label">Placeholder Text</label>
+                <input
+                  type="text"
+                  className="adm-form-input"
+                  placeholder="e.g. Enter company name"
+                  value={newFieldPlaceholder}
+                  onChange={(e) => setNewFieldPlaceholder(e.target.value)}
+                />
+              </div>
+
+              <div className="adm-form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
+                <input
+                  type="checkbox"
+                  id="chk-compulsory"
+                  checked={newFieldRequired}
+                  onChange={(e) => setNewFieldRequired(e.target.checked)}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <label htmlFor="chk-compulsory" className="adm-form-label" style={{ margin: 0, cursor: 'pointer' }}>
+                  Make this field compulsory (compulsory validation with retry)
+                </label>
+              </div>
+
+              <div className="adm-modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
+                <button
+                  type="button"
+                  className="adm-btn-secondary"
+                  onClick={() => setShowAddFieldModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="adm-submit-btn"
+                  style={{ background: '#00ffff', color: '#030a16', fontWeight: 'bold' }}
+                >
+                  <Plus size={16} />
+                  <span>Add Field</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Slide Banner Image Gallery Modal */}
       <ImageGalleryModal
         isOpen={isSlideGalleryOpen}
         onClose={() => setIsSlideGalleryOpen(false)}
         onSelectImage={(path) => setNewSlideUrl(path)}
         currentPath={newSlideUrl}
-        title="Select Banner Slide Image"
+        title="Select Ad / Banner Slide Image"
       />
     </div>
   );

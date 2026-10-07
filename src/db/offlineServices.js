@@ -484,10 +484,13 @@ export const offlineVisitorService = {
     
     const record = {
       name: visitorData.name || 'Anonymous Visitor',
-      phone: visitorData.phone || '',
+      phone: visitorData.phone || visitorData.mobile || '',
       email: visitorData.email || '',
-      company: visitorData.company || 'Independent',
-      purpose: visitorData.purpose || 'General Inquiry',
+      company: visitorData.company || visitorData.place || 'Independent',
+      purpose: visitorData.purpose || visitorData.visit || 'General Inquiry',
+      gender: visitorData.gender || '',
+      place: visitorData.place || '',
+      visit: visitorData.visit || visitorData.purpose || 'General Inquiry',
       host: visitorData.host || 'Reception Desk',
       badgeType: visitorData.badgeType || 'Standard Visitor',
       badgeNumber,
@@ -497,6 +500,7 @@ export const offlineVisitorService = {
       photo: visitorData.photo || null,
       notes: visitorData.notes || '',
       createdAt: new Date().toISOString(),
+      ...visitorData,
     };
 
     const id = await db.visitors.add(record);
@@ -529,14 +533,15 @@ export const offlineVisitorService = {
     const visitors = await db.visitors.toArray();
     if (!visitors || visitors.length === 0) return '';
     
-    const headers = ['ID', 'Name', 'Phone', 'Email', 'Company', 'Purpose', 'Host', 'Badge Type', 'Badge Number', 'Check-In Time', 'Check-Out Time', 'Status'];
+    const headers = ['ID', 'Name', 'Gender', 'Phone', 'Email', 'Place / Company', 'Purpose of Visit', 'Host', 'Badge Type', 'Badge Number', 'Check-In Time', 'Check-Out Time', 'Status'];
     const rows = visitors.map((v) => [
       v.id,
       `"${(v.name || '').replace(/"/g, '""')}"`,
-      `"${(v.phone || '').replace(/"/g, '""')}"`,
+      `"${(v.gender || '').replace(/"/g, '""')}"`,
+      `"${(v.phone || v.mobile || '').replace(/"/g, '""')}"`,
       `"${(v.email || '').replace(/"/g, '""')}"`,
-      `"${(v.company || '').replace(/"/g, '""')}"`,
-      `"${(v.purpose || '').replace(/"/g, '""')}"`,
+      `"${(v.place || v.company || '').replace(/"/g, '""')}"`,
+      `"${(v.visit || v.purpose || '').replace(/"/g, '""')}"`,
       `"${(v.host || '').replace(/"/g, '""')}"`,
       `"${(v.badgeType || '').replace(/"/g, '""')}"`,
       `"${(v.badgeNumber || '').replace(/"/g, '""')}"`,

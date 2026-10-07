@@ -213,6 +213,10 @@ class RaspberryPiService {
     }
   }
 
+  triggerAction(actionName) {
+    return this.sendExpression(actionName);
+  }
+
   setSpeechActive(isSpeaking) {
     if (isSpeaking) {
       this.sendExpression('talking');

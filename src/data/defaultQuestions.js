@@ -10,6 +10,11 @@ export const DEFAULT_QA_QUESTIONS = [
     answer: "I am Aurra, an autonomous humanoid AI receptionist robot developed by Robomiracle Technologies. I assist visitors, manage registrations, and guide you around our facility.",
     category: "About",
     keywords: [
+      "what can you do",
+      "what can you do?",
+      "what do you do",
+      "what are your features",
+      "how can you help",
       "who are you",
       "who are you?",
       "who are u",

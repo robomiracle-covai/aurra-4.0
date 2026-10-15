@@ -254,7 +254,23 @@ const speakViaNative = (launcher, text, selectedVoiceURI, onStart, onEnd) => {
 
 import { kioskConfigService } from '../services/kioskConfigService';
 
+let isAiMutedGlobally = false;
+
+export const setAiSpeechMuted = (muted) => {
+  isAiMutedGlobally = !!muted;
+  if (isAiMutedGlobally) {
+    cancelSpeech();
+  }
+};
+
+export const getAiSpeechMuted = () => isAiMutedGlobally;
+
 export const speakWithVoice = async (text, options = {}) => {
+  if (isAiMutedGlobally) {
+    options.onEnd?.();
+    return false;
+  }
+
   const currentCfg = kioskConfigService?.getConfig ? kioskConfigService.getConfig() : null;
   const {
     gender = currentCfg?.voiceGender || 'female',

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { esp32Service } from '../../services/esp32Service';
 import { raspberryPiService } from '../../services/raspberryPiService';
+import { logger } from '../../services/logger';
 import './Control.css';
 
 const LED_PRESETS = [
@@ -99,6 +100,7 @@ export default function Control({ onNavigate }) {
   // Touch-and-hold motor driving
   const startDrive = (direction, dx, dy) => {
     updateVisualJoystick(dx, dy);
+    logger.breadcrumb('HARDWARE', `Joystick drive: ${direction.toUpperCase()}`);
     esp32Service.sendMotorCommand(direction);
   };
 
@@ -120,6 +122,7 @@ export default function Control({ onNavigate }) {
   };
 
   const handleColorPicker = (hex) => {
+    logger.breadcrumb('HARDWARE', `Set RGB eye color to: ${hex}`);
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     if (result) {
       const r = parseInt(result[1], 16);
@@ -131,6 +134,7 @@ export default function Control({ onNavigate }) {
 
   const handleActionClick = (actionNum) => {
     if (hwState.activeAction !== null) return;
+    logger.breadcrumb('HARDWARE', `Triggered Action Sequence #${actionNum}`);
     setActionProgress(0);
     esp32Service.triggerActionSequence(actionNum, (prog) => {
       setActionProgress(prog);

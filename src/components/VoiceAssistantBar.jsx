@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Volume2, HelpCircle, Keyboard, Send, X, CornerDownLeft, Pause, Play, Sparkles } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, HelpCircle, Keyboard, Send, X, CornerDownLeft, Pause, Play, Sparkles } from 'lucide-react';
 import { voiceNavigationService } from '../services/voiceNavigationService';
 import { kioskConfigService } from '../services/kioskConfigService';
 import './VoiceAssistantBar.css';
@@ -7,8 +7,11 @@ import './VoiceAssistantBar.css';
 export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleView }) {
   const [isListening, setIsListening] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isAiMuted, setIsAiMuted] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [latestReply, setLatestReply] = useState(null);
   const [showHints, setShowHints] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [typedInput, setTypedInput] = useState('');
@@ -27,8 +30,16 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
     const unsubscribe = voiceNavigationService.subscribe((state) => {
       setIsListening(state.isListening);
       if (state.isThinking !== undefined) setIsThinking(state.isThinking);
-      if (state.transcript !== undefined) setTranscript(state.transcript);
+      if (state.isSpeaking !== undefined) setIsSpeaking(state.isSpeaking);
+      if (state.isAiMuted !== undefined) setIsAiMuted(state.isAiMuted);
+      if (state.transcript !== undefined) {
+        setTranscript(state.transcript);
+        if (state.transcript && state.transcript.trim().length > 0) {
+          setLatestReply(null);
+        }
+      }
       if (state.feedback !== undefined) setFeedback(state.feedback);
+      if (state.latestReply !== undefined) setLatestReply(state.latestReply);
     });
 
     return () => {
@@ -44,6 +55,16 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
 
   const handleToggle = () => {
     voiceNavigationService.toggleListening();
+  };
+
+  const handleToggleAiMute = () => {
+    // If AI is currently speaking, mute/silence speech immediately!
+    if (isSpeaking) {
+      voiceNavigationService.cancelSpeech();
+      voiceNavigationService.setAiMuted(true);
+    } else {
+      voiceNavigationService.toggleAiMute();
+    }
   };
 
   const handleSendTypedCommand = (e) => {
@@ -73,7 +94,7 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
   };
 
   return (
-    <div className={`voice-assistant-bar ${isKeyboardOpen ? 'keyboard-mode' : ''}`}>
+    <div className={`voice-assistant-bar ${isKeyboardOpen ? 'keyboard-mode' : ''} ${latestReply ? 'has-reply' : ''}`}>
       {/* Mic Action Toggle Button */}
       <button
         className={`voice-mic-btn ${isListening ? 'listening' : 'muted'}`}
@@ -122,31 +143,72 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
       ) : (
         <div className="voice-content-wrap">
           <div className="voice-status-line">
-            {isThinking ? (
-              <span className="status-indicator thinking">
-                <Sparkles size={13} className="sparkle-pulse" />
-                AURRA THINKING (AI)...
-              </span>
-            ) : (
-              <span className={`status-indicator ${isListening ? 'live' : 'idle'}`}>
-                <span className="dot"></span>
-                {isListening ? 'AURRA LISTENING' : 'MIC PAUSED'}
-              </span>
-            )}
-            {feedback && (
-              <span className="feedback-tag">
-                <Volume2 size={12} />
-                {feedback}
-              </span>
+            <div className="status-line-left">
+              {isThinking ? (
+                <span className="status-indicator thinking">
+                  <Sparkles size={13} className="sparkle-pulse" />
+                  AURRA THINKING (AI)...
+                </span>
+              ) : isSpeaking ? (
+                <span className="status-indicator speaking">
+                  <div className="gemini-mini-bars">
+                    <span className="g-bar b1"></span>
+                    <span className="g-bar b2"></span>
+                    <span className="g-bar b3"></span>
+                    <span className="g-bar b4"></span>
+                  </div>
+                  AURRA SPEAKING
+                </span>
+              ) : (
+                <span className={`status-indicator ${isListening ? 'live' : 'idle'}`}>
+                  <span className="dot"></span>
+                  {isListening ? 'AURRA LISTENING' : 'MIC PAUSED'}
+                </span>
+              )}
+
+              {latestReply && (
+                <span className={`inline-source-pill source-${latestReply.source || 'default'}`}>
+                  {latestReply.source === 'offline-faq' && '🟢 OFFLINE FAQ'}
+                  {latestReply.source === 'groq-llm' && '⚡ CLOUD AI'}
+                  {latestReply.source === 'hardware' && '⚙️ HARDWARE'}
+                  {latestReply.source === 'navigation' && '🧭 NAVIGATION'}
+                  {(!latestReply.source || latestReply.source === 'fallback') && '🤖 AURRA AI'}
+                </span>
+              )}
+            </div>
+
+            {latestReply && (
+              <button
+                type="button"
+                className="inline-dismiss-btn"
+                onClick={() => {
+                  voiceNavigationService.clearInteractiveReply();
+                  setLatestReply(null);
+                }}
+                title="Clear Response"
+              >
+                <X size={13} />
+              </button>
             )}
           </div>
 
           <div className="voice-speech-text">
-            {transcript ? (
+            {latestReply ? (
+              <div className="inline-qa-content">
+                {latestReply.query && (
+                  <div className="inline-user-query">
+                    <span className="query-prefix">You:</span> "{latestReply.query}"
+                  </div>
+                )}
+                <div className="inline-robot-answer">
+                  <span className="answer-prefix">Aurra:</span> {latestReply.reply}
+                </div>
+              </div>
+            ) : transcript ? (
               <span className="heard-text">"{transcript}"</span>
             ) : (
               <span className="prompt-text">
-                {isListening ? 'Say "Open greetings", "Tour", "Facilities", "Control", or tap keyboard...' : 'Microphone paused. Tap keyboard or mic icon to command Aurra.'}
+                {isListening ? 'Say "Who are you?", "Tour", "Facilities", "Register", or tap keyboard...' : 'Microphone paused. Tap keyboard or mic icon to command Aurra.'}
               </span>
             )}
           </div>
@@ -171,7 +233,8 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
         <HelpCircle size={18} />
       </button>
 
-      {/* Pause AI / Resume AI Efficiency Button */}
+      {/* Pause AI / Resume AI Efficiency Button (Commented out for now as requested) */}
+      {/*
       <button
         className={`voice-pause-ai-btn ${isListening ? 'listening' : 'paused'}`}
         onClick={handleToggle}
@@ -186,6 +249,37 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
           <>
             <Play size={14} />
             <span>Resume AI</span>
+          </>
+        )}
+      </button>
+      */}
+
+      {/* Speaker Button: Sound ON / Sound OFF (Muted) */}
+      <button
+        className={`voice-speaker-btn ${isAiMuted ? 'sound-off' : isSpeaking ? 'speaking' : 'sound-on'}`}
+        onClick={handleToggleAiMute}
+        title={
+          isSpeaking
+            ? 'AI is speaking — tap to mute AI speech now'
+            : isAiMuted
+            ? 'Speaker is OFF (Muted) — tap to turn speaker ON'
+            : 'Speaker is ON — tap to turn speaker OFF (Mute AI)'
+        }
+      >
+        {isAiMuted ? (
+          <>
+            <VolumeX size={16} color="#ef4444" />
+            <span>Speaker OFF</span>
+          </>
+        ) : isSpeaking ? (
+          <>
+            <VolumeX size={16} className="speaking-pulse-icon" />
+            <span>Mute AI</span>
+          </>
+        ) : (
+          <>
+            <Volume2 size={16} color="#00ffff" />
+            <span>Speaker ON</span>
           </>
         )}
       </button>

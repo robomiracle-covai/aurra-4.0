@@ -134,12 +134,36 @@ export default function SliderAndCards({
   useEffect(() => {
     if (!showSlider || slides.length === 0) return;
 
-    const interval = setInterval(() => {
-      setCurrentSlideIndex((prev) => (prev + 1) % slides.length);
-    }, 5000);
+    const currentSlide = slides[currentSlideIndex];
+    if (!currentSlide) return;
 
-    return () => clearInterval(interval);
-  }, [showSlider, slides.length]);
+    const isVid = (
+      currentSlide.mediaType === 'video' ||
+      currentSlide.url?.startsWith('data:video/') ||
+      /\.(mp4|webm|mov|mkv)(\?.*)?$/i.test(currentSlide.url || '')
+    );
+
+    // If it's a video set to play full length until end (default for video),
+    // slide advance is handled by the video element's onEnded event handler.
+    const shouldPlayUntilEnd = isVid && (currentSlide.playUntilEnd !== false);
+    if (shouldPlayUntilEnd) {
+      // Safety timeout: in case video metadata fails or video stalls, fallback after 10 minutes
+      const safetyTimer = setTimeout(() => {
+        if (slides.length > 1) {
+          setCurrentSlideIndex((prev) => (prev + 1) % slides.length);
+        }
+      }, 600000);
+      return () => clearTimeout(safetyTimer);
+    }
+
+    // For image slides or video with fixed timeframe:
+    const seconds = Number(currentSlide.duration) > 0 ? Number(currentSlide.duration) : 5;
+    const timer = setTimeout(() => {
+      setCurrentSlideIndex((prev) => (prev + 1) % slides.length);
+    }, seconds * 1000);
+
+    return () => clearTimeout(timer);
+  }, [showSlider, slides, currentSlideIndex]);
 
   // ── Reload Kiosk Data when Admin Closes ──
   useEffect(() => {
@@ -245,15 +269,64 @@ export default function SliderAndCards({
       <main className="kiosk-main-content">
         {showSlider ? (
           /* SLIDESHOW BANNER VIEW */
-          <div className="slider-outer-frame" onDoubleClick={() => setShowSlider(false)}>
+          <div
+            className="slider-outer-frame"
+            onDoubleClick={() => setShowSlider(false)}
+            onClick={(e) => {
+              const vid = e.currentTarget.querySelector('video');
+              if (vid && activeSlide.isMuted !== true) {
+                vid.muted = false;
+                vid.volume = 1.0;
+                vid.play().catch(() => {});
+              }
+            }}
+          >
             <div className="slider-viewport">
               {activeSlide.url ? (
-                <img
-                  src={activeSlide.url}
-                  alt={activeSlide.title}
-                  className="slide-image"
-                  onError={(e) => { e.target.style.display = 'none'; }}
-                />
+                (activeSlide.mediaType === 'video' || activeSlide.url.startsWith('data:video/') || /\.(mp4|webm|mov|mkv)(\?.*)?$/i.test(activeSlide.url)) ? (
+                  <video
+                    key={activeSlide.url}
+                    src={activeSlide.url}
+                    autoPlay
+                    loop={slides.length === 1}
+                    playsInline
+                    muted={activeSlide.isMuted === true}
+                    onEnded={() => {
+                      if (slides.length > 1) {
+                        setCurrentSlideIndex((prev) => (prev + 1) % slides.length);
+                      }
+                    }}
+                    onError={() => {
+                      if (slides.length > 1) {
+                        setCurrentSlideIndex((prev) => (prev + 1) % slides.length);
+                      }
+                    }}
+                    className="slide-image slide-video"
+                    ref={(videoEl) => {
+                      if (videoEl) {
+                        const isMuted = activeSlide.isMuted === true;
+                        videoEl.muted = isMuted;
+                        videoEl.volume = isMuted ? 0 : 1.0;
+                        const playPromise = videoEl.play();
+                        if (playPromise !== undefined) {
+                          playPromise.catch(() => {
+                            if (!isMuted) {
+                              videoEl.muted = true;
+                              videoEl.play().catch(() => {});
+                            }
+                          });
+                        }
+                      }
+                    }}
+                  />
+                ) : (
+                  <img
+                    src={activeSlide.url}
+                    alt={activeSlide.title}
+                    className="slide-image"
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                )
               ) : (
                 <div className="cyber-slide-banner">
                   <div className="cyber-grid-mesh"></div>

@@ -14,6 +14,7 @@ import PublicFacilitiesView from './pages/Facilities/PublicFacilitiesView';
 import VoiceAssistantBar from './components/VoiceAssistantBar';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import AurraStartupSplashScreen from './components/AurraStartupSplashScreen';
+import { logger } from './services/logger';
 import './App.css';
 
 function App() {
@@ -25,12 +26,15 @@ function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
 
   const handleNavigate = (route, card = null) => {
+    logger.breadcrumb('NAV', `Navigated to: ${route || '/'}`, card?.title ? { cardTitle: card.title } : null);
     setSelectedCard(card);
     if (!route || route === '/' || route === '/home') {
       setShowCardsView(false);
       setIsAdminOpen(false);
       setCurrentRoute('/');
     } else if (route === '/admin') {
+      setShowBootScreen(false);
+      setBootPhase('completed');
       setIsAdminOpen(true);
       setCurrentRoute('/');
     } else if (route.includes('view=cards')) {
@@ -42,6 +46,8 @@ function App() {
       setIsAdminOpen(false);
       setCurrentRoute('/');
     } else {
+      setShowBootScreen(false);
+      setBootPhase('completed');
       setIsAdminOpen(false);
       setCurrentRoute(route);
     }

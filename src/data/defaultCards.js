@@ -17,7 +17,7 @@ export const DEFAULT_REGISTRATION_CARDS = [
     href: '/qa',
     className: 'qa',
     isEnabled: true,
-    voiceAccessEnabled: true,
+    voiceAccessEnabled: true, 
     voiceKeywords: ['question', 'query', 'queries', 'ask', 'help', 'voice assistant'],
   },
   {
@@ -98,7 +98,21 @@ export const DEFAULT_REGISTRATION_CARDS = [
     className: 'testing-interaction',
     isEnabled: true,
     voiceAccessEnabled: true,
-    voiceKeywords: ['testing interaction', 'test mode', 'diagnostic', 'testing', 'isolator'],
+    voiceKeywords: [
+      'testing interaction',
+      'testing interactive',
+      'testing mode',
+      'test mode',
+      'test interactive',
+      'testing',
+      'test lab',
+      'testing lab',
+      'diagnostic',
+      'diagnostic mode',
+      'diagnostic lab',
+      'feature isolator',
+      'isolator',
+    ],
   },
 ];
 

@@ -100,12 +100,14 @@ export default function TestingInteractionModeView({ onNavigate }) {
     }
   };
 
-  // ── Display Mode: 'customer' (Clean UI) vs 'developer' (Full Diagnostic Lab) ──
+  // ── Display Mode: 'developer' (Full Diagnostic Lab) vs 'customer' (Clean UI) ──
+  // Testing Interactive Mode is a dedicated diagnostic workbench, so it defaults to Developer Mode.
   const [uiMode, setUiMode] = useState(() => {
     try {
-      return localStorage.getItem('aurra_testing_ui_mode') || 'customer';
+      const saved = localStorage.getItem('aurra_testing_ui_mode');
+      return saved === 'developer' ? 'developer' : 'developer';
     } catch {
-      return 'customer';
+      return 'developer';
     }
   });
 
@@ -117,8 +119,11 @@ export default function TestingInteractionModeView({ onNavigate }) {
     if (newMode === 'customer') {
       if (!enableChat) setEnableChat(true);
       if (!enableTts) setEnableTts(true);
-      // Strictly respect user's STT switch! If switched OFF in developer mode, it stays OFF in customer mode.
-      addLog('UI_MODE', `Switched to Customer Mode: Clean conversation interface active (STT: ${enableStt ? 'ON' : 'OFF'})`, 'info');
+      if (!enableStt) {
+        setEnableStt(true);
+        try { localStorage.setItem('aurra_testing_stt_enabled', 'true'); } catch {}
+      }
+      addLog('UI_MODE', 'Switched to Customer Mode: Clean conversation interface active (STT: ON)', 'info');
     } else {
       addLog('UI_MODE', 'Switched to Developer Mode: Full diagnostic workbench active', 'info');
     }
@@ -129,11 +134,14 @@ export default function TestingInteractionModeView({ onNavigate }) {
   const [enableTts, setEnableTts] = useState(true);
   const [enableStt, setEnableStt] = useState(() => {
     try {
+      // Default to true so live microphone recognizer is always immediately operational on entering the lab
       const saved = localStorage.getItem('aurra_testing_stt_enabled');
-      if (saved !== null) return saved === 'true';
-      return false; // Default OFF for safety
+      if (saved === 'false') {
+        localStorage.removeItem('aurra_testing_stt_enabled');
+      }
+      return true;
     } catch {
-      return false;
+      return true;
     }
   });
   const [enableVision, setEnableVision] = useState(false); // Default OFF for clean isolated testing
@@ -161,9 +169,7 @@ export default function TestingInteractionModeView({ onNavigate }) {
     {
       id: 1,
       role: 'assistant',
-      text: (typeof window !== 'undefined' && localStorage.getItem('aurra_testing_ui_mode') === 'developer')
-        ? 'Diagnostic Mode Active. Aurra is loaded with official hardware & software specifications from Robomiracle Technologies (Coimbatore).'
-        : 'Hello! Welcome to Robomiracle Technologies. I am Aurra, an intelligent AI humanoid receptionist. How may I assist you today?',
+      text: 'Diagnostic Mode Active. Aurra is loaded with official hardware & software specifications from Robomiracle Technologies (Coimbatore).',
       timestamp: Date.now(),
       source: 'system',
       latencyMs: 0
@@ -598,12 +604,18 @@ export default function TestingInteractionModeView({ onNavigate }) {
     };
   }, [enableVision, visionIntervalMs, runVisionInference]);
 
-  // Disconnect global background voice listener while in isolated testing lab
+  // Disconnect global background voice listener while in isolated testing lab, and restore it on unmount
   useEffect(() => {
     if (voiceNavigationService?.stopListening) {
       voiceNavigationService.stopListening(true);
       addLog('SYSTEM', 'Isolated Testing Lab active: Global VoiceAssistantBar listener paused', 'info');
     }
+    return () => {
+      // Re-enable global voice assistant when leaving the isolated testing lab
+      if (voiceNavigationService?.startListening) {
+        voiceNavigationService.startListening(true);
+      }
+    };
   }, [addLog]);
 
   // ── SPEECH RECOGNITION (STT) LIFECYCLE & ANTI-ECHO CONTROLLER ──

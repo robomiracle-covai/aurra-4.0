@@ -3437,15 +3437,33 @@
   overflow: hidden;
 }
 
-.adm-slide-thumb img {
+.adm-slide-thumb img,
+.adm-slide-thumb video,
+.adm-slide-thumb-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: transform 0.3s ease;
 }
 
-.adm-slide-card:hover .adm-slide-thumb img {
+.adm-slide-card:hover .adm-slide-thumb img,
+.adm-slide-card:hover .adm-slide-thumb video {
   transform: scale(1.03);
+}
+
+.adm-slide-media-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: rgba(0, 213, 255, 0.3);
+  border: 1px solid rgba(0, 213, 255, 0.7);
+  color: #00ffff;
+  backdrop-filter: blur(4px);
 }
 
 .adm-slide-placeholder {
@@ -3569,6 +3587,475 @@
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SCREENSHOT 2: ADD SLIDE CAPSULE BAR
+   ═══════════════════════════════════════════════════════════ */
+.adm-slide-add-capsule-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: #020712;
+  border: 1.5px solid #00ffff;
+  border-radius: 30px;
+  margin-bottom: 24px;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.15);
+}
+
+.adm-slide-capsule-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #00ffff;
+  letter-spacing: 0.3px;
+}
+
+.adm-slide-capsule-btn {
+  background: transparent;
+  border: 1.5px solid #00ffff;
+  color: #00ffff;
+  padding: 6px 20px;
+  border-radius: 18px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.3px;
+}
+
+.adm-slide-capsule-btn:hover {
+  background: rgba(0, 255, 255, 0.18);
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SCREENSHOT 1: ADD SLIDE POPUP MODAL
+   ═══════════════════════════════════════════════════════════ */
+.adm-slide-popup-card {
+  width: 100%;
+  max-width: 650px;
+  background: #030812;
+  border: 1.5px solid #00ffff;
+  border-radius: 24px;
+  padding: 30px 32px;
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.85), 0 0 30px rgba(0, 255, 255, 0.25);
+  animation: ldsFadeIn 0.22s ease-out;
+}
+
+.adm-slide-popup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.adm-slide-popup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.adm-slide-popup-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #38bdf8;
+  letter-spacing: 0.3px;
+}
+
+.adm-slide-popup-input {
+  width: 100%;
+  background: #020610;
+  border: 1.5px solid #00d5ff;
+  border-radius: 14px;
+  padding: 12px 18px;
+  color: #ffffff;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.adm-slide-popup-input:focus {
+  border-color: #00ffff;
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.35);
+}
+
+.adm-slide-popup-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.adm-slide-popup-preview-btn {
+  background: transparent;
+  border: 1.5px solid #00d5ff;
+  color: #38bdf8;
+  padding: 5px 18px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.adm-slide-popup-preview-btn:hover,
+.adm-slide-popup-preview-btn.active {
+  background: rgba(0, 213, 255, 0.2);
+  border-color: #00ffff;
+  color: #00ffff;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+.adm-slide-popup-dropzone {
+  width: 100%;
+  min-height: 150px;
+  background: #020610;
+  border: 1.5px solid #00d5ff;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 16px;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.adm-slide-popup-dropzone:hover {
+  border-color: #00ffff;
+  background: rgba(0, 213, 255, 0.03);
+  box-shadow: inset 0 0 15px rgba(0, 255, 255, 0.1);
+}
+
+.adm-dropzone-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.adm-dropzone-text-main {
+  font-size: 14px;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.adm-dropzone-text-sub {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.adm-dropzone-content-filled {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.adm-dropzone-thumb {
+  width: 130px;
+  height: 80px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1.5px solid rgba(0, 213, 255, 0.5);
+}
+
+.adm-dropzone-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.adm-dropzone-badge {
+  background: rgba(0, 213, 255, 0.2);
+  color: #00ffff;
+  border: 1px solid rgba(0, 213, 255, 0.4);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.adm-dropzone-hint {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* ── EXACT KIOSK BANNER PREVIEW CONTAINER ── */
+.adm-slide-popup-kiosk-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.adm-kiosk-preview-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 290px;
+  background: #080d16;
+  border: 2px solid rgba(0, 255, 255, 0.6);
+  box-shadow: 0 0 25px rgba(0, 255, 255, 0.2), inset 0 0 15px rgba(0, 255, 255, 0.08);
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+}
+
+.adm-kiosk-preview-media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.adm-kiosk-preview-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(2,6,23,0.85) 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 18px 24px;
+}
+
+.adm-kiosk-preview-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #00ffff;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.adm-kiosk-preview-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+}
+
+.adm-kiosk-preview-subtitle {
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.adm-kiosk-preview-tag {
+  font-size: 11px;
+  color: #38bdf8;
+  text-align: center;
+  font-style: italic;
+}
+
+.adm-slide-popup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.adm-slide-popup-btn {
+  padding: 10px 24px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.adm-slide-popup-btn.cancel {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+}
+
+.adm-slide-popup-btn.cancel:hover {
+  background: rgba(51, 65, 85, 0.9);
+  color: #ffffff;
+}
+
+.adm-slide-popup-btn.submit {
+  background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
+  border: none;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 180, 216, 0.35);
+}
+
+.adm-slide-popup-btn.submit:hover:not(:disabled) {
+  background: linear-gradient(135deg, #00d5ff 0%, #0096c7 100%);
+  transform: translateY(-1px);
+}
+
+.adm-slide-popup-btn.submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── SLIDE POPUP AUDIO & TIMING OPTIONS ── */
+.adm-slide-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+}
+
+.adm-slide-option-pill {
+  flex: 1;
+  min-width: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #020610;
+  border: 1.5px solid rgba(0, 213, 255, 0.4);
+  color: #94a3b8;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.adm-slide-option-pill:hover {
+  border-color: #00ffff;
+  color: #e2e8f0;
+  background: rgba(0, 255, 255, 0.05);
+}
+
+.adm-slide-option-pill.active {
+  border-color: #00ffff;
+  color: #00ffff;
+  background: rgba(0, 255, 255, 0.12);
+  box-shadow: 0 0 14px rgba(0, 255, 255, 0.25);
+  font-weight: 600;
+}
+
+.adm-slide-timing-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.adm-slide-duration-control-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: rgba(0, 213, 255, 0.04);
+  border: 1px dashed rgba(0, 213, 255, 0.35);
+  padding: 10px 14px;
+  border-radius: 12px;
+}
+
+.adm-slide-timing-desc {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.adm-slide-duration-number-input {
+  width: 80px !important;
+  padding: 6px 10px !important;
+  text-align: center;
+  font-size: 15px !important;
+  font-weight: 700;
+  color: #00ffff !important;
+}
+
+.adm-slide-timing-unit {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.adm-slide-quick-secs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.adm-slide-sec-pill {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(0, 213, 255, 0.3);
+  color: #94a3b8;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.adm-slide-sec-pill:hover,
+.adm-slide-sec-pill.active {
+  border-color: #00ffff;
+  color: #00ffff;
+  background: rgba(0, 255, 255, 0.15);
+}
+
+/* ── SLIDE LIST BADGES & CONTROLS ── */
+.adm-slide-timing-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(3, 8, 18, 0.85);
+  border: 1px solid rgba(0, 213, 255, 0.4);
+  color: #38bdf8;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+
+.adm-slide-content-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.adm-slide-audio-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.adm-slide-audio-pill.unmuted {
+  background: rgba(0, 255, 255, 0.12);
+  border: 1px solid rgba(0, 255, 255, 0.5);
+  color: #00ffff;
+}
+
+.adm-slide-audio-pill.unmuted:hover {
+  background: rgba(0, 255, 255, 0.25);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+.adm-slide-audio-pill.muted {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.adm-slide-audio-pill.muted:hover {
+  background: rgba(239, 68, 68, 0.25);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
 }
 
 

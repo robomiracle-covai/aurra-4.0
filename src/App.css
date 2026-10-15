@@ -4,15 +4,21 @@
   position: relative;
   width: 100vw;
   height: 100vh;
+  min-height: 100vh;
   overflow: hidden;
   background-color: #06090e;
+  display: flex;
+  flex-direction: column;
 }
 
 .aurra-view-container {
-  width: 100%;
-  height: 100%;
-  overflow-y: auto;
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
   -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto;
 }
 
 /* Globally Persistent Floating Voice Bar at bottom of screen */

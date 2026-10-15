@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   LayoutDashboard,
   LayoutTemplate,
@@ -41,6 +41,7 @@ import {
   X,
   Sparkles,
   Volume2,
+  VolumeX,
   Lock,
   Key,
   CheckCircle2,
@@ -58,6 +59,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import AdminChatHistoryView from '../../components/AdminChatHistoryView';
+import LiveDataStudio from '../../components/LiveDataStudio';
 import { llmService, DEFAULT_SYSTEM_PROMPT } from '../../services/llmService';
 import { getLiveKnowledgeBlock, mergeKnowledgeIntoPrompt } from '../../services/facilityTourKnowledgeService';
 import {
@@ -82,11 +84,13 @@ import { assetUrl } from '../../utils/platform';
 import { logger } from '../../services/logger';
 import ImageSelectorField from '../../components/ImageSelectorField';
 import ImageGalleryModal from '../../components/ImageGalleryModal';
+import { LogViewerModal } from '../../components/LogViewerModal';
 import './AdminDashboard.css';
 
 export default function AdminDashboard({ onNavigate, onClose }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [statusMsg, setStatusMsg] = useState('');
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
 
   // Branding state
   const [headerName, setHeaderName] = useState('');
@@ -100,6 +104,14 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   const [newSlideTitle, setNewSlideTitle] = useState('');
   const [newSlideSubtitle, setNewSlideSubtitle] = useState('');
   const [newSlideUrl, setNewSlideUrl] = useState('');
+  const [newSlideMediaType, setNewSlideMediaType] = useState('image'); // 'image' | 'video'
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [isAddSlideModalOpen, setIsAddSlideModalOpen] = useState(false);
+  const [isPreviewBannerMode, setIsPreviewBannerMode] = useState(false);
+  const [newSlideIsMuted, setNewSlideIsMuted] = useState(false);
+  const [newSlidePlayUntilEnd, setNewSlidePlayUntilEnd] = useState(true);
+  const [newSlideDuration, setNewSlideDuration] = useState(5);
+  const slideFileInputRef = useRef(null);
   const [isSlideGalleryOpen, setIsSlideGalleryOpen] = useState(false);
 
   // Q&A state
@@ -362,21 +374,101 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     showStatus('Slide removed');
   };
 
+  const handleSlideFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|mkv)$/i.test(file.name);
+    const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(file.name);
+
+    if (!isVideo && !isImage) {
+      alert('Please select a valid image (PNG, JPG, WebP) or video (MP4, WebM) file.');
+      return;
+    }
+
+    if (!newSlideTitle.trim()) {
+      const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+      setNewSlideTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
+    }
+
+    setIsUploadingMedia(true);
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      setNewSlideUrl(event.target.result);
+      setNewSlideMediaType(isVideo ? 'video' : 'image');
+      if (isVideo) {
+        setNewSlidePlayUntilEnd(true);
+      }
+      setIsUploadingMedia(false);
+      showStatus(`Loaded ${isVideo ? 'video' : 'image'}: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+    };
+
+    reader.onerror = (err) => {
+      console.error('File read error:', err);
+      alert('Failed to read media file from device.');
+      setIsUploadingMedia(false);
+    };
+
+    reader.readAsDataURL(file);
+  };
+
   const handleAddSlide = async (e) => {
     e.preventDefault();
     if (!newSlideTitle.trim()) return;
+    if (!newSlideUrl.trim()) {
+      alert('Please select or upload an image or video for this banner.');
+      return;
+    }
+    const mediaType = newSlideMediaType || (newSlideUrl.startsWith('data:video/') || /\.(mp4|webm|mov|mkv)$/i.test(newSlideUrl) ? 'video' : 'image');
     await offlineSliderService.addSlideImage({
       title: newSlideTitle.trim(),
       subtitle: newSlideSubtitle.trim(),
       url: newSlideUrl.trim(),
+      mediaType,
       isSelected: true,
+      isMuted: Boolean(newSlideIsMuted),
+      playUntilEnd: mediaType === 'video' ? Boolean(newSlidePlayUntilEnd) : false,
+      duration: Number(newSlideDuration) || 5,
     });
     setNewSlideTitle('');
     setNewSlideSubtitle('');
     setNewSlideUrl('');
+    setNewSlideMediaType('image');
+    setNewSlideIsMuted(false);
+    setNewSlidePlayUntilEnd(true);
+    setNewSlideDuration(5);
+    setIsAddSlideModalOpen(false);
+    setIsPreviewBannerMode(false);
+    if (slideFileInputRef.current) slideFileInputRef.current.value = '';
     const updated = await offlineSliderService.getSlideImages();
     setSlides(updated);
-    showStatus('New banner slide added');
+    showStatus(`New banner ${mediaType === 'video' ? 'video' : 'slide'} added successfully`);
+  };
+
+  const handleOpenAddSlideModal = () => {
+    setNewSlideTitle('');
+    setNewSlideSubtitle('');
+    setNewSlideUrl('');
+    setNewSlideMediaType('image');
+    setNewSlideIsMuted(false);
+    setNewSlidePlayUntilEnd(true);
+    setNewSlideDuration(5);
+    setIsPreviewBannerMode(false);
+    setIsAddSlideModalOpen(true);
+  };
+
+  const handleCloseAddSlideModal = () => {
+    setIsAddSlideModalOpen(false);
+    setIsPreviewBannerMode(false);
+  };
+
+  const handleToggleSlideMute = async (slide) => {
+    const updatedMuted = !slide.isMuted;
+    await offlineSliderService.updateSlideImage(slide.id, { isMuted: updatedMuted });
+    const updated = await offlineSliderService.getSlideImages();
+    setSlides(updated);
+    showStatus(`Slide audio set to ${updatedMuted ? 'Muted' : 'Unmuted (Sound On)'}`);
   };
 
   const handleResetSlides = async () => {
@@ -1660,6 +1752,13 @@ export default function AdminDashboard({ onNavigate, onClose }) {
 
           <div className="adm-menu-group-label">DEVELOPER & SYSTEM</div>
           <button
+            className={`adm-nav-item dev-highlight ${activeTab === 'livedata' ? 'active' : ''}`}
+            onClick={() => setActiveTab('livedata')}
+          >
+            <Database size={18} color="#00ffff" />
+            <span>Live Data Studio</span>
+          </button>
+          <button
             className={`adm-nav-item dev-highlight ${activeTab === 'developer' ? 'active' : ''}`}
             onClick={() => setActiveTab('developer')}
           >
@@ -2022,110 +2121,90 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                   </button>
                 </div>
 
-                {/* Add Slide Form */}
-                <form onSubmit={handleAddSlide} className="adm-add-slide-form">
-                  <div className="adm-slide-form-head">
-                    <h4>Add New Ad / Banner Slide</h4>
-                    <button
-                      type="button"
-                      className="adm-gallery-pick-btn"
-                      onClick={() => setIsSlideGalleryOpen(true)}
-                    >
-                      <ImageIcon size={15} />
-                      <span>Browse Image Gallery</span>
-                    </button>
-                  </div>
-                  <div className="adm-slide-inputs-grid">
-                    <input
-                      type="text"
-                      placeholder="Slide Title (e.g. Campus Robotics Tour)"
-                      value={newSlideTitle}
-                      onChange={(e) => setNewSlideTitle(e.target.value)}
-                      required
-                    />
-                    <input
-                      type="text"
-                      placeholder="Subtitle or Description"
-                      value={newSlideSubtitle}
-                      onChange={(e) => setNewSlideSubtitle(e.target.value)}
-                    />
-                    <div className="adm-slide-url-picker-wrap">
-                      <input
-                        type="text"
-                        placeholder="Image path, URL or select from gallery"
-                        value={newSlideUrl}
-                        onChange={(e) => setNewSlideUrl(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="adm-inline-gallery-btn"
-                        onClick={() => setIsSlideGalleryOpen(true)}
-                        title="Pick from Gallery"
-                      >
-                        <ImageIcon size={14} />
-                        <span>Gallery</span>
-                      </button>
-                    </div>
-                    <button type="submit" className="adm-submit-btn compact">
-                      <Plus size={16} />
-                      <span>Add Slide</span>
-                    </button>
-                  </div>
-                  {newSlideUrl && (
-                    <div className="adm-slide-preview-strip">
-                      <img
-                        src={newSlideUrl.startsWith('data:') ? newSlideUrl : assetUrl(newSlideUrl)}
-                        alt="Preview"
-                        className="adm-slide-preview-thumb"
-                        onError={(e) => (e.target.style.display = 'none')}
-                      />
-                      <span className="adm-slide-preview-path">{newSlideUrl}</span>
-                      <button
-                        type="button"
-                        className="adm-mini-clear-btn"
-                        onClick={() => setNewSlideUrl('')}
-                        title="Clear Image"
-                      >
-                        <X size={13} />
-                      </button>
-                    </div>
-                  )}
-                </form>
+                {/* Clean Capsule Bar from Screenshot 2 */}
+                <div className="adm-slide-add-capsule-bar">
+                  <span className="adm-slide-capsule-title">
+                    Add promotional ad Banner (Image or Video)
+                  </span>
+                  <button
+                    type="button"
+                    className="adm-slide-capsule-btn"
+                    onClick={handleOpenAddSlideModal}
+                  >
+                    add slide
+                  </button>
+                </div>
 
                 {/* Slides List */}
                 <div className="adm-slides-grid">
-                  {slides.map((slide) => (
-                    <div key={slide.id} className={`adm-slide-card ${slide.isSelected ? 'active' : 'inactive'}`}>
-                      <div className="adm-slide-thumb">
-                        {slide.url ? (
-                          <img src={slide.url} alt={slide.title} onError={(e) => (e.target.style.display = 'none')} />
-                        ) : (
-                          <div className="adm-slide-placeholder">No Image URL</div>
-                        )}
-                        <span className={`adm-slide-status-badge ${slide.isSelected ? 'active' : ''}`}>
-                          {slide.isSelected ? 'ACTIVE' : 'DISABLED'}
-                        </span>
-                      </div>
-                      <div className="adm-slide-content">
-                        <strong>{slide.title}</strong>
-                        <p>{slide.subtitle || 'No subtitle provided'}</p>
-                        <div className="adm-slide-btns">
-                          <button
-                            className="adm-mini-btn"
-                            onClick={() => handleToggleSlide(slide)}
-                          >
-                            {slide.isSelected ? 'Disable' : 'Enable'}
-                          </button>
-                          <button
-                            className="adm-mini-btn danger"
-                            onClick={() => handleDeleteSlide(slide.id)}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                  {slides.map((slide) => {
+                    const isVid = slide.mediaType === 'video' || slide.url?.startsWith('data:video/') || /\.(mp4|webm|mov|mkv)$/i.test(slide.url || '');
+                    return (
+                      <div key={slide.id} className={`adm-slide-card ${slide.isSelected ? 'active' : 'inactive'}`}>
+                        <div className="adm-slide-thumb">
+                          {slide.url ? (
+                            isVid ? (
+                              <video
+                                src={slide.url}
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                className="adm-slide-thumb-video"
+                              />
+                            ) : (
+                              <img src={slide.url} alt={slide.title} onError={(e) => (e.target.style.display = 'none')} />
+                            )
+                          ) : (
+                            <div className="adm-slide-placeholder">No Media URL</div>
+                          )}
+                          <span className={`adm-slide-status-badge ${slide.isSelected ? 'active' : ''}`}>
+                            {slide.isSelected ? 'ACTIVE' : 'DISABLED'}
+                          </span>
+                          {isVid && (
+                            <span className="adm-slide-media-badge">VIDEO</span>
+                          )}
+                          <span className="adm-slide-timing-badge">
+                            {isVid 
+                              ? (slide.playUntilEnd !== false ? '🎬 Full Video' : `⏱️ ${slide.duration || 5}s`)
+                              : `⏱️ ${slide.duration || 5}s`
+                            }
+                          </span>
+                        </div>
+                        <div className="adm-slide-content">
+                          <div className="adm-slide-content-header">
+                            <strong>{slide.title}</strong>
+                            {isVid && (
+                              <button
+                                type="button"
+                                className={`adm-slide-audio-pill ${slide.isMuted ? 'muted' : 'unmuted'}`}
+                                onClick={() => handleToggleSlideMute(slide)}
+                                title={slide.isMuted ? 'Muted (Click to enable audio)' : 'Sound On (Click to mute)'}
+                              >
+                                {slide.isMuted ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                                <span>{slide.isMuted ? 'Muted' : 'Sound On'}</span>
+                              </button>
+                            )}
+                          </div>
+                          <p>{slide.subtitle || 'No subtitle provided'}</p>
+                          <div className="adm-slide-btns">
+                            <button
+                              className="adm-mini-btn"
+                              onClick={() => handleToggleSlide(slide)}
+                            >
+                              {slide.isSelected ? 'Disable' : 'Enable'}
+                            </button>
+                            <button
+                              className="adm-mini-btn danger"
+                              onClick={() => handleDeleteSlide(slide.id)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -4631,6 +4710,53 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                   </div>
                 </div>
 
+                {/* ── Diagnostic Flight Recorder & IDE Tools ── */}
+                <div style={{ margin: '24px 0 16px 0', borderTop: '1px solid rgba(0, 213, 255, 0.2)' }} />
+                <div className="adm-panel-header-row" style={{ marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h4 className="adm-panel-title" style={{ fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Terminal size={18} color="#00ffff" />
+                      <span>Zero-Lag Diagnostic Flight Recorder & IDE Tools</span>
+                    </h4>
+                    <p className="adm-panel-desc">
+                      Inspect the circular ring buffer, view pre-crash user breadcrumbs, or copy a markdown report to paste into your IDE/AI chat for instant bug fixing.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="adm-submit-btn"
+                      style={{ padding: '8px 14px', fontSize: '12px' }}
+                      onClick={() => setIsLogModalOpen(true)}
+                    >
+                      <Terminal size={15} />
+                      <span>Open Flight Recorder</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="adm-submit-btn"
+                      style={{
+                        padding: '8px 14px',
+                        fontSize: '12px',
+                        background: 'linear-gradient(135deg, rgba(0, 255, 255, 0.25), rgba(56, 189, 248, 0.2))',
+                        border: '1.5px solid #00ffff',
+                        color: '#fff',
+                        boxShadow: '0 0 12px rgba(0, 255, 255, 0.25)'
+                      }}
+                      onClick={async () => {
+                        const report = logger.generateIdeDiagnosticReport();
+                        if (navigator.clipboard) {
+                          await navigator.clipboard.writeText(report);
+                          showStatus('Copied IDE Diagnostic Report to clipboard!');
+                        }
+                      }}
+                    >
+                      <Sparkles size={15} color="#00ffff" />
+                      <span>Export Report for IDE Fix</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* ── Security & 4-Digit Admin PIN Management ── */}
                 <div style={{ margin: '24px 0 16px 0', borderTop: '1px solid rgba(0, 213, 255, 0.2)' }} />
                 <div className="adm-panel-header-row" style={{ marginBottom: '12px' }}>
@@ -4785,8 +4911,289 @@ export default function AdminDashboard({ onNavigate, onClose }) {
               </div>
             </div>
           )}
+
+          {/* ── LIVE DATA STUDIO (MYSQL-STYLE DATABASE VIEWER & EDITOR) ── */}
+          {activeTab === 'livedata' && (
+            <div className="adm-tab-panel">
+              <LiveDataStudio />
+            </div>
+          )}
         </div>
       </main>
+
+      {/* ── Add Promotional Banner Popup Modal (Screenshot 1) ── */}
+      {isAddSlideModalOpen && (
+        <div className="adm-modal-overlay" onClick={handleCloseAddSlideModal}>
+          <div className="adm-slide-popup-card" onClick={(e) => e.stopPropagation()}>
+            <form onSubmit={handleAddSlide} className="adm-slide-popup-form">
+              {/* Field 1: Title */}
+              <div className="adm-slide-popup-field">
+                <label className="adm-slide-popup-label">Title</label>
+                <input
+                  type="text"
+                  className="adm-slide-popup-input"
+                  value={newSlideTitle}
+                  onChange={(e) => setNewSlideTitle(e.target.value)}
+                  placeholder=""
+                  required
+                />
+              </div>
+
+              {/* Field 2: Sub title */}
+              <div className="adm-slide-popup-field">
+                <label className="adm-slide-popup-label">Sub title</label>
+                <input
+                  type="text"
+                  className="adm-slide-popup-input"
+                  value={newSlideSubtitle}
+                  onChange={(e) => setNewSlideSubtitle(e.target.value)}
+                  placeholder=""
+                />
+              </div>
+
+              {/* Field 3: Image / Video + Preview button on right */}
+              <div className="adm-slide-popup-field">
+                <div className="adm-slide-popup-label-row">
+                  <label className="adm-slide-popup-label">Image / Video</label>
+                  <button
+                    type="button"
+                    className={`adm-slide-popup-preview-btn ${isPreviewBannerMode ? 'active' : ''}`}
+                    onClick={() => {
+                      if (!newSlideUrl) {
+                        alert('Please choose or upload an image/video first to preview.');
+                        return;
+                      }
+                      setIsPreviewBannerMode((prev) => !prev);
+                    }}
+                  >
+                    Preview
+                  </button>
+                </div>
+
+                <input
+                  type="file"
+                  ref={slideFileInputRef}
+                  accept="image/*,video/*"
+                  style={{ display: 'none' }}
+                  onChange={handleSlideFileUpload}
+                />
+
+                {/* If Preview Mode: Exact 1:1 Live Kiosk Home Screen Banner Replica */}
+                {isPreviewBannerMode && newSlideUrl ? (
+                  <div className="adm-slide-popup-kiosk-preview">
+                    <div className="adm-kiosk-preview-frame">
+                      {newSlideMediaType === 'video' || newSlideUrl.startsWith('data:video/') || /\.(mp4|webm|mov|mkv)$/i.test(newSlideUrl) ? (
+                        <video
+                          src={newSlideUrl}
+                          autoPlay
+                          loop
+                          playsInline
+                          muted={newSlideIsMuted}
+                          className="adm-kiosk-preview-media"
+                          ref={(el) => {
+                            if (el) {
+                              el.muted = newSlideIsMuted;
+                              el.volume = newSlideIsMuted ? 0 : 1.0;
+                              el.play().catch(() => {});
+                            }
+                          }}
+                        />
+                      ) : (
+                        <img
+                          src={newSlideUrl.startsWith('data:') ? newSlideUrl : assetUrl(newSlideUrl)}
+                          alt={newSlideTitle || 'Preview'}
+                          className="adm-kiosk-preview-media"
+                        />
+                      )}
+                      <div className="adm-kiosk-preview-overlay">
+                        <div className="adm-kiosk-preview-badge">
+                          <Sparkles size={14} color="#00ffff" />
+                          <span>AURRA AUTONOMOUS KIOSK</span>
+                        </div>
+                        <h3 className="adm-kiosk-preview-title">{newSlideTitle || 'Banner Title'}</h3>
+                        <p className="adm-kiosk-preview-subtitle">{newSlideSubtitle || 'Banner Subtitle'}</p>
+                      </div>
+                    </div>
+                    <span className="adm-kiosk-preview-tag">
+                      ✨ Exact live aspect ratio & text layout as shown on Home Screen
+                    </span>
+                  </div>
+                ) : (
+                  /* Big Upload Box from Screenshot 1 */
+                  <div
+                    className="adm-slide-popup-dropzone"
+                    onClick={() => slideFileInputRef.current?.click()}
+                  >
+                    {isUploadingMedia ? (
+                      <div className="adm-dropzone-center">
+                        <RefreshCw size={26} className="lds-spin" color="#00ffff" />
+                        <span>Loading file from device...</span>
+                      </div>
+                    ) : newSlideUrl ? (
+                      <div className="adm-dropzone-content-filled">
+                        {newSlideMediaType === 'video' || newSlideUrl.startsWith('data:video/') || /\.(mp4|webm|mov|mkv)$/i.test(newSlideUrl) ? (
+                          <video
+                            src={newSlideUrl}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="adm-dropzone-thumb"
+                          />
+                        ) : (
+                          <img
+                            src={newSlideUrl.startsWith('data:') ? newSlideUrl : assetUrl(newSlideUrl)}
+                            alt="Media Preview"
+                            className="adm-dropzone-thumb"
+                          />
+                        )}
+                        <div className="adm-dropzone-meta">
+                          <span className="adm-dropzone-badge">
+                            {newSlideMediaType === 'video' ? '🎬 VIDEO LOADED' : '🖼️ IMAGE LOADED'}
+                          </span>
+                          <span className="adm-dropzone-hint">Tap to replace with another file</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="adm-dropzone-center">
+                        <Upload size={32} color="#00ffff" />
+                        <span className="adm-dropzone-text-main">
+                          Click to choose Image or Video from device
+                        </span>
+                        <span className="adm-dropzone-text-sub">
+                          Supports MP4, WebM, MKV, PNG, JPG, WebP
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Field 4: Audio Sound Setting (Mute / Unmute) */}
+              <div className="adm-slide-popup-field">
+                <label className="adm-slide-popup-label">Audio Sound Setting</label>
+                <div className="adm-slide-toggle-row">
+                  <button
+                    type="button"
+                    className={`adm-slide-option-pill ${!newSlideIsMuted ? 'active' : ''}`}
+                    onClick={() => setNewSlideIsMuted(false)}
+                  >
+                    <Volume2 size={15} />
+                    <span>🔊 Sound On (Unmuted)</span>
+                    {!newSlideIsMuted && <Check size={14} />}
+                  </button>
+                  <button
+                    type="button"
+                    className={`adm-slide-option-pill ${newSlideIsMuted ? 'active' : ''}`}
+                    onClick={() => setNewSlideIsMuted(true)}
+                  >
+                    <VolumeX size={15} />
+                    <span>🔇 Muted (Silent)</span>
+                    {newSlideIsMuted && <Check size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Field 5: Slide Display Timing & Time Frame */}
+              <div className="adm-slide-popup-field">
+                <label className="adm-slide-popup-label">Display Time Frame & Duration</label>
+                {newSlideMediaType === 'video' || newSlideUrl.startsWith('data:video/') || /\.(mp4|webm|mov|mkv)$/i.test(newSlideUrl) ? (
+                  <div className="adm-slide-timing-box">
+                    <div className="adm-slide-toggle-row">
+                      <button
+                        type="button"
+                        className={`adm-slide-option-pill ${newSlidePlayUntilEnd ? 'active' : ''}`}
+                        onClick={() => setNewSlidePlayUntilEnd(true)}
+                      >
+                        <span>🎬 Play Full Video (Move next only when finished)</span>
+                        {newSlidePlayUntilEnd && <Check size={14} />}
+                      </button>
+                      <button
+                        type="button"
+                        className={`adm-slide-option-pill ${!newSlidePlayUntilEnd ? 'active' : ''}`}
+                        onClick={() => setNewSlidePlayUntilEnd(false)}
+                      >
+                        <span>⏱️ Fixed Time Frame</span>
+                        {!newSlidePlayUntilEnd && <Check size={14} />}
+                      </button>
+                    </div>
+
+                    {!newSlidePlayUntilEnd && (
+                      <div className="adm-slide-duration-control-row">
+                        <span className="adm-slide-timing-desc">Slide Duration:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="300"
+                          className="adm-slide-popup-input adm-slide-duration-number-input"
+                          value={newSlideDuration}
+                          onChange={(e) => setNewSlideDuration(Math.max(1, parseInt(e.target.value) || 5))}
+                        />
+                        <span className="adm-slide-timing-unit">seconds</span>
+                        <div className="adm-slide-quick-secs">
+                          {[5, 10, 15, 30].map((s) => (
+                            <button
+                              key={s}
+                              type="button"
+                              className={`adm-slide-sec-pill ${newSlideDuration === s ? 'active' : ''}`}
+                              onClick={() => setNewSlideDuration(s)}
+                            >
+                              {s}s
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="adm-slide-duration-control-row">
+                    <span className="adm-slide-timing-desc">Slide Duration:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      className="adm-slide-popup-input adm-slide-duration-number-input"
+                      value={newSlideDuration}
+                      onChange={(e) => setNewSlideDuration(Math.max(1, parseInt(e.target.value) || 5))}
+                    />
+                    <span className="adm-slide-timing-unit">seconds</span>
+                    <div className="adm-slide-quick-secs">
+                      {[3, 5, 10, 15].map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          className={`adm-slide-sec-pill ${newSlideDuration === s ? 'active' : ''}`}
+                          onClick={() => setNewSlideDuration(s)}
+                        >
+                          {s}s
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="adm-slide-popup-actions">
+                <button
+                  type="button"
+                  className="adm-slide-popup-btn cancel"
+                  onClick={handleCloseAddSlideModal}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="adm-slide-popup-btn submit"
+                  disabled={isUploadingMedia || !newSlideUrl}
+                >
+                  Add Slide
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── Edit / Add QR Code Link Modal ── */}
       {showLinkModal && (
@@ -5586,6 +5993,12 @@ export default function AdminDashboard({ onNavigate, onClose }) {
         onSelectImage={(path) => setNewSlideUrl(path)}
         currentPath={newSlideUrl}
         title="Select Ad / Banner Slide Image"
+      />
+
+      {/* Diagnostic Flight Recorder Modal */}
+      <LogViewerModal
+        isOpen={isLogModalOpen}
+        onClose={() => setIsLogModalOpen(false)}
       />
     </div>
   );

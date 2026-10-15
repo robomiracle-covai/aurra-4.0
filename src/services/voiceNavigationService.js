@@ -9,7 +9,7 @@
 
 import { offlineCardService, offlineQaService } from '../db/offlineServices';
 import { hardwareDispatcher } from './hardwareDispatcher';
-import { speakWithVoice, cancelSpeech, isAnySpeaking } from '../utils/speechSynthesis';
+import { speakWithVoice, cancelSpeech, isAnySpeaking, setAiSpeechMuted } from '../utils/speechSynthesis';
 import { llmService } from './llmService';
 import { logger } from './logger';
 import { chatHistoryService } from './chatHistoryService';
@@ -97,6 +97,44 @@ export function isAcousticEcho(heardText, lastSpokenText) {
   return false;
 }
 
+/**
+ * Merge consecutive speech recognition chunks into a coherent utterance without stutter or duplication
+ */
+export function mergeSpeechUtterances(prevText, nextText) {
+  const prev = (prevText || '').trim();
+  const next = (nextText || '').trim();
+  if (!prev) return next;
+  if (!next) return prev;
+
+  const prevLower = prev.toLowerCase();
+  const nextLower = next.toLowerCase();
+
+  // 1. If next is an extension of prev (e.g. prev="who are", next="who are you")
+  if (nextLower.startsWith(prevLower)) {
+    return next;
+  }
+
+  // 2. If prev already contains next or ends with next
+  if (prevLower.endsWith(nextLower) || prevLower.includes(nextLower)) {
+    return prev;
+  }
+
+  // 3. Word-level overlap: match trailing words of prev with leading words of next
+  const prevWords = prev.split(/\s+/);
+  const nextWords = next.split(/\s+/);
+
+  for (let k = Math.min(prevWords.length, nextWords.length); k > 0; k--) {
+    const prevSuffix = prevWords.slice(-k).join(' ').toLowerCase();
+    const nextPrefix = nextWords.slice(0, k).join(' ').toLowerCase();
+    if (prevSuffix === nextPrefix) {
+      return [...prevWords, ...nextWords.slice(k)].join(' ');
+    }
+  }
+
+  // 4. Disjoint separate clauses
+  return `${prev} ${next}`;
+}
+
 class VoiceNavigationService {
   constructor() {
     this.recognition = null;
@@ -104,6 +142,7 @@ class VoiceNavigationService {
     this.manualStop = false;
     this.userPaused = false;
     this.isSpeakingTts = false;
+    this.isAiMuted = false;
     this.forceLlmOnly = false;
     this.subscribers = new Set();
     this.currentTranscript = '';
@@ -122,6 +161,10 @@ class VoiceNavigationService {
     this.lastProcessedUtterance = '';
     this.lastProcessedTime = 0;
     this.lastSpokenText = '';
+    this.speechAccumulator = '';
+    this.speechDebounceTimer = null;
+    this.latestInteractiveReply = null;
+    this.replyDismissTimer = null;
   }
 
   setTypingMode(enabled) {
@@ -234,8 +277,66 @@ class VoiceNavigationService {
     this.lastSpeechEndTime = Date.now();
     cancelSpeech();
     this.currentTranscript = '';
+    this.speechAccumulator = '';
+    if (this.speechDebounceTimer) {
+      clearTimeout(this.speechDebounceTimer);
+      this.speechDebounceTimer = null;
+    }
     this.notify({ isSpeaking: false, isThinking: false, transcript: '' });
     this.startListening(true);
+  }
+
+  setInteractiveReply(replyObj) {
+    this.latestInteractiveReply = replyObj;
+    this.notify({ latestReply: replyObj });
+
+    if (this.replyDismissTimer) {
+      clearTimeout(this.replyDismissTimer);
+    }
+    // Auto-dismiss reply card after 16 seconds so screen doesn't stay permanently covered
+    this.replyDismissTimer = setTimeout(() => {
+      this.clearInteractiveReply();
+    }, 16000);
+  }
+
+  clearInteractiveReply() {
+    if (this.replyDismissTimer) {
+      clearTimeout(this.replyDismissTimer);
+      this.replyDismissTimer = null;
+    }
+    this.latestInteractiveReply = null;
+    this.notify({ latestReply: null });
+  }
+
+  dispatchAccumulatedSpeech() {
+    if (this.speechDebounceTimer) {
+      clearTimeout(this.speechDebounceTimer);
+      this.speechDebounceTimer = null;
+    }
+
+    const fullUtterance = (this.speechAccumulator || this.currentTranscript || '').trim();
+    this.speechAccumulator = '';
+
+    if (!fullUtterance || fullUtterance.length < 2) return;
+
+    logger.speech('VOICE', `Dispatched full speech utterance: "${fullUtterance}"`);
+    logger.breadcrumb('VOICE', `Full Utterance: "${fullUtterance}"`);
+    this.processVoiceCommand(fullUtterance.toLowerCase(), { inputType: 'voice' });
+  }
+
+  setAiMuted(muted) {
+    this.isAiMuted = Boolean(muted);
+    setAiSpeechMuted(this.isAiMuted);
+    if (this.isAiMuted) {
+      this.cancelSpeech();
+    }
+    this.notify({ isAiMuted: this.isAiMuted });
+    logger.info('VOICE', `AI speech output: ${this.isAiMuted ? 'MUTED' : 'UNMUTED'}`);
+  }
+
+  toggleAiMute() {
+    this.setAiMuted(!this.isAiMuted);
+    return this.isAiMuted;
   }
 
   setNavigationHandler(fn) {
@@ -295,20 +396,57 @@ class VoiceNavigationService {
         const candidate = (final || interim).toLowerCase().trim();
 
         // Allow immediate barge-in for urgent navigation/stop commands
-        const isUrgent = candidate.includes('home') || candidate === 'stop' || candidate.includes('cancel') || candidate.includes('exit');
+        const isUrgent = candidate === 'stop' || candidate === 'shut up' || candidate === 'cancel' || candidate === 'silence' || candidate === 'home' || candidate === 'go home' || candidate === 'exit';
         const isBusy = this.isProcessing || this.isSpeakingTts || isAnySpeaking();
-        if (!isUrgent && (isBusy || (this.lastSpeechEndTime && Date.now() - this.lastSpeechEndTime < 850))) {
-          // Hard drop: mic input is completely muted while Aurra is processing, speaking, or settling
+        if (!isUrgent && (isBusy || (this.lastSpeechEndTime && Date.now() - this.lastSpeechEndTime < 750))) {
+          // Mic input is muted while Aurra is processing, speaking, or settling
           return;
         }
 
-        const displayText = (final || interim).trim();
-        this.currentTranscript = displayText;
-        this.notify({ transcript: displayText });
+        // Live visual interim transcript preview
+        if (interim) {
+          const livePreview = mergeSpeechUtterances(this.speechAccumulator, interim).trim();
+          this.currentTranscript = livePreview;
+          this.notify({ transcript: livePreview });
+        }
 
-        if (final && final.trim().length >= 3) {
-          logger.speech('VOICE', `Heard utterance: "${final.trim()}"`);
-          this.processVoiceCommand(final.trim().toLowerCase());
+        if (final && final.trim().length > 0) {
+          const cleanFinal = final.trim();
+
+          // Acoustic echo filter (block echo of Aurra's own spoken text)
+          if (this.lastSpokenText && (
+            cleanFinal.toLowerCase().includes(this.lastSpokenText.toLowerCase().slice(0, 25)) ||
+            this.lastSpokenText.toLowerCase().includes(cleanFinal.toLowerCase())
+          )) {
+            return;
+          }
+
+          // Accumulate speech tokens using mergeSpeechUtterances to eliminate duplicate prefixes
+          const accumulated = mergeSpeechUtterances(this.speechAccumulator, cleanFinal).trim();
+          this.speechAccumulator = accumulated;
+          this.currentTranscript = accumulated;
+          this.notify({ transcript: accumulated });
+
+          // Urgent single commands dispatch immediately
+          const lowerAcc = accumulated.toLowerCase();
+          if (lowerAcc === 'stop' || lowerAcc === 'shut up' || lowerAcc === 'cancel' || lowerAcc === 'silence' || lowerAcc === 'home' || lowerAcc === 'go home') {
+            if (this.speechDebounceTimer) {
+              clearTimeout(this.speechDebounceTimer);
+              this.speechDebounceTimer = null;
+            }
+            this.dispatchAccumulatedSpeech();
+            return;
+          }
+
+          // Reset debounce timer
+          if (this.speechDebounceTimer) {
+            clearTimeout(this.speechDebounceTimer);
+          }
+
+          // 750ms End-of-Thought Patience Window: Waits for user to finish speaking multi-word sentences
+          this.speechDebounceTimer = setTimeout(() => {
+            this.dispatchAccumulatedSpeech();
+          }, 750);
         }
       };
 
@@ -320,10 +458,22 @@ class VoiceNavigationService {
         if (event.error === 'not-allowed') {
           this.isListening = false;
           this.notify({ isListening: false, error: 'Microphone permission denied' });
+        } else if (event.error === 'network') {
+          // Android WebView transient network glitch: schedule auto-recovery
+          setTimeout(() => {
+            if (!this.manualStop && !this.userPaused && !this.isListening && !this.isSpeakingTts && !this.isProcessing) {
+              this.startListening(true);
+            }
+          }, 800);
         }
       };
 
       this.recognition.onend = () => {
+        // Flush any pending utterance if microphone ended
+        if (this.speechAccumulator && this.speechAccumulator.trim().length >= 2) {
+          this.dispatchAccumulatedSpeech();
+        }
+
         // If user is typing on the keyboard, or explicitly paused, do NOT restart
         if (this.isTypingMode || this.manualStop || this.userPaused) {
           this.isListening = false;
@@ -380,20 +530,27 @@ class VoiceNavigationService {
 
     // 1. High-Priority System Navigation & Interruption Intents (Never blocked by settling or echo)
     const isHomeIntent =
-      utterance.includes('home') ||
+      utterance === 'home' ||
+      utterance === 'go home' ||
       utterance.includes('main menu') ||
       utterance.includes('main screen') ||
       utterance.includes('main page') ||
       utterance === 'back' ||
-      utterance.includes('go back') ||
-      utterance.includes('exit') ||
-      utterance.includes('close') ||
-      utterance.includes('leave') ||
-      utterance.includes('quit');
+      utterance === 'go back' ||
+      utterance === 'exit' ||
+      utterance === 'close';
 
     if (isHomeIntent) {
       this.cancelSpeech();
       this.setFeedback('Returning to Home screen');
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: 'Returning to Home screen',
+        source: 'navigation',
+        confidence: 100,
+        category: 'Navigation',
+        timestamp: Date.now(),
+      });
       this.speak('Returning to Home screen');
       setTimeout(() => {
         this.navigationHandler?.('/');
@@ -404,29 +561,110 @@ class VoiceNavigationService {
     if (utterance === 'stop' || utterance === 'cancel' || utterance === 'shut up' || utterance === 'be quiet' || utterance === 'silence') {
       this.cancelSpeech();
       this.setFeedback('Speech paused');
+      this.clearInteractiveReply();
       return;
     }
 
-    if (utterance.includes('admin') || utterance.includes('setting') || utterance.includes('open admin') || utterance.includes('dashboard')) {
+    const isAdminIntent =
+      utterance === 'admin' ||
+      utterance === 'settings' ||
+      utterance.includes('open admin') ||
+      utterance.includes('go to admin') ||
+      utterance.includes('open settings') ||
+      utterance.includes('dashboard');
+
+    if (isAdminIntent) {
       this.cancelSpeech();
       this.setFeedback('Opening Admin Settings');
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: 'Opening Admin Settings',
+        source: 'navigation',
+        confidence: 100,
+        category: 'Navigation',
+        timestamp: Date.now(),
+      });
       this.speak('Opening Admin Settings');
       this.adminHandler?.();
       return;
     }
 
-    if (utterance.includes('show card') || utterance.includes('show feature') || utterance.includes('action card') || utterance.includes('cards')) {
+    const isCardsIntent =
+      utterance === 'cards' ||
+      utterance === 'action cards' ||
+      utterance.includes('show card') ||
+      utterance.includes('show cards') ||
+      utterance.includes('show feature') ||
+      utterance.includes('open cards');
+
+    if (isCardsIntent) {
       this.cancelSpeech();
       this.setFeedback('Switching to Action Cards');
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: 'Switching to Action Cards',
+        source: 'navigation',
+        confidence: 100,
+        category: 'Navigation',
+        timestamp: Date.now(),
+      });
       this.speak('Opening Action Cards');
       this.navigationHandler?.('/?view=cards');
       this.viewToggleHandler?.(false);
       return;
     }
 
-    if (utterance.includes('interaction') || utterance.includes('interactive') || utterance.includes('humanoid') || utterance.includes('hud') || utterance.includes('avatar')) {
+    // High-specificity check for Testing / Diagnostic Lab
+    const isTestingIntent =
+      utterance === 'testing' ||
+      utterance === 'test mode' ||
+      utterance === 'testing mode' ||
+      utterance === 'diagnostic' ||
+      utterance === 'diagnostic mode' ||
+      utterance.includes('open testing') ||
+      utterance.includes('go to testing') ||
+      utterance.includes('open diagnostic') ||
+      utterance.includes('diagnostic lab') ||
+      utterance.includes('testing lab');
+
+    if (isTestingIntent) {
+      this.cancelSpeech();
+      this.setFeedback('Opening Testing Interactive Mode');
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: 'Opening Testing Interactive Mode',
+        source: 'navigation',
+        confidence: 100,
+        category: 'Navigation',
+        timestamp: Date.now(),
+      });
+      this.speak('Opening Testing Interactive Mode');
+      setTimeout(() => {
+        this.navigationHandler?.('/testing-interaction');
+      }, 250);
+      return;
+    }
+
+    const isInteractionIntent =
+      utterance === 'interaction' ||
+      utterance === 'interaction mode' ||
+      utterance === 'interactive mode' ||
+      utterance.includes('open interaction') ||
+      utterance.includes('go to interaction') ||
+      utterance.includes('open interactive mode') ||
+      utterance.includes('hud mode');
+
+    if (isInteractionIntent) {
       this.cancelSpeech();
       this.setFeedback('Opening Interaction Mode');
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: 'Opening Interaction Mode',
+        source: 'navigation',
+        confidence: 100,
+        category: 'Navigation',
+        timestamp: Date.now(),
+      });
       this.speak('Opening Interaction Mode');
       setTimeout(() => {
         this.navigationHandler?.('/interaction');
@@ -437,6 +675,14 @@ class VoiceNavigationService {
     if (utterance.includes('show slider') || utterance.includes('banner') || utterance.includes('slideshow')) {
       this.cancelSpeech();
       this.setFeedback('Switching to Slideshow Banner');
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: 'Switching to Slideshow Banner',
+        source: 'navigation',
+        confidence: 100,
+        category: 'Navigation',
+        timestamp: Date.now(),
+      });
       this.speak('Displaying banner');
       this.navigationHandler?.('/?view=slider');
       this.viewToggleHandler?.(true);
@@ -454,8 +700,8 @@ class VoiceNavigationService {
       this.cancelSpeech();
     }
 
-    // 3. Post-speech acoustic settling delay (850ms) - only applies to voice
-    if (inputType === 'voice' && this.lastSpeechEndTime && (Date.now() - this.lastSpeechEndTime < 850)) {
+    // 3. Post-speech acoustic settling delay (750ms) - only applies to voice
+    if (inputType === 'voice' && this.lastSpeechEndTime && (Date.now() - this.lastSpeechEndTime < 750)) {
       logger.speech('VOICE', `Dropped utterance during acoustic settling: "${rawUtterance}"`);
       return;
     }
@@ -466,9 +712,9 @@ class VoiceNavigationService {
       return;
     }
 
-    // 5. Deduplicate identical/similar utterances within 4 seconds
+    // 5. Deduplicate identical/similar utterances within 3.5 seconds
     const timeSinceLast = Date.now() - this.lastProcessedTime;
-    if (timeSinceLast < 4000) {
+    if (timeSinceLast < 3500) {
       if (this.lastProcessedUtterance === utterance || utterance.includes(this.lastProcessedUtterance) || this.lastProcessedUtterance.includes(utterance)) {
         logger.speech('VOICE', `Dropped duplicate utterance: "${rawUtterance}"`);
         return;
@@ -504,232 +750,230 @@ class VoiceNavigationService {
     try {
       // 4. Direct Cloud AI Mode Override (Sends all queries straight to Groq LLM API using Admin API key)
       if (this.forceLlmOnly) {
-      if (!llmService.isConfigured()) {
-        const noKeyMsg = "Cloud AI is not configured. Please enter your Groq API key in Admin Settings.";
-        this.setFeedback(noKeyMsg);
-        this.speak(noKeyMsg);
-        return;
-      }
-
-      this.isThinking = true;
-      this.notify({ isThinking: true, feedback: 'Consulting Groq AI...' });
-      logger.speech('VOICE', `[Direct Cloud AI Mode] Sending query to Groq LLM: "${rawUtterance}"`);
-
-      const llmResult = await llmService.generateResponse(rawUtterance, this.conversationHistory);
-      this.isThinking = false;
-      this.notify({ isThinking: false });
-
-      if (llmResult.success && llmResult.text) {
-        const aiReply = llmResult.text;
-        const latency = Math.round(performance.now() - queryStartTime);
-        logTiming(`Groq LLM response arrived`, `(${latency}ms total latency)`);
-        this.setFeedback(aiReply);
-
-        this.conversationHistory.push({ role: 'user', content: rawUtterance });
-        this.conversationHistory.push({ role: 'assistant', content: aiReply });
-        if (this.conversationHistory.length > 8) {
-          this.conversationHistory = this.conversationHistory.slice(-8);
+        if (!llmService.isConfigured()) {
+          const noKeyMsg = "Cloud AI is not configured. Please enter your Groq API key in Admin Settings.";
+          this.setFeedback(noKeyMsg);
+          this.setInteractiveReply({
+            query: rawUtterance,
+            reply: noKeyMsg,
+            source: 'fallback',
+            confidence: 0,
+            category: 'Admin Config',
+            timestamp: Date.now(),
+          });
+          this.speak(noKeyMsg);
+          return;
         }
 
-        this.speak(aiReply);
+        this.isThinking = true;
+        this.notify({ isThinking: true, feedback: 'Consulting Groq AI...' });
+        logger.speech('VOICE', `[Direct Cloud AI Mode] Sending query to Groq LLM: "${rawUtterance}"`);
+
+        const llmResult = await llmService.generateResponse(rawUtterance, this.conversationHistory);
+        this.isThinking = false;
+        this.notify({ isThinking: false });
+
+        if (llmResult.success && llmResult.text) {
+          const aiReply = llmResult.text;
+          const latency = Math.round(performance.now() - queryStartTime);
+          logTiming(`Groq LLM response arrived`, `(${latency}ms total latency)`);
+          this.setFeedback(aiReply);
+          this.setInteractiveReply({
+            query: rawUtterance,
+            reply: aiReply,
+            source: 'groq-llm',
+            confidence: 100,
+            category: 'Groq Cloud AI',
+            timestamp: Date.now(),
+          });
+
+          this.conversationHistory.push({ role: 'user', content: rawUtterance });
+          this.conversationHistory.push({ role: 'assistant', content: aiReply });
+          if (this.conversationHistory.length > 8) {
+            this.conversationHistory = this.conversationHistory.slice(-8);
+          }
+
+          this.speak(aiReply);
+
+          chatHistoryService.addMessage({
+            role: 'assistant',
+            text: aiReply,
+            inputType,
+            source: 'groq-llm-direct',
+            confidence: 100,
+            latencyMs: latency,
+          });
+
+          window.dispatchEvent(new CustomEvent('aurra:qa-answered', {
+            detail: {
+              query: rawUtterance,
+              match: { question: rawUtterance, answer: aiReply, category: 'Groq Cloud AI' },
+              confidence: 100,
+              source: 'groq-llm-direct',
+            }
+          }));
+          return;
+        } else {
+          const detail = llmResult.error ? ` (${llmResult.error})` : '';
+          const errReply = llmResult.text || `Unable to connect to Cloud AI${detail}. Please check your internet or API key in Admin Settings.`;
+          this.setFeedback(errReply);
+          this.setInteractiveReply({
+            query: rawUtterance,
+            reply: errReply,
+            source: 'fallback',
+            confidence: 0,
+            category: 'Cloud AI Error',
+            timestamp: Date.now(),
+          });
+          this.speak(errReply);
+          return;
+        }
+      }
+
+      // 5. Robot Hardware Commands (ESP32 / Motors / Servos / Eyes)
+      const hwResult = hardwareDispatcher.evaluate(utterance);
+      if (hwResult.handled) {
+        const latency = Math.round(performance.now() - queryStartTime);
+        logTiming(`Hardware command matched`, `(${hwResult.action} in ${latency}ms)`);
+        this.setFeedback(hwResult.message);
+        this.setInteractiveReply({
+          query: rawUtterance,
+          reply: hwResult.message,
+          source: 'hardware',
+          confidence: 100,
+          category: 'Hardware Control',
+          timestamp: Date.now(),
+        });
+        this.speak(hwResult.message);
 
         chatHistoryService.addMessage({
           role: 'assistant',
-          text: aiReply,
+          text: hwResult.message,
           inputType,
-          source: 'groq-llm-direct',
+          source: 'hardware',
           confidence: 100,
           latencyMs: latency,
         });
 
-        window.dispatchEvent(new CustomEvent('aurra:qa-answered', {
-          detail: {
-            query: rawUtterance,
-            match: { question: rawUtterance, answer: aiReply, category: 'Groq Cloud AI' },
-            confidence: 100,
-            source: 'groq-llm-direct',
+        return;
+      }
+
+      // Check for explicit navigation verbs and commands
+      const hasNavVerb = /^(open|go to|take me to|navigate to|switch to|show|launch|start|display)\b/i.test(utterance);
+      const isNavOnlyWord = ['register', 'registration', 'form', 'admission', 'sign up', 'tour', 'guided tour', 'show me around', 'walkthrough', 'robot tour', 'cockpit', 'camera', 'face greeting', 'public facilities', 'facilities', 'weblinks', 'website'].includes(utterance);
+      const isExplicitNav = hasNavVerb || isNavOnlyWord;
+
+      const cards = await offlineCardService.getCards();
+
+      // IF EXPLICIT NAVIGATION WAS REQUESTED (e.g. "Open Form", "Take a tour", "Register")
+      if (isExplicitNav) {
+        let matchedCard = null;
+
+        for (const card of cards) {
+          if (card.href === '/interaction' && (utterance.includes('testing') || utterance.includes('test') || utterance.includes('diagnostic'))) {
+            continue;
           }
-        }));
-        return;
-      } else {
-        const detail = llmResult.error ? ` (${llmResult.error})` : '';
-        const errReply = llmResult.text || `Unable to connect to Cloud AI${detail}. Please check your internet or API key in Admin Settings.`;
-        this.setFeedback(errReply);
-        this.speak(errReply);
-        return;
-      }
-    }
+          const titleMatch = utterance.includes(card.title.toLowerCase());
+          const keywords = card.voiceKeywords || [];
+          const keywordMatch = keywords.some((kw) => utterance.includes(kw.toLowerCase()));
 
-    // 5. Robot Hardware Commands (ESP32 / Motors / Servos / Eyes)
-    const hwResult = hardwareDispatcher.evaluate(utterance);
-    if (hwResult.handled) {
-      const latency = Math.round(performance.now() - queryStartTime);
-      logTiming(`Hardware command matched`, `(${hwResult.action} in ${latency}ms)`);
-      this.setFeedback(hwResult.message);
-      this.speak(hwResult.message);
-
-      chatHistoryService.addMessage({
-        role: 'assistant',
-        text: hwResult.message,
-        inputType,
-        source: 'hardware',
-        confidence: 100,
-        latencyMs: latency,
-      });
-
-      return;
-    }
-
-    // 3. Match against Action Cards in IndexedDB (Voice Access Gatekeeper)
-    const cards = await offlineCardService.getCards();
-      
-      let matchedCard = null;
-
-      // Find first card matching utterance
-      for (const card of cards) {
-        const titleMatch = utterance.includes(card.title.toLowerCase());
-        const keywords = card.voiceKeywords || [];
-        const keywordMatch = keywords.some((kw) => utterance.includes(kw.toLowerCase()));
-
-        if (titleMatch || keywordMatch) {
-          matchedCard = card;
-          break;
+          if (titleMatch || keywordMatch) {
+            matchedCard = card;
+            break;
+          }
         }
-      }
 
-      if (!matchedCard) {
-        // Fallback checks for common navigation terms
-        if (utterance.includes('greeting') || utterance.includes('face') || utterance.includes('recognize') || utterance.includes('camera')) {
-          matchedCard = cards.find((c) => c.href === '/face-recognition') || {
-            title: 'Face Greetings',
-            href: '/face-recognition',
-            voiceAccessEnabled: true,
-          };
-        } else if (
-          utterance.includes('open qa') || 
-          utterance.includes('open q&a') || 
-          utterance.includes('open questions') || 
-          utterance.includes('go to qa') || 
-          utterance.includes('faq hub')
-        ) {
-          matchedCard = cards.find((c) => c.href === '/qa') || {
-            title: 'Interactive Q&A',
-            href: '/qa',
-            voiceAccessEnabled: true,
-          };
-        } else if (
-          utterance.includes('website') ||
-          utterance.includes('social link') ||
-          utterance.includes('brochure') ||
-          utterance.includes('qr code') ||
-          utterance.includes('open links')
-        ) {
-          matchedCard = cards.find((c) => c.href === '/weblinks') || {
-            title: 'Website & Social Links',
-            href: '/weblinks',
-            voiceAccessEnabled: true,
-          };
-        } else if (
-          utterance.includes('testing interactive') ||
-          utterance.includes('test mode') ||
-          utterance.includes('diagnostic mode') ||
-          utterance.includes('test lab')
-        ) {
-          matchedCard = cards.find((c) => c.href === '/testing-interaction') || {
-            title: 'Testing Interactive Mode',
-            href: '/testing-interaction',
-            voiceAccessEnabled: true,
-          };
-        } else if (
-          utterance.includes('interaction') ||
-          utterance.includes('interactive') ||
-          utterance.includes('humanoid') ||
-          utterance.includes('hud') ||
-          utterance.includes('avatar')
-        ) {
-          matchedCard = cards.find((c) => c.href === '/interaction') || {
-            title: 'Interaction Mode',
-            href: '/interaction',
-            voiceAccessEnabled: true,
-          };
-        } else if (
-          utterance.includes('tour') ||
-          utterance.includes('show me around') ||
-          utterance.includes('guided tour') ||
-          utterance.includes('take a tour') ||
-          utterance.includes('robot tour')
-        ) {
-          matchedCard = cards.find((c) => c.href === '/guided-tour') || {
-            title: 'Guided Robot Tour',
-            href: '/guided-tour',
-            voiceAccessEnabled: true,
-          };
-        } else if (
-          utterance.includes('facility') ||
-          utterance.includes('facilities') ||
-          utterance.includes('amenities') ||
-          utterance.includes('washroom') ||
-          utterance.includes('restroom') ||
-          utterance.includes('toilet') ||
-          utterance.includes('canteen') ||
-          utterance.includes('cafeteria') ||
-          utterance.includes('drinking water') ||
-          utterance.includes('elevator') ||
-          utterance.includes('stairs') ||
-          utterance.includes('room directory') ||
-          utterance.includes('floor directory') ||
-          utterance.includes('building map')
-        ) {
-          matchedCard = cards.find((c) => c.href === '/facilities') || {
-            title: 'Public Facilities',
-            href: '/facilities',
-            voiceAccessEnabled: true,
-          };
+        if (!matchedCard) {
+          if (utterance.includes('greeting') || utterance.includes('face') || utterance.includes('recognize') || utterance.includes('camera')) {
+            matchedCard = cards.find((c) => c.href === '/face-recognition') || {
+              title: 'Face Greetings',
+              href: '/face-recognition',
+              voiceAccessEnabled: true,
+            };
+          } else if (utterance.includes('tour') || utterance.includes('show me around')) {
+            matchedCard = cards.find((c) => c.href === '/guided-tour') || {
+              title: 'Guided Robot Tour',
+              href: '/guided-tour',
+              voiceAccessEnabled: true,
+            };
+          } else if (utterance.includes('form') || utterance.includes('register') || utterance.includes('admission')) {
+            matchedCard = cards.find((c) => c.href === '/form') || {
+              title: "I'd like to register",
+              href: '/form',
+              voiceAccessEnabled: true,
+            };
+          } else if (utterance.includes('facilities') || utterance.includes('amenities')) {
+            matchedCard = cards.find((c) => c.href === '/facilities') || {
+              title: 'Public Facilities',
+              href: '/facilities',
+              voiceAccessEnabled: true,
+            };
+          }
         }
-      }
 
-      if (matchedCard) {
-        // Voice Access Gatekeeper Check!
-        const isVoiceAllowed = matchedCard.voiceAccessEnabled !== false;
+        if (matchedCard) {
+          const isVoiceAllowed = matchedCard.voiceAccessEnabled !== false;
 
-        if (!isVoiceAllowed) {
-          const blockedMsg = `Access denied. Voice navigation for ${matchedCard.title} is turned OFF in admin.`;
-          this.setFeedback(blockedMsg);
-          logger.warn('VOICE', `Voice access BLOCKED for [${matchedCard.title}]. Admin toggle is OFF.`);
-          this.speak(blockedMsg);
+          if (!isVoiceAllowed) {
+            const blockedMsg = `Access denied. Voice navigation for ${matchedCard.title} is turned OFF in admin.`;
+            this.setFeedback(blockedMsg);
+            this.setInteractiveReply({
+              query: rawUtterance,
+              reply: blockedMsg,
+              source: 'navigation',
+              confidence: 0,
+              category: 'Access Denied',
+              timestamp: Date.now(),
+            });
+            logger.warn('VOICE', `Voice access BLOCKED for [${matchedCard.title}]. Admin toggle is OFF.`);
+            this.speak(blockedMsg);
+            return;
+          }
+
+          const grantedMsg = `Opening ${matchedCard.title}`;
+          this.setFeedback(grantedMsg);
+          this.setInteractiveReply({
+            query: rawUtterance,
+            reply: grantedMsg,
+            source: 'navigation',
+            confidence: 100,
+            category: 'Navigation',
+            timestamp: Date.now(),
+          });
+          logger.speech('VOICE', `Voice access GRANTED for [${matchedCard.title}] -> ${matchedCard.href}`);
+
+          let navigated = false;
+          const doNavigate = () => {
+            if (navigated) return;
+            navigated = true;
+            this.navigationHandler?.(matchedCard.href, matchedCard);
+          };
+
+          this.speak(grantedMsg, {
+            onEnd: doNavigate,
+          });
+
+          setTimeout(doNavigate, 350);
           return;
         }
-
-        // Voice Access Allowed
-        const grantedMsg = `Opening ${matchedCard.title}`;
-        this.setFeedback(grantedMsg);
-        logger.speech('VOICE', `Voice access GRANTED for [${matchedCard.title}] -> ${matchedCard.href}`);
-        
-        let navigated = false;
-        const doNavigate = () => {
-          if (navigated) return;
-          navigated = true;
-          this.navigationHandler?.(matchedCard.href, matchedCard);
-        };
-
-        this.speak(grantedMsg, {
-          onEnd: doNavigate,
-        });
-
-        // Navigate promptly (350ms) so user experiences snappy screen transitions
-        setTimeout(doNavigate, 350);
-
-        return;
       }
 
-      // 4. Tier 2: Universal Offline Q&A Knowledge Matching (< 3ms IndexedDB)
+      // 6. Conversational / Q&A Intent: Tier 1 - Universal Offline Q&A Matching (< 3ms IndexedDB)
       const qaResult = await offlineQaService.findBestAnswer(rawUtterance);
-      if (qaResult && qaResult.match && (qaResult.confidence >= 60 || !llmService.isConfigured())) {
+      if (qaResult && qaResult.match && (qaResult.confidence >= 50 || !llmService.isConfigured())) {
         const item = qaResult.match;
         const latency = Math.round(performance.now() - queryStartTime);
         logTiming(`Offline FAQ matched`, `"${item.question}" (${qaResult.confidence}% in ${latency}ms)`);
         this.setFeedback(item.answer);
-        
+        this.setInteractiveReply({
+          query: rawUtterance,
+          reply: item.answer,
+          source: 'offline-faq',
+          confidence: qaResult.confidence,
+          category: item.category || 'Knowledge Base',
+          timestamp: Date.now(),
+        });
+
         this.speak(item.answer);
 
         chatHistoryService.addMessage({
@@ -752,7 +996,7 @@ class VoiceNavigationService {
         return;
       }
 
-      // 5. Tier 3: Escalate to Real AI Groq LLM (Cloud API)
+      // 7. Tier 2: Escalate to Real AI Groq LLM (Cloud API)
       if (llmService.isConfigured()) {
         this.isThinking = true;
         this.notify({ isThinking: true, feedback: 'Thinking...' });
@@ -767,6 +1011,14 @@ class VoiceNavigationService {
           const latency = Math.round(performance.now() - queryStartTime);
           logTiming(`Groq LLM answer arrived`, `(API: ${llmResult.latencyMs}ms, Total: ${latency}ms)`);
           this.setFeedback(aiReply);
+          this.setInteractiveReply({
+            query: rawUtterance,
+            reply: aiReply,
+            source: 'groq-llm',
+            confidence: 99,
+            category: 'Groq Cloud AI',
+            timestamp: Date.now(),
+          });
 
           // Maintain recent conversation history
           this.conversationHistory.push({ role: 'user', content: rawUtterance });
@@ -797,18 +1049,57 @@ class VoiceNavigationService {
           return;
         } else if (llmResult.reason === 'OFFLINE' && llmResult.text) {
           this.setFeedback(llmResult.text);
+          this.setInteractiveReply({
+            query: rawUtterance,
+            reply: llmResult.text,
+            source: 'groq-llm',
+            confidence: 80,
+            category: 'Offline Fallback',
+            timestamp: Date.now(),
+          });
           this.speak(llmResult.text);
           return;
         }
       }
 
-      // 6. Friendly intelligent fallback if LLM is disabled or fails
+      // 8. Tier 3: Action Card Keyword Fallback (e.g. user mentioned "canteen" or "washroom" without asking directly)
+      for (const card of cards) {
+        const keywords = card.voiceKeywords || [];
+        if (keywords.some((kw) => utterance.includes(kw.toLowerCase()))) {
+          const isVoiceAllowed = card.voiceAccessEnabled !== false;
+          if (isVoiceAllowed) {
+            const grantedMsg = `Opening ${card.title}`;
+            this.setFeedback(grantedMsg);
+            this.setInteractiveReply({
+              query: rawUtterance,
+              reply: grantedMsg,
+              source: 'navigation',
+              confidence: 90,
+              category: 'Navigation',
+              timestamp: Date.now(),
+            });
+            this.speak(grantedMsg);
+            setTimeout(() => this.navigationHandler?.(card.href, card), 350);
+            return;
+          }
+        }
+      }
+
+      // 9. Friendly intelligent fallback response
       this.isThinking = false;
       this.notify({ isThinking: false });
-      const fallbackMsg = "Sorry, I could not catch that.";
+      const fallbackMsg = "I am Aurra, your humanoid AI assistant. You can ask me questions about our facility, or say 'open form' or 'open tour' to explore.";
       const latency = Math.round(performance.now() - queryStartTime);
       logTiming(`Fallback triggered (${latency}ms)`);
       this.setFeedback(fallbackMsg);
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: fallbackMsg,
+        source: 'fallback',
+        confidence: 0,
+        category: 'Aurra AI',
+        timestamp: Date.now(),
+      });
       this.speak(fallbackMsg);
 
     } catch (err) {
@@ -886,9 +1177,12 @@ class VoiceNavigationService {
     this.subscribers.add(callback);
     callback({
       isListening: this.isListening,
+      isSpeaking: this.isSpeakingTts,
+      isAiMuted: this.isAiMuted,
       transcript: this.currentTranscript,
       feedback: this.lastFeedback,
       isThinking: this.isThinking,
+      latestReply: this.latestInteractiveReply,
     });
     return () => this.subscribers.delete(callback);
   }
@@ -901,9 +1195,12 @@ class VoiceNavigationService {
       try {
         cb({
           isListening: this.isListening,
+          isSpeaking: this.isSpeakingTts,
+          isAiMuted: this.isAiMuted,
           transcript: this.currentTranscript,
           feedback: this.lastFeedback,
           isThinking: this.isThinking,
+          latestReply: this.latestInteractiveReply,
           ...data,
         });
       } catch {

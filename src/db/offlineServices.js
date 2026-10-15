@@ -74,8 +74,11 @@ export const offlineCardService = {
     } else {
       // Auto-seed any newly registered default cards if missing from existing Dexie DB
       for (const defCard of DEFAULT_REGISTRATION_CARDS) {
-        if (!cards.some((c) => c.href === defCard.href)) {
+        const existing = cards.find((c) => c.href === defCard.href);
+        if (!existing) {
           await db.cards.add(defCard);
+        } else if (defCard.href === '/testing-interaction' && (!existing.voiceKeywords || existing.voiceKeywords.length < defCard.voiceKeywords.length)) {
+          await db.cards.update(existing.id, { voiceKeywords: defCard.voiceKeywords });
         }
       }
       cards = await db.cards.toArray();
@@ -152,6 +155,12 @@ export const offlineSliderService = {
     return await db.images.get(numId);
   },
 
+  updateSlideImage: async (id, patch) => {
+    const numId = parseNumericId(id);
+    await db.images.update(numId, patch);
+    return await db.images.get(numId);
+  },
+
   deleteSlideImage: async (id) => {
     const numId = parseNumericId(id);
     await db.images.delete(numId);
@@ -215,6 +224,16 @@ export const offlineQaService = {
     let questions = await db.qaQuestions.toArray();
     if (!questions || questions.length === 0) {
       await db.qaQuestions.bulkAdd(DEFAULT_QA_QUESTIONS);
+      questions = await db.qaQuestions.toArray();
+    } else {
+      for (const defQ of DEFAULT_QA_QUESTIONS) {
+        const existing = questions.find((q) => q.question.toLowerCase() === defQ.question.toLowerCase());
+        if (!existing) {
+          await db.qaQuestions.add(defQ);
+        } else if (defQ.keywords && defQ.keywords.length > (existing.keywords?.length || 0)) {
+          await db.qaQuestions.update(existing.id, { keywords: defQ.keywords });
+        }
+      }
       questions = await db.qaQuestions.toArray();
     }
     return questions;

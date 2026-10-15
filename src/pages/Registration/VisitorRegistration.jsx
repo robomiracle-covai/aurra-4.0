@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { Mic, Volume2, VolumeX, Sparkles } from 'lucide-react';
 import { voiceNavigationService } from '../../services/voiceNavigationService';
 import { cancelSpeech, speakWithVoice } from '../../utils/speechSynthesis';
 import { offlineVisitorService } from '../../db/offlineServices';
@@ -988,6 +989,7 @@ export default function VisitorRegistration({ onNavigate }) {
     };
 
     logger.info('FORM_SUBMIT', record);
+    logger.breadcrumb('FORM', `Submitted visitor registration: ${record.name} (${record.phone || 'No phone'})`);
 
     try {
       await offlineVisitorService.registerVisitor(record);
@@ -1022,7 +1024,11 @@ export default function VisitorRegistration({ onNavigate }) {
         },
       });
     } catch (err) {
-      logger.error('FORM_SUBMIT_ERROR', err.message);
+      logger.error('FORM_SUBMIT_ERROR', err, {
+        origin: 'VisitorRegistration.jsx:submitFormDirectly',
+        context: { name: record.name, phone: record.phone },
+        suggestedFix: 'Check Dexie.js visitors table schema or IndexedDB storage quota.',
+      });
       showToast('Failed to submit. Please try again.', 'error');
       setIsSubmitting(false);
     }
@@ -1072,21 +1078,95 @@ export default function VisitorRegistration({ onNavigate }) {
 
       {/* ── CENTRAL CLEAN FORM CARD ── */}
       <main className="simple-card">
-        {/* Voice Conversational Status Banner */}
+        {/* Voice Conversational Status Banner with Google Gemini Style Agent Waves */}
         <div className={`simple-voice-banner ${isListening ? 'listening' : ''} ${isSpeaking ? 'speaking' : ''}`}>
-          <div className="voice-icon">
-            {isSpeaking ? '🔊' : isListening ? '🎙' : '⚡'}
+          {/* Gemini Voice Agent Animated Wave / Interactive Mic Visualizer */}
+          <div className="gemini-visualizer-col">
+            {isSpeaking ? (
+              <div className="gemini-agent-waves" title="Aurra Speaking (Gemini Voice Agent)">
+                <span className="gemini-wave-bar wave-1"></span>
+                <span className="gemini-wave-bar wave-2"></span>
+                <span className="gemini-wave-bar wave-3"></span>
+                <span className="gemini-wave-bar wave-4"></span>
+                <span className="gemini-wave-bar wave-5"></span>
+              </div>
+            ) : isListening ? (
+              <div className="gemini-agent-listening" title="Now you can speak now">
+                <div className="listening-orb-halo">
+                  <Mic size={18} className="listening-mic-icon" />
+                </div>
+                <div className="listening-live-bars">
+                  <span className="listen-bar l1"></span>
+                  <span className="listen-bar l2"></span>
+                  <span className="listen-bar l3"></span>
+                  <span className="listen-bar l4"></span>
+                </div>
+              </div>
+            ) : (
+              <div className="gemini-agent-idle" title="Voice auto-pilot ready">
+                <Sparkles size={18} color="#00ffff" />
+              </div>
+            )}
           </div>
-          <div className="voice-message">
-            {statusMessage}
+
+          <div className="gemini-message-col">
+            <div className="gemini-status-pill-row">
+              {isSpeaking ? (
+                <span className="gemini-status-badge speaking">
+                  <Sparkles size={11} />
+                  <span>AURRA IS SPEAKING...</span>
+                </span>
+              ) : isListening ? (
+                <span className="gemini-status-badge listening">
+                  <span className="mic-live-pulse-dot"></span>
+                  <strong>NOW YOU CAN SPEAK NOW</strong>
+                </span>
+              ) : (
+                <span className="gemini-status-badge idle">
+                  <span>VOICE AUTO-PILOT</span>
+                </span>
+              )}
+            </div>
+            <div className="gemini-voice-text">
+              {isListening
+                ? (statusMessage.startsWith('Listening for') ? statusMessage : `🎙️ Now you can speak now... (${activeFields[activeStep]?.label || 'Answer'})`)
+                : statusMessage
+              }
+            </div>
           </div>
-          <button
-            type="button"
-            className={`voice-toggle-btn ${voiceAutoPilot ? 'active' : ''}`}
-            onClick={toggleVoiceAutoPilot}
-          >
-            {voiceAutoPilot ? 'Voice: ON' : 'Voice: PAUSED'}
-          </button>
+
+          <div className="gemini-actions-col">
+            {isSpeaking && (
+              <button
+                type="button"
+                className="gemini-skip-voice-btn"
+                onClick={() => stopAudio()}
+                title="Mute / Skip Aurra speech"
+              >
+                <VolumeX size={13} />
+                <span>Mute</span>
+              </button>
+            )}
+            {!isListening && !isSpeaking && (
+              <button
+                type="button"
+                className="gemini-speak-now-btn"
+                onClick={() => runVoiceStep(activeStep, true)}
+                title="Tap to speak now"
+              >
+                <Mic size={13} />
+                <span>Speak Now</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className={`voice-toggle-btn ${voiceAutoPilot ? 'active' : ''}`}
+              onClick={toggleVoiceAutoPilot}
+              title={voiceAutoPilot ? 'Pause voice assistant' : 'Enable voice assistant'}
+            >
+              {voiceAutoPilot ? 'Voice: ON' : 'Voice: PAUSED'}
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>

@@ -93,6 +93,11 @@ public class LauncherBridge {
     }
 
     @JavascriptInterface
+    public String downloadBase64(String url) {
+        return activity.downloadBase64Sync(url);
+    }
+
+    @JavascriptInterface
     public int getBatteryLevel() {
         try {
             android.os.BatteryManager bm = (android.os.BatteryManager) activity.getSystemService(android.content.Context.BATTERY_SERVICE);

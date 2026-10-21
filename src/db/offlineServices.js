@@ -1038,6 +1038,150 @@ export const offlineFacilityService = {
   },
 };
 
+/**
+ * Offline PDF & Document Knowledge Services (IndexedDB)
+ */
+export const offlinePdfService = {
+  getDocuments: async () => {
+    try {
+      const docs = await db.pdfDocuments.toArray();
+      return docs.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+    } catch (err) {
+      console.warn('Failed to get PDF documents from IndexedDB:', err);
+      return [];
+    }
+  },
+
+  getDocument: async (id) => {
+    try {
+      return await db.pdfDocuments.get(id);
+    } catch (err) {
+      console.warn(`Failed to get PDF document ${id}:`, err);
+      return null;
+    }
+  },
+
+  saveDocument: async (docData, chunks = []) => {
+    try {
+      const docId = docData.id || `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const now = new Date().toISOString();
+      const record = {
+        ...docData,
+        id: docId,
+        createdAt: docData.createdAt || now,
+        updatedAt: now,
+      };
+
+      await db.pdfDocuments.put(record);
+
+      if (chunks && chunks.length > 0) {
+        await db.pdfChunks.where('documentId').equals(docId).delete();
+        const formattedChunks = chunks.map((c, idx) => ({
+          documentId: docId,
+          pageNumber: c.pageNumber || 1,
+          chunkIndex: idx,
+          text: c.text || '',
+        }));
+        await db.pdfChunks.bulkAdd(formattedChunks);
+      }
+
+      return record;
+    } catch (err) {
+      console.error('Failed to save PDF document:', err);
+      throw err;
+    }
+  },
+
+  deleteDocument: async (id) => {
+    try {
+      await db.pdfDocuments.delete(id);
+      await db.pdfChunks.where('documentId').equals(id).delete();
+      await db.pdfChatMessages.where('documentId').equals(id).delete();
+      return { success: true, id };
+    } catch (err) {
+      console.error(`Failed to delete document ${id}:`, err);
+      throw err;
+    }
+  },
+
+  getChunks: async (documentId) => {
+    try {
+      return await db.pdfChunks.where('documentId').equals(documentId).sortBy('chunkIndex');
+    } catch (err) {
+      console.warn(`Failed to get chunks for document ${documentId}:`, err);
+      return [];
+    }
+  },
+
+  searchChunks: async (documentId, query, maxResults = 5) => {
+    try {
+      const chunks = await db.pdfChunks.where('documentId').equals(documentId).toArray();
+      if (!query || !query.trim()) return chunks.slice(0, maxResults);
+
+      const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+      if (terms.length === 0) return chunks.slice(0, maxResults);
+
+      const scored = chunks.map((chunk) => {
+        const lower = chunk.text.toLowerCase();
+        let score = 0;
+        for (const term of terms) {
+          if (lower.includes(term)) {
+            const count = lower.split(term).length - 1;
+            score += count * 2;
+          }
+        }
+        return { ...chunk, score };
+      });
+
+      const matched = scored
+        .filter((c) => c.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, maxResults);
+
+      // Fallback: if no keyword hits, return first few chunks
+      return matched.length > 0 ? matched : chunks.slice(0, maxResults);
+    } catch (err) {
+      console.warn('Failed searching chunks:', err);
+      return [];
+    }
+  },
+
+  getChatMessages: async (documentId) => {
+    try {
+      return await db.pdfChatMessages.where('documentId').equals(documentId).toArray();
+    } catch (err) {
+      console.warn(`Failed getting chat messages for ${documentId}:`, err);
+      return [];
+    }
+  },
+
+  addChatMessage: async (documentId, { role, text, citations = [] }) => {
+    try {
+      const id = await db.pdfChatMessages.add({
+        documentId,
+        role,
+        text,
+        citations,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+      return await db.pdfChatMessages.get(id);
+    } catch (err) {
+      console.error('Failed to add chat message:', err);
+      throw err;
+    }
+  },
+
+  clearChatMessages: async (documentId) => {
+    try {
+      await db.pdfChatMessages.where('documentId').equals(documentId).delete();
+      return { success: true };
+    } catch (err) {
+      console.error('Failed to clear chat messages:', err);
+      throw err;
+    }
+  },
+};
+
 export { chatHistoryService as offlineChatService } from '../services/chatHistoryService';
 
 

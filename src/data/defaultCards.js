@@ -114,6 +114,29 @@ export const DEFAULT_REGISTRATION_CARDS = [
       'isolator',
     ],
   },
+  {
+    id: 11,
+    title: 'PDF Document AI',
+    subtitle: 'Upload PDF & Interactive Document Q&A',
+    href: '/pdf',
+    className: 'pdf-qa',
+    isEnabled: true,
+    voiceAccessEnabled: true,
+    voiceKeywords: [
+      'pdf',
+      'pdf document',
+      'document',
+      'documents',
+      'ask pdf',
+      'upload pdf',
+      'read pdf',
+      'pdf chat',
+      'pdf reader',
+      'file',
+      'document q&a',
+      'pdf q&a',
+    ],
+  },
 ];
 
 export const DEFAULT_SLIDES = [

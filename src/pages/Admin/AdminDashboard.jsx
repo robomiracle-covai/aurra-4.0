@@ -68,6 +68,7 @@ import { renderFacilityIcon } from '../Facilities/PublicFacilitiesView';
 import { DEFAULT_PORTAL_LINKS } from '../WebLinks/weblinksData';
 import AdminChatHistoryView from '../../components/AdminChatHistoryView';
 import LiveDataStudio from '../../components/LiveDataStudio';
+import DebugView from '../Debug/DebugView';
 import { llmService, DEFAULT_SYSTEM_PROMPT } from '../../services/llmService';
 import { getLiveKnowledgeBlock, mergeKnowledgeIntoPrompt } from '../../services/facilityTourKnowledgeService';
 import {
@@ -1762,7 +1763,14 @@ export default function AdminDashboard({ onNavigate, onClose }) {
             onClick={() => setActiveTab('livedata')}
           >
             <Database size={18} color="#00ffff" />
-            <span>Live Data Studio</span>
+            <span>Live Data Studio (DB)</span>
+          </button>
+          <button
+            className={`adm-nav-item dev-highlight ${activeTab === 'debug' ? 'active' : ''}`}
+            onClick={() => setActiveTab('debug')}
+          >
+            <Terminal size={18} color="#00ffff" />
+            <span>API Telemetry & Debug</span>
           </button>
           <button
             className={`adm-nav-item dev-highlight ${activeTab === 'developer' ? 'active' : ''}`}
@@ -4926,6 +4934,13 @@ export default function AdminDashboard({ onNavigate, onClose }) {
           {activeTab === 'livedata' && (
             <div className="adm-tab-panel">
               <LiveDataStudio />
+            </div>
+          )}
+
+          {/* ── REAL-TIME API TELEMETRY & NETWORK DEBUGGER ── */}
+          {activeTab === 'debug' && (
+            <div className="adm-tab-panel" style={{ height: 'calc(100vh - 120px)', padding: 0, overflow: 'hidden' }}>
+              <DebugView onNavigate={onNavigate} isInAdmin={true} />
             </div>
           )}
         </div>

@@ -441,6 +441,214 @@ class LlmService {
   }
 
   /**
+   * Generates a context-grounded answer for an uploaded PDF document
+   * Combines retrieved PDF page chunks with Groq/Gemini LLM inference.
+   */
+  async generatePdfAnswer(userQuery, documentTitleOrChunks, maybeChunks = [], maybeHistory = []) {
+    if (!this.config.enabled) {
+      return { success: false, reason: 'DISABLED' };
+    }
+
+    let documentTitle = 'Uploaded Document';
+    let relevantChunks = [];
+    let conversationHistory = [];
+
+    if (Array.isArray(documentTitleOrChunks)) {
+      relevantChunks = documentTitleOrChunks;
+      conversationHistory = Array.isArray(maybeChunks) ? maybeChunks : [];
+    } else {
+      documentTitle = documentTitleOrChunks || 'Uploaded Document';
+      relevantChunks = Array.isArray(maybeChunks) ? maybeChunks : [];
+      conversationHistory = Array.isArray(maybeHistory) ? maybeHistory : [];
+    }
+
+    const docContext = (relevantChunks || [])
+      .map((c) => `[Page ${c.pageNumber}]: ${c.text}`)
+      .join('\n\n');
+
+    const pdfSystemPrompt =
+      `You are Aurra, an intelligent AI humanoid assistant analyzing the document: "${documentTitle || 'Uploaded Document'}".
+CRITICAL INSTRUCTIONS:
+1. Answer the user's question accurately and objectively using ONLY the provided document excerpts below.
+2. Cite the exact page number(s) where information was found, formatted like [Page X].
+3. Keep answers concise, clear, and direct (between 25 and 65 words) so they can be spoken smoothly.
+4. If the question cannot be answered from the provided excerpts, say: "I couldn't find that specific detail in the uploaded document." Do not fabricate facts.
+5. Do not use asterisks or markdown styling.
+
+DOCUMENT EXCERPTS:
+${docContext || 'No document excerpts available.'}`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), (this.config.timeoutMs || 8000) + 2000);
+    const startTime = Date.now();
+    const isGemini = this.config.provider === 'gemini';
+
+    // 1. Google Gemini PDF Inference
+    if (isGemini) {
+      const gKey = (this.config.geminiApiKey || DEFAULT_GEMINI_API_KEY).trim();
+      const gModel = (this.config.geminiModel || 'gemini-1.5-flash').replace(/^models\//, '');
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${gModel}:generateContent?key=${gKey}`;
+
+      const geminiBody = {
+        system_instruction: {
+          parts: [{ text: pdfSystemPrompt }],
+        },
+        contents: [
+          ...(conversationHistory || []).slice(-4).map((h) => ({
+            role: h.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: h.text || h.content || '' }],
+          })),
+          {
+            role: 'user',
+            parts: [{ text: userQuery }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.3, // Lower temperature for high factual accuracy
+          maxOutputTokens: 350,
+        },
+      };
+
+      try {
+        const response = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(geminiBody),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+        const data = await response.json();
+        if (!response.ok || data.error) {
+          throw new Error(data.error?.message || `HTTP ${response.status}`);
+        }
+
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const cleaned = this.cleanPdfResponse(rawText);
+        const latency = Date.now() - startTime;
+
+        return {
+          success: true,
+          text: cleaned,
+          latencyMs: latency,
+          model: gModel,
+          provider: 'Gemini Document AI',
+          citations: this.extractCitations(cleaned, relevantChunks),
+        };
+      } catch (err) {
+        clearTimeout(timeoutId);
+        logger.warn('LLM', `Gemini PDF answer failed: ${err.message}. Trying Groq fallback.`);
+      }
+    }
+
+    // 2. Groq Cloud API PDF Inference
+    try {
+      const apiKey = (this.config.apiKey || DEFAULT_GROQ_API_KEY).trim();
+      const body = {
+        model: this.config.model || 'qwen/qwen3.8-27b',
+        messages: [
+          { role: 'system', content: pdfSystemPrompt },
+          ...(conversationHistory || []).slice(-4).map((h) => ({
+            role: h.role === 'assistant' ? 'assistant' : 'user',
+            content: h.text || h.content || '',
+          })),
+          { role: 'user', content: userQuery },
+        ],
+        temperature: 0.3,
+        max_tokens: 350,
+      };
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Groq HTTP ${response.status}: ${errText.slice(0, 100)}`);
+      }
+
+      const data = await response.json();
+      const rawText = data.choices?.[0]?.message?.content || '';
+      const cleaned = this.cleanPdfResponse(rawText);
+      const latency = Date.now() - startTime;
+
+      return {
+        success: true,
+        text: cleaned,
+        latencyMs: latency,
+        model: body.model,
+        provider: 'Groq Document AI',
+        citations: this.extractCitations(cleaned, relevantChunks),
+      };
+    } catch (err) {
+      clearTimeout(timeoutId);
+      logger.error('LLM', `PDF QA error: ${err.message}. Falling back to extractive text.`);
+
+      // 3. Offline Extractive Fallback
+      if (relevantChunks && relevantChunks.length > 0) {
+        const topChunk = relevantChunks[0];
+        const snippet = topChunk.text.replace(/\[Page \d+\]:\s*/, '').slice(0, 180);
+        return {
+          success: true,
+          text: `According to Page ${topChunk.pageNumber} of the document: ${snippet}...`,
+          latencyMs: Date.now() - startTime,
+          model: 'Offline Extractive Match',
+          provider: 'Local Document Index',
+          citations: [topChunk.pageNumber],
+        };
+      }
+
+      return {
+        success: false,
+        text: 'Unable to connect to Document AI. Please verify internet connection or API settings in Admin.',
+        latencyMs: Date.now() - startTime,
+        error: err.message,
+      };
+    }
+  }
+
+  /**
+   * Cleans PDF response while preserving [Page X] citations
+   */
+  cleanPdfResponse(text) {
+    if (!text) return '';
+    let cleaned = text;
+    cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+    cleaned = cleaned.replace(/<\|.*?\|>/g, '');
+    cleaned = cleaned.replace(/<[^>]*>/g, '');
+    cleaned = cleaned.replace(/[\*_]{1,2}/g, '');
+    cleaned = cleaned.replace(/`{1,3}/g, '');
+    cleaned = cleaned.replace(/^#+\s+/gm, '');
+    cleaned = cleaned.replace(/^(assistant|aurra):\s*/i, '');
+    cleaned = cleaned.replace(/\r\n/g, '\n').replace(/\n{2,}/g, ' ').trim();
+    return cleaned;
+  }
+
+  /**
+   * Extracts page citation numbers like [Page 2] or Page 3 from text
+   */
+  extractCitations(text, fallbackChunks = []) {
+    const citations = new Set();
+    const regex = /\[?Page\s+(\d+)\]?/gi;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      const page = parseInt(match[1], 10);
+      if (!isNaN(page)) citations.add(page);
+    }
+    if (citations.size === 0 && fallbackChunks && fallbackChunks.length > 0) {
+      citations.add(fallbackChunks[0].pageNumber);
+    }
+    return Array.from(citations);
+  }
+
+  /**
    * Test API connectivity directly from Admin Panel
    */
   async testConnection() {

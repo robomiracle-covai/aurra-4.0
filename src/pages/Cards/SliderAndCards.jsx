@@ -42,6 +42,7 @@ const getCardIcon = (href, className) => {
   if (href?.includes('interaction')) return <Eye size={28} color="#00ffff" />;
   if (href?.includes('web')) return <Globe size={28} color="#00ffff" />;
   if (href?.includes('hardware')) return <Activity size={28} color="#00ffff" />;
+  if (href?.includes('pdf')) return <FileText size={28} color="#ff3366" />;
   return <Sparkles size={28} color="#00ffff" />;
 };
 

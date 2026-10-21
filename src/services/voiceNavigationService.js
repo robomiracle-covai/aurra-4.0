@@ -7,7 +7,7 @@
  * - Logs all speech recognition events to diagnostic logger
  */
 
-import { offlineCardService, offlineQaService } from '../db/offlineServices';
+import { offlineCardService, offlineQaService, offlinePdfService } from '../db/offlineServices';
 import { hardwareDispatcher } from './hardwareDispatcher';
 import { speakWithVoice, cancelSpeech, isAnySpeaking, setAiSpeechMuted } from '../utils/speechSynthesis';
 import { llmService } from './llmService';
@@ -165,6 +165,23 @@ class VoiceNavigationService {
     this.speechDebounceTimer = null;
     this.latestInteractiveReply = null;
     this.replyDismissTimer = null;
+    this.documentContext = null;
+  }
+
+  setDocumentContext(ctx) {
+    this.documentContext = ctx;
+    this.notify({ documentContext: ctx });
+    logger.info('VOICE', `Active Document Context registered: "${ctx?.title || 'Unknown'}" (ID: ${ctx?.docId})`);
+  }
+
+  clearDocumentContext() {
+    this.documentContext = null;
+    this.notify({ documentContext: null });
+    logger.info('VOICE', 'Active Document Context cleared');
+  }
+
+  getDocumentContext() {
+    return this.documentContext;
   }
 
   setTypingMode(enabled) {
@@ -672,6 +689,68 @@ class VoiceNavigationService {
       return;
     }
 
+    const isPdfIntent =
+      utterance === 'pdf' ||
+      utterance === 'open pdf' ||
+      utterance === 'pdf document' ||
+      utterance === 'pdf chat' ||
+      utterance === 'ask pdf' ||
+      utterance === 'upload pdf' ||
+      utterance === 'read pdf' ||
+      utterance === 'documents' ||
+      utterance.includes('open pdf') ||
+      utterance.includes('go to pdf') ||
+      utterance.includes('ask pdf') ||
+      utterance.includes('pdf reader');
+
+    if (isPdfIntent) {
+      this.cancelSpeech();
+      this.setFeedback('Opening PDF Document AI');
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: 'Opening PDF Document AI',
+        source: 'navigation',
+        confidence: 100,
+        category: 'Navigation',
+        timestamp: Date.now(),
+      });
+      this.speak('Opening PDF Document Assistant');
+      setTimeout(() => {
+        this.navigationHandler?.('/pdf');
+      }, 250);
+      return;
+    }
+
+    const isDebugIntent =
+      utterance === 'debug' ||
+      utterance === 'api debug' ||
+      utterance === 'telemetry' ||
+      utterance === 'open debug' ||
+      utterance === 'go to debug' ||
+      utterance === 'network logs' ||
+      utterance.includes('api logs') ||
+      utterance.includes('debug mode') ||
+      utterance.includes('open telemetry') ||
+      utterance.includes('network inspector');
+
+    if (isDebugIntent) {
+      this.cancelSpeech();
+      this.setFeedback('Opening Live API Telemetry & Debug');
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: 'Opening Live API Telemetry & Debug',
+        source: 'navigation',
+        confidence: 100,
+        category: 'Navigation',
+        timestamp: Date.now(),
+      });
+      this.speak('Opening API Telemetry Debugger');
+      setTimeout(() => {
+        this.navigationHandler?.('/debug');
+      }, 250);
+      return;
+    }
+
     if (utterance.includes('show slider') || utterance.includes('banner') || utterance.includes('slideshow')) {
       this.cancelSpeech();
       this.setFeedback('Switching to Slideshow Banner');
@@ -954,6 +1033,78 @@ class VoiceNavigationService {
           });
 
           setTimeout(doNavigate, 350);
+          return;
+        }
+      }
+
+      // 5B. Active PDF Document AI Context Interceptor (When user is viewing a PDF document)
+      if (this.documentContext && this.documentContext.docId) {
+        const docId = this.documentContext.docId;
+        const docTitle = this.documentContext.title || 'Document';
+        this.notify({ isThinking: true, feedback: `Analyzing ${docTitle}...` });
+        logger.speech('VOICE', `[Document AI Mode] Searching chunks for: "${rawUtterance}" in doc ${docId}`);
+
+        const relevantChunks = await offlinePdfService.searchChunks(docId, rawUtterance);
+        const answerResult = await llmService.generatePdfAnswer(
+          rawUtterance,
+          docTitle,
+          relevantChunks,
+          this.conversationHistory
+        );
+
+        this.isProcessing = false;
+        this.isThinking = false;
+        this.notify({ isThinking: false });
+
+        if (answerResult.success && answerResult.text) {
+          const answerText = answerResult.text;
+          const citations = answerResult.citations || (relevantChunks[0] ? [relevantChunks[0].pageNumber] : []);
+
+          this.setFeedback(answerText);
+          this.setInteractiveReply({
+            query: rawUtterance,
+            reply: answerText,
+            source: 'pdf-document-ai',
+            confidence: 100,
+            category: 'PDF Document AI',
+            citations,
+            timestamp: Date.now(),
+          });
+
+          if (typeof this.documentContext.onAnswer === 'function') {
+            this.documentContext.onAnswer({
+              query: rawUtterance,
+              answer: answerText,
+              citations,
+              model: answerResult.model,
+              provider: answerResult.provider,
+            });
+          }
+
+          this.speak(answerText);
+
+          chatHistoryService.addMessage({
+            role: 'assistant',
+            text: answerText,
+            inputType,
+            source: 'pdf-document-ai',
+            confidence: 100,
+            citations,
+          });
+
+          return;
+        } else {
+          const fallbackText = answerResult.text || 'I could not find an answer in this document.';
+          this.setFeedback(fallbackText);
+          this.speak(fallbackText);
+          if (typeof this.documentContext.onAnswer === 'function') {
+            this.documentContext.onAnswer({
+              query: rawUtterance,
+              answer: fallbackText,
+              citations: [],
+              model: 'Fallback',
+            });
+          }
           return;
         }
       }

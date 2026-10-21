@@ -15,6 +15,7 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
   const [showHints, setShowHints] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [typedInput, setTypedInput] = useState('');
+  const [documentContext, setDocumentContext] = useState(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -27,11 +28,14 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
       autoStart: cfg.autoListenOnBoot !== false,
     });
 
+    setDocumentContext(voiceNavigationService.getDocumentContext());
+
     const unsubscribe = voiceNavigationService.subscribe((state) => {
       setIsListening(state.isListening);
       if (state.isThinking !== undefined) setIsThinking(state.isThinking);
       if (state.isSpeaking !== undefined) setIsSpeaking(state.isSpeaking);
       if (state.isAiMuted !== undefined) setIsAiMuted(state.isAiMuted);
+      if (state.documentContext !== undefined) setDocumentContext(state.documentContext);
       if (state.transcript !== undefined) {
         setTranscript(state.transcript);
         if (state.transcript && state.transcript.trim().length > 0) {
@@ -118,7 +122,7 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
             ref={inputRef}
             type="text"
             className="voice-typing-input"
-            placeholder="Type command (e.g. 'show cards', 'facilities', 'register', 'admin')..."
+            placeholder={documentContext ? `Ask anything about "${documentContext.title || 'this PDF'}"...` : "Type command (e.g. 'show cards', 'facilities', 'register', 'admin')..."}
             value={typedInput}
             onChange={(e) => setTypedInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -144,6 +148,12 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
         <div className="voice-content-wrap">
           <div className="voice-status-line">
             <div className="status-line-left">
+              {documentContext && (
+                <span style={{ fontSize: '10px', background: 'rgba(255, 51, 102, 0.2)', color: '#ff3366', border: '1px solid rgba(255, 51, 102, 0.4)', padding: '2px 8px', borderRadius: '999px', fontWeight: 'bold', letterSpacing: '0.05em' }}>
+                  📄 DOC AI ACTIVE
+                </span>
+              )}
+
               {isThinking ? (
                 <span className="status-indicator thinking">
                   <Sparkles size={13} className="sparkle-pulse" />
@@ -168,6 +178,7 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
 
               {latestReply && (
                 <span className={`inline-source-pill source-${latestReply.source || 'default'}`}>
+                  {latestReply.source === 'pdf-document-ai' && '📄 DOCUMENT AI'}
                   {latestReply.source === 'offline-faq' && '🟢 OFFLINE FAQ'}
                   {latestReply.source === 'groq-llm' && '⚡ CLOUD AI'}
                   {latestReply.source === 'hardware' && '⚙️ HARDWARE'}
@@ -208,7 +219,15 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
               <span className="heard-text">"{transcript}"</span>
             ) : (
               <span className="prompt-text">
-                {isListening ? 'Say "Who are you?", "Tour", "Facilities", "Register", or tap keyboard...' : 'Microphone paused. Tap keyboard or mic icon to command Aurra.'}
+                {documentContext ? (
+                  isListening 
+                    ? `Ask anything about "${documentContext.title || 'this PDF'}" or tap keyboard...` 
+                    : `Document AI active. Tap keyboard or mic icon to ask about "${documentContext.title || 'this PDF'}"...`
+                ) : (
+                  isListening 
+                    ? 'Say "Who are you?", "Tour", "Facilities", "Register", or tap keyboard...' 
+                    : 'Microphone paused. Tap keyboard or mic icon to command Aurra.'
+                )}
               </span>
             )}
           </div>

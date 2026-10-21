@@ -447,12 +447,19 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("*/*");
-        // Allow images and videos (all formats: MP4, WebM, MKV, etc.)
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
+        // Allow PDF documents, images, and videos
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{
+            "application/pdf",
+            "image/*",
+            "video/*",
+            "text/plain",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        });
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
         try {
             startActivityForResult(
-                    Intent.createChooser(intent, "Select Image or Video"),
+                    Intent.createChooser(intent, "Select PDF Document, Image, or Video"),
                     FILE_CHOOSER_REQUEST_CODE);
         } catch (Exception e) {
             Log.e(TAG, "File picker launch failed", e);
@@ -812,6 +819,58 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         }
     }
 
+    public String downloadBase64Sync(String urlString) {
+        HttpURLConnection conn = null;
+        try {
+            String currentUrl = urlString;
+            int redirects = 0;
+            while (redirects < 6) {
+                URL url = new URL(currentUrl);
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(25000);
+                conn.setInstanceFollowRedirects(true);
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile)");
+                int status = conn.getResponseCode();
+                if (status == HttpURLConnection.HTTP_MOVED_TEMP
+                        || status == HttpURLConnection.HTTP_MOVED_PERM
+                        || status == 307 || status == 308) {
+                    String newUrl = conn.getHeaderField("Location");
+                    if (newUrl != null && !newUrl.isEmpty()) {
+                        conn.disconnect();
+                        currentUrl = newUrl;
+                        redirects++;
+                        continue;
+                    }
+                }
+                if (status >= 200 && status < 300) {
+                    try (InputStream is = conn.getInputStream();
+                         java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream()) {
+                        byte[] data = new byte[8192];
+                        int nRead;
+                        while ((nRead = is.read(data, 0, data.length)) != -1) {
+                            buffer.write(data, 0, nRead);
+                        }
+                        buffer.flush();
+                        byte[] fileBytes = buffer.toByteArray();
+                        String base64 = android.util.Base64.encodeToString(fileBytes, android.util.Base64.NO_WRAP);
+                        String contentType = conn.getContentType();
+                        return "{\"ok\":true,\"base64\":" + jsonString(base64)
+                                + ",\"size\":" + fileBytes.length
+                                + ",\"contentType\":" + jsonString(contentType != null ? contentType : "application/pdf") + "}";
+                    }
+                } else {
+                    return "{\"ok\":false,\"error\":\"HTTP " + status + "\"}";
+                }
+            }
+            return "{\"ok\":false,\"error\":\"Too many redirects\"}";
+        } catch (Exception e) {
+            Log.w(TAG, "downloadBase64Sync failed: " + urlString + " — " + e.getMessage());
+            return "{\"ok\":false,\"error\":" + jsonString(e.getMessage() != null ? e.getMessage() : "download error") + "}";
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
 
     private static String readStream(InputStream stream) throws Exception {
         if (stream == null) return "";

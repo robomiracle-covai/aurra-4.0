@@ -11,6 +11,8 @@ import FeaturePlaceholder from './pages/FeatureView/FeaturePlaceholder';
 import WebLinks from './pages/WebLinks/WebLinks';
 import GuidedTourView from './pages/GuidedTour/GuidedTourView';
 import PublicFacilitiesView from './pages/Facilities/PublicFacilitiesView';
+import PdfChatView from './pages/PdfChat/PdfChatView';
+import DebugView from './pages/Debug/DebugView';
 import VoiceAssistantBar from './components/VoiceAssistantBar';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import AurraStartupSplashScreen from './components/AurraStartupSplashScreen';
@@ -100,6 +102,10 @@ function App() {
           <WebLinks onNavigate={handleNavigate} />
         ) : currentRoute === '/facilities' ? (
           <PublicFacilitiesView onNavigate={handleNavigate} />
+        ) : currentRoute === '/pdf' ? (
+          <PdfChatView onNavigate={handleNavigate} />
+        ) : currentRoute === '/debug' ? (
+          <DebugView onNavigate={handleNavigate} />
         ) : currentRoute !== '/' ? (
           <FeaturePlaceholder
             path={currentRoute}

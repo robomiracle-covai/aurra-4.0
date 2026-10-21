@@ -1,7 +1,7 @@
 import { db } from './dexieDb';
 import { DEFAULT_REGISTRATION_CARDS, DEFAULT_SLIDES } from '../data/defaultCards';
 import { DEFAULT_QA_QUESTIONS } from '../data/defaultQuestions';
-import { OFFICIAL_WEBLINKS } from '../pages/WebLinks/weblinksData';
+import { OFFICIAL_WEBLINKS, DEFAULT_PORTAL_LINKS, OFFICIAL_CHANNELS } from '../pages/WebLinks/weblinksData';
 import { DEFAULT_TOUR_STOPS } from '../data/defaultTourStops';
 import { DEFAULT_ROBOT_TOURS } from '../data/defaultRobotTours';
 import { DEFAULT_FACILITIES } from '../data/defaultFacilities';
@@ -580,7 +580,8 @@ export const offlineWebLinksService = {
   getWebLinks: async () => {
     try {
       let links = await db.weblinks.toArray();
-      if (!links || links.length === 0) {
+      if (!links || links.length < 8) {
+        await db.weblinks.clear();
         const initialLinks = OFFICIAL_WEBLINKS.map((link, index) => ({
           ...link,
           isEnabled: link.isEnabled !== false,
@@ -688,6 +689,63 @@ export const offlineWebLinksService = {
     }));
     await db.weblinks.bulkAdd(initialLinks);
     return await db.weblinks.toArray();
+  },
+
+  getPortalLinks: async () => {
+    try {
+      const links = await offlineWebLinksService.getWebLinks();
+      const map = { ...DEFAULT_PORTAL_LINKS };
+      links.forEach((l) => {
+        if (l.id && map[l.id] !== undefined && l.url) {
+          map[l.id] = l.url;
+        }
+      });
+      return map;
+    } catch {
+      return { ...DEFAULT_PORTAL_LINKS };
+    }
+  },
+
+  savePortalLinks: async (linksObj) => {
+    try {
+      for (const [key, url] of Object.entries(linksObj)) {
+        const cleanUrl = (url || '').trim();
+        let record = await db.weblinks.get(key);
+        if (!record) {
+          record = await db.weblinks.where('id').equals(key).first();
+        }
+        if (record) {
+          await db.weblinks.update(record.id, {
+            url: cleanUrl,
+            displayUrl: cleanUrl.replace(/^https?:\/\//i, '').replace(/\/$/, ''),
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          const matchCh = OFFICIAL_CHANNELS.find((c) => c.id === key);
+          await db.weblinks.put({
+            id: key,
+            key,
+            category: 'social',
+            title: matchCh?.title || key,
+            subtitle: matchCh?.subtitle || '',
+            url: cleanUrl,
+            displayUrl: cleanUrl.replace(/^https?:\/\//i, '').replace(/\/$/, ''),
+            description: matchCh?.subtitle || '',
+            tag: matchCh?.tag || 'OFFICIAL LINK',
+            tagColor: matchCh?.brandColor || '#00ffff',
+            accentColor: matchCh?.brandColor || '#00ffff',
+            badge: 'Verified Official',
+            isEnabled: true,
+            sortOrder: OFFICIAL_CHANNELS.findIndex((c) => c.id === key) ?? 0,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+      return await offlineWebLinksService.getWebLinks();
+    } catch (e) {
+      console.warn('Failed saving portal links:', e);
+      throw e;
+    }
   },
 };
 
@@ -964,6 +1022,12 @@ export const offlineFacilityService = {
     await db.facilities.update(id, { isEnabled });
     notifyKnowledgeUpdated('facilities');
     return { success: true, isEnabled };
+  },
+
+  clearAllFacilities: async () => {
+    await db.facilities.clear();
+    notifyKnowledgeUpdated('facilities');
+    return [];
   },
 
   restoreDefaultFacilities: async () => {

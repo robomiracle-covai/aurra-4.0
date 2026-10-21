@@ -226,7 +226,10 @@
 .adm-tab-scroll-container {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 24px 28px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .adm-tab-panel {
@@ -234,7 +237,10 @@
   flex-direction: column;
   gap: 20px;
   max-width: 1200px;
+  width: 100%;
+  box-sizing: border-box;
   margin: 0 auto;
+  overflow-x: hidden;
 }
 
 /* ── Metric Cards ── */
@@ -4057,6 +4063,553 @@
   background: rgba(239, 68, 68, 0.25);
   box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
 }
+
+/* ==========================================================================
+   NEXUS PUBLIC FACILITIES MANAGEMENT - ADMIN STYLES (AURRA DARK CYBER THEME)
+   ========================================================================== */
+.nexus-adm-panel-wrap {
+  background: #040e1b;
+  border: 1px solid rgba(0, 213, 255, 0.25);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 213, 255, 0.05);
+  color: #e2e8f0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.nexus-admin-fac-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(0, 213, 255, 0.15);
+  margin-bottom: 24px;
+}
+
+.nexus-admin-fac-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nexus-admin-fac-subtitle {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.nexus-admin-fac-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nexus-adm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.nexus-adm-btn.secondary {
+  background: rgba(0, 213, 255, 0.08);
+  border-color: rgba(0, 213, 255, 0.35);
+  color: #00ffff;
+}
+
+.nexus-adm-btn.secondary:hover {
+  background: rgba(0, 213, 255, 0.18);
+  border-color: #00ffff;
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.25);
+}
+
+.nexus-adm-btn.danger-outline {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
+
+.nexus-adm-btn.danger-outline:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+}
+
+.nexus-adm-btn.primary {
+  background: linear-gradient(135deg, #00d5ff 0%, #0284c7 100%);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(0, 213, 255, 0.35);
+}
+
+.nexus-adm-btn.primary:hover {
+  background: linear-gradient(135deg, #38bdf8 0%, #0369a1 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(0, 213, 255, 0.5);
+}
+
+/* 4-Columns Grid */
+.nexus-admin-fac-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  width: 100%;
+}
+
+@media (max-width: 1400px) {
+  .nexus-admin-fac-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1000px) {
+  .nexus-admin-fac-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .nexus-admin-fac-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Facility Card */
+.nexus-admin-card {
+  background: #061122;
+  border: 1.5px solid rgba(0, 213, 255, 0.2);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 210px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.nexus-admin-card:hover {
+  border-color: #00ffff;
+  box-shadow: 0 0 18px rgba(0, 255, 255, 0.25);
+}
+
+.nexus-admin-card.is-disabled {
+  opacity: 0.5;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #030814;
+}
+
+/* Header Inside Card */
+.nexus-admin-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.nexus-admin-card-icon-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.nexus-admin-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(0, 255, 255, 0.08);
+  border: 1px solid rgba(0, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nexus-admin-card-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.3;
+}
+
+/* Status Badge */
+.nexus-admin-status-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.nexus-admin-status-badge.enabled {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.nexus-admin-status-badge.disabled {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+/* Description Text */
+.nexus-admin-card-desc {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #94a3b8;
+  margin: 0 0 16px 0;
+  flex: 1;
+  text-align: left;
+}
+
+/* Card Footer Controls */
+.nexus-admin-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 213, 255, 0.1);
+}
+
+/* Toggle Switch */
+.nexus-toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.nexus-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.nexus-slider {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  background-color: #334155;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+.nexus-slider::before {
+  content: "";
+  position: absolute;
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.nexus-toggle-switch input:checked + .nexus-slider {
+  background-color: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.nexus-toggle-switch input:checked + .nexus-slider::before {
+  transform: translateX(16px);
+}
+
+.nexus-toggle-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+/* Card Action Buttons */
+.nexus-card-action-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nexus-icon-edit-btn,
+.nexus-icon-trash-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.nexus-icon-edit-btn {
+  background: rgba(0, 213, 255, 0.08);
+  border-color: rgba(0, 213, 255, 0.25);
+  color: #00ffff;
+}
+
+.nexus-icon-edit-btn:hover {
+  background: rgba(0, 213, 255, 0.2);
+  border-color: #00ffff;
+  color: #ffffff;
+}
+
+.nexus-icon-trash-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.nexus-icon-trash-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+/* ==========================================================================
+   EXTERNAL PORTAL LINKS SETTINGS - (NEXUS 2-COLUMN INPUT GRID)
+   ========================================================================== */
+.nexus-portal-inputs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .nexus-portal-inputs-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nexus-portal-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.nexus-portal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nexus-portal-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #e2e8f0;
+  letter-spacing: 0.3px;
+}
+
+.nexus-portal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.nexus-portal-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #051426;
+  border: 1px solid rgba(0, 213, 255, 0.25);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  color: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.nexus-portal-input:focus {
+  outline: none;
+  border-color: #00ffff;
+  background: #071930;
+  box-shadow: 0 0 16px rgba(0, 213, 255, 0.3);
+}
+
+.nexus-portal-input::placeholder {
+  color: #475569;
+}
+
+/* ==========================================================================
+   LIVE SCANNABLE QR PORTALS PREVIEW (3 COLUMNS x ROWS DOWN)
+   ========================================================================== */
+.nexus-adm-panel-wrap {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.nexus-admin-qr-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .nexus-admin-qr-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .nexus-admin-qr-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nexus-admin-qr-grid .nexus-admin-card {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 16px;
+  min-height: 180px;
+}
+
+.nexus-card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.nexus-card-icon-container {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(0, 255, 255, 0.08);
+  border: 1px solid rgba(0, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  padding: 2px;
+  box-sizing: border-box;
+}
+
+.nexus-card-icon-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.nexus-enable-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  border: 1px solid currentColor;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.nexus-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.nexus-card-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.nexus-card-desc {
+  margin: 0;
+  font-family: monospace;
+  font-size: 11.5px;
+  color: #38bdf8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  max-width: 100%;
+  display: block;
+  box-sizing: border-box;
+}
+
+.nexus-card-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 213, 255, 0.1);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.nexus-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nexus-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+
+
 
 
 

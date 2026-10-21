@@ -55,9 +55,17 @@ import {
   Navigation,
   Layers,
   MessageSquare,
-  Building2
+  Building2,
+  ShoppingBag,
+  HeartPulse,
+  Bed,
+  GraduationCap,
+  Ticket,
+  Cloud
 } from 'lucide-react';
 import QRCode from 'qrcode';
+import { renderFacilityIcon } from '../Facilities/PublicFacilitiesView';
+import { DEFAULT_PORTAL_LINKS } from '../WebLinks/weblinksData';
 import AdminChatHistoryView from '../../components/AdminChatHistoryView';
 import LiveDataStudio from '../../components/LiveDataStudio';
 import { llmService, DEFAULT_SYSTEM_PROMPT } from '../../services/llmService';
@@ -137,6 +145,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   const [weblinksSearch, setWeblinksSearch] = useState('');
   const [weblinksCategoryFilter, setWeblinksCategoryFilter] = useState('ALL');
   const [adminQrMap, setAdminQrMap] = useState({});
+  const [portalFormUrls, setPortalFormUrls] = useState(DEFAULT_PORTAL_LINKS);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [modalMode, setModalMode] = useState('add'); // 'add' | 'edit'
   
@@ -233,28 +242,17 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   const [stepFormImage, setStepFormImage] = useState('');
   const [testingStepPhase, setTestingStepPhase] = useState(null);
 
-  // Campus Facilities & Room Directory state
+  // Nexus Public Facilities State
   const [facilities, setFacilities] = useState([]);
-  const [facilitySearch, setFacilitySearch] = useState('');
-  const [facilityFloorFilter, setFacilityFloorFilter] = useState('all');
   const [showFacilityModal, setShowFacilityModal] = useState(false);
   const [facilityModalMode, setFacilityModalMode] = useState('add');
   const [facilityForm, setFacilityForm] = useState({
     id: '',
-    code: '',
-    name: '',
-    floor: 'ground',
-    floorLabel: 'Ground Floor (Level 0)',
-    wing: 'Central Atrium',
-    category: 'reception',
-    categoryLabel: 'Reception & Check-In',
-    icon: 'Building2',
-    hours: '9:00 AM – 6:00 PM',
-    distanceMeters: 15,
-    walkTime: '20 sec walk',
-    status: 'Open',
-    directions: '',
-    amenities: 'Wi-Fi, Accessible',
+    title: '',
+    description: '',
+    icon: 'ShoppingBag',
+    isEnabled: true,
+    sortOrder: 1,
   });
 
   // Dynamic Visitor Form Fields management state
@@ -295,6 +293,9 @@ export default function AdminDashboard({ onNavigate, onClose }) {
 
       const linkList = await offlineWebLinksService.getWebLinks();
       setWeblinks(linkList || []);
+
+      const loadedPortalUrls = await offlineWebLinksService.getPortalLinks();
+      if (loadedPortalUrls) setPortalFormUrls(loadedPortalUrls);
 
       const stopsList = await offlineTourService.getStops();
       setTourStops(stopsList || []);
@@ -1033,8 +1034,35 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     if (!window.confirm('Reset all QR Code portals and links back to factory defaults? Any custom added portals will be removed.')) return;
     const restored = await offlineWebLinksService.resetToDefaults();
     setWeblinks(restored || []);
+    setPortalFormUrls(DEFAULT_PORTAL_LINKS);
     showStatus('QR portals reset to factory defaults');
     logger.info('ADMIN', 'Reset QR portals to default');
+  };
+
+  const handleSavePortalLinks = async (e) => {
+    if (e) e.preventDefault();
+    try {
+      await offlineWebLinksService.savePortalLinks(portalFormUrls);
+      const refreshedLinks = await offlineWebLinksService.getWebLinks();
+      setWeblinks(refreshedLinks || []);
+      showStatus('External portal links saved & updated successfully');
+      logger.info('ADMIN', 'Saved 8 external portal links');
+    } catch (err) {
+      showStatus(`Failed saving portal links: ${err.message}`);
+    }
+  };
+
+  const handleResetPortalLinks = async () => {
+    if (!window.confirm('Reset all 8 external portal links back to default official Robomiracle URLs?')) return;
+    try {
+      const restored = await offlineWebLinksService.resetToDefaults();
+      setWeblinks(restored || []);
+      setPortalFormUrls(DEFAULT_PORTAL_LINKS);
+      showStatus('Restored default official portal links');
+      logger.info('ADMIN', 'Reset portal links to default');
+    } catch (err) {
+      showStatus(`Reset failed: ${err.message}`);
+    }
   };
 
   // ── Guided Robot Tour Handlers ──
@@ -1502,46 +1530,18 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     return matchesCat && matchesQ;
   });
 
-  // Facility management handlers
-  const handleToggleFacility = async (id, isEnabled) => {
-    try {
-      await offlineFacilityService.toggleFacilityEnabled(id, isEnabled);
-      setFacilities((prev) => prev.map((f) => (f.id === id ? { ...f, isEnabled } : f)));
-      showStatus(`Facility ${isEnabled ? 'enabled' : 'disabled'}`);
-    } catch (err) {
-      showStatus(`Error updating facility: ${err.message}`);
-    }
-  };
 
-  const handleDeleteFacility = async (id, name) => {
-    if (!window.confirm(`Delete facility "${name}"?`)) return;
-    try {
-      await offlineFacilityService.deleteFacility(id);
-      setFacilities((prev) => prev.filter((f) => f.id !== id));
-      showStatus(`Deleted "${name}"`);
-    } catch (err) {
-      showStatus(`Error deleting facility: ${err.message}`);
-    }
-  };
 
   const handleOpenAddFacility = () => {
     setFacilityModalMode('add');
+    const nextNum = facilities.length + 1;
     setFacilityForm({
       id: `fac-${Date.now()}`,
-      code: `G-0${facilities.length + 1}`,
-      name: '',
-      floor: 'ground',
-      floorLabel: 'Ground Floor (Level 0)',
-      wing: 'East Wing',
-      category: 'reception',
-      categoryLabel: 'Reception & Check-In',
-      icon: 'Building2',
-      hours: '9:00 AM – 6:00 PM',
-      distanceMeters: 20,
-      walkTime: '30 sec walk',
-      status: 'Open',
-      directions: '',
-      amenities: 'Wi-Fi, Accessible',
+      title: `${nextNum}. `,
+      description: '',
+      icon: 'ShoppingBag',
+      isEnabled: true,
+      sortOrder: nextNum,
     });
     setShowFacilityModal(true);
   };
@@ -1549,8 +1549,12 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   const handleOpenEditFacility = (fac) => {
     setFacilityModalMode('edit');
     setFacilityForm({
-      ...fac,
-      amenities: Array.isArray(fac.amenities) ? fac.amenities.join(', ') : (fac.amenities || ''),
+      id: fac.id,
+      title: fac.title || fac.name || '',
+      description: fac.description || '',
+      icon: fac.icon || 'ShoppingBag',
+      isEnabled: fac.isEnabled !== false,
+      sortOrder: fac.sortOrder || 1,
     });
     setShowFacilityModal(true);
   };
@@ -1558,29 +1562,23 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   const handleSaveFacility = async (e) => {
     e.preventDefault();
     try {
-      const amenitiesArray = typeof facilityForm.amenities === 'string'
-        ? facilityForm.amenities.split(',').map((s) => s.trim()).filter(Boolean)
-        : (facilityForm.amenities || []);
-
-      const floorLabel =
-        facilityForm.floor === 'ground' ? 'Ground Floor (Level 0)' :
-        facilityForm.floor === 'first' ? 'First Floor (Level 1)' :
-        facilityForm.floor === 'second' ? 'Second Floor (Level 2)' : 'Outdoor / Campus';
-
       const payload = {
-        ...facilityForm,
-        floorLabel,
-        amenities: amenitiesArray,
-        distanceMeters: Number(facilityForm.distanceMeters) || 0,
-        sortOrder: facilityForm.sortOrder || facilities.length + 1,
+        id: facilityForm.id || `fac-${Date.now()}`,
+        code: `${facilityForm.sortOrder || 1}`,
+        title: facilityForm.title,
+        name: facilityForm.title,
+        description: facilityForm.description,
+        icon: facilityForm.icon,
+        isEnabled: facilityForm.isEnabled !== false,
+        sortOrder: Number(facilityForm.sortOrder) || facilities.length + 1,
       };
 
       if (facilityModalMode === 'add') {
         await offlineFacilityService.addFacility(payload);
-        showStatus(`Added facility "${payload.name}"`);
+        showStatus(`Added "${payload.title}"`);
       } else {
         await offlineFacilityService.updateFacility(payload.id, payload);
-        showStatus(`Updated facility "${payload.name}"`);
+        showStatus(`Updated "${payload.title}"`);
       }
 
       const refreshed = await offlineFacilityService.getFacilities();
@@ -1592,30 +1590,38 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   };
 
   const handleResetFacilities = async () => {
-    if (!window.confirm('Reset all facilities and directories to factory defaults? Any custom rooms will be reverted.')) return;
+    if (!window.confirm('Reset public facilities to the standard default 9 items as shown in Nexus?')) return;
     try {
       const reset = await offlineFacilityService.restoreDefaultFacilities();
       setFacilities(reset);
-      showStatus('Restored campus facilities to factory defaults');
+      showStatus('Restored default 9 public facilities');
     } catch (err) {
       showStatus(`Reset failed: ${err.message}`);
     }
   };
 
-  const filteredFacilitiesAdmin = facilities.filter((fac) => {
-    const matchesFloor = facilityFloorFilter === 'all' || fac.floor === facilityFloorFilter;
-    const q = facilitySearch.toLowerCase().trim();
-    const matchesQ =
-      !q ||
-      fac.name?.toLowerCase().includes(q) ||
-      fac.title?.toLowerCase().includes(q) ||
-      fac.description?.toLowerCase().includes(q) ||
-      fac.code?.toLowerCase().includes(q) ||
-      fac.wing?.toLowerCase().includes(q) ||
-      fac.categoryLabel?.toLowerCase().includes(q) ||
-      fac.directions?.toLowerCase().includes(q);
-    return matchesFloor && matchesQ;
-  });
+  const handleClearAllFacilities = async () => {
+    if (!window.confirm('Are you sure you want to clear all public facilities?')) return;
+    try {
+      await offlineFacilityService.clearAllFacilities();
+      setFacilities([]);
+      showStatus('Cleared all public facilities');
+    } catch (err) {
+      showStatus(`Failed clearing facilities: ${err.message}`);
+    }
+  };
+
+  const handleToggleFacility = async (id, isEnabled) => {
+    try {
+      await offlineFacilityService.toggleFacilityEnabled(id, isEnabled);
+      setFacilities((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, isEnabled } : f))
+      );
+      showStatus(isEnabled ? 'Facility enabled' : 'Facility disabled');
+    } catch (err) {
+      showStatus(`Error updating facility: ${err.message}`);
+    }
+  };
 
   return (
     <div className="adm-dashboard-root">
@@ -1746,7 +1752,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
             onClick={() => setActiveTab('facilities')}
           >
             <Building2 size={18} />
-            <span>Campus Facilities & Rooms</span>
+            <span>Public Facilities</span>
             {facilities.length > 0 && <span className="adm-nav-badge">{facilities.length}</span>}
           </button>
 
@@ -1810,7 +1816,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
               {activeTab === 'tour' && 'Guided Robot Tour & Facility Waypoints'}
               {activeTab === 'hardware' && 'Robot Hardware, Servo Poses & Wi-Fi Setup'}
               {activeTab === 'weblinks' && 'QR Codes & Official Portals Manager'}
-              {activeTab === 'facilities' && 'Public Facilities & Room Directory Management'}
+              {activeTab === 'facilities' && 'Public Facilities'}
               {activeTab === 'developer' && 'Developer Mode, PIN Security & System Toggles'}
               {activeTab === 'backup' && 'Database Backup, JSON Export & Reset'}
             </h1>
@@ -3802,460 +3808,464 @@ export default function AdminDashboard({ onNavigate, onClose }) {
             </div>
           )}
 
-          {/* 9. QR CODES & WEBLINKS TAB */}
+          {/* 9. QR CODES & WEBLINKS TAB (NEXUS AI 8-CHANNEL ARCHITECTURE) */}
           {activeTab === 'weblinks' && (
             <div className="adm-tab-panel">
-              <div className="adm-card-panel">
-                <div className="adm-panel-header-row">
+              <div className="nexus-adm-panel-wrap">
+                {/* Header matching Nexus Screenshot */}
+                <div className="nexus-admin-fac-header">
                   <div>
-                    <h3 className="adm-panel-title">QR Code Portals & Official Links</h3>
-                    <p className="adm-panel-desc">
-                      Manage official links, digital brochures, social networks, and live scannable QR codes for visitor mobile devices.
+                    <h3 className="nexus-admin-fac-title">External Portal Links Settings</h3>
+                    <p className="nexus-admin-fac-subtitle">
+                      Configure the 8 official channels displayed on the kiosk Website Portal
                     </p>
                   </div>
-                  <div className="adm-actions-btn-group">
-                    <button className="adm-btn-action" onClick={handleOpenAddLink}>
-                      <Plus size={16} />
-                      <span>Add QR Portal</span>
-                    </button>
-                    <button className="adm-btn-action" onClick={() => onNavigate?.('/weblinks')}>
-                      <ExternalLink size={16} />
+                  <div className="nexus-admin-fac-actions">
+                    <button
+                      className="nexus-adm-btn secondary"
+                      onClick={() => {
+                        if (onClose) onClose();
+                        if (onNavigate) onNavigate('/weblinks');
+                      }}
+                      title="Preview Website Portal on Kiosk"
+                    >
+                      <ExternalLink size={15} />
                       <span>View on Kiosk</span>
                     </button>
-                    <button className="adm-btn-action danger-outline" onClick={handleResetLinks} title="Reset to default official links">
-                      <RotateCcw size={16} />
+                    <button
+                      className="nexus-adm-btn secondary"
+                      onClick={handleResetPortalLinks}
+                      title="Reset all 8 links to factory defaults"
+                    >
+                      <RotateCcw size={15} />
                       <span>Reset Defaults</span>
+                    </button>
+                    <button
+                      className="nexus-adm-btn primary"
+                      onClick={handleSavePortalLinks}
+                      title="Save & Update all links"
+                    >
+                      <Save size={15} />
+                      <span>Save &amp; Update Links</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Filter and Search Bar */}
-                <div className="adm-filter-toolbar">
-                  <div className="adm-search-input-wrap">
-                    <Search size={16} />
-                    <input
-                      type="text"
-                      className="adm-search-input"
-                      placeholder="Search links by title, url, tag, description..."
-                      value={weblinksSearch}
-                      onChange={(e) => setWeblinksSearch(e.target.value)}
-                    />
+                {/* 2-Column Grid matching Screenshot */}
+                <div className="nexus-portal-inputs-grid">
+                  {/* Left Column */}
+                  <div className="nexus-portal-col">
+                    <div className="nexus-portal-field">
+                      <label className="nexus-portal-label">
+                        <span className="nexus-portal-dot" style={{ background: '#00d5ff' }} />
+                        <span>Official Website URL</span>
+                      </label>
+                      <input
+                        type="url"
+                        className="nexus-portal-input"
+                        placeholder="https://www.robomiracle.com/"
+                        value={portalFormUrls.website || ''}
+                        onChange={(e) => setPortalFormUrls((prev) => ({ ...prev, website: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="nexus-portal-field">
+                      <label className="nexus-portal-label">
+                        <span className="nexus-portal-dot" style={{ background: '#ff0000' }} />
+                        <span>YouTube Channel URL</span>
+                      </label>
+                      <input
+                        type="url"
+                        className="nexus-portal-input"
+                        placeholder="https://www.youtube.com/@robomiracle"
+                        value={portalFormUrls.youtube || ''}
+                        onChange={(e) => setPortalFormUrls((prev) => ({ ...prev, youtube: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="nexus-portal-field">
+                      <label className="nexus-portal-label">
+                        <span className="nexus-portal-dot" style={{ background: '#e1306c' }} />
+                        <span>Instagram URL</span>
+                      </label>
+                      <input
+                        type="url"
+                        className="nexus-portal-input"
+                        placeholder="https://www.instagram.com/robomiracle"
+                        value={portalFormUrls.instagram || ''}
+                        onChange={(e) => setPortalFormUrls((prev) => ({ ...prev, instagram: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="nexus-portal-field">
+                      <label className="nexus-portal-label">
+                        <span className="nexus-portal-dot" style={{ background: '#ffffff' }} />
+                        <span>X (Twitter) URL</span>
+                      </label>
+                      <input
+                        type="url"
+                        className="nexus-portal-input"
+                        placeholder="https://x.com/robomiracle"
+                        value={portalFormUrls.twitter || ''}
+                        onChange={(e) => setPortalFormUrls((prev) => ({ ...prev, twitter: e.target.value }))}
+                      />
+                    </div>
                   </div>
-                  <div className="adm-filter-chips">
-                    {['ALL', 'web', 'brochure', 'media', 'social', 'tech', 'contact', 'custom'].map((cat) => (
-                      <button
-                        key={cat}
-                        className={`adm-filter-chip ${weblinksCategoryFilter === cat ? 'active' : ''}`}
-                        onClick={() => setWeblinksCategoryFilter(cat)}
-                      >
-                        {cat.toUpperCase()}
-                      </button>
-                    ))}
+
+                  {/* Right Column */}
+                  <div className="nexus-portal-col">
+                    <div className="nexus-portal-field">
+                      <label className="nexus-portal-label">
+                        <span className="nexus-portal-dot" style={{ background: '#0a66c2' }} />
+                        <span>LinkedIn URL</span>
+                      </label>
+                      <input
+                        type="url"
+                        className="nexus-portal-input"
+                        placeholder="https://www.linkedin.com/company/robomiracle"
+                        value={portalFormUrls.linkedin || ''}
+                        onChange={(e) => setPortalFormUrls((prev) => ({ ...prev, linkedin: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="nexus-portal-field">
+                      <label className="nexus-portal-label">
+                        <span className="nexus-portal-dot" style={{ background: '#1877f2' }} />
+                        <span>Facebook Page URL</span>
+                      </label>
+                      <input
+                        type="url"
+                        className="nexus-portal-input"
+                        placeholder="https://www.facebook.com/robomiracle"
+                        value={portalFormUrls.facebook || ''}
+                        onChange={(e) => setPortalFormUrls((prev) => ({ ...prev, facebook: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="nexus-portal-field">
+                      <label className="nexus-portal-label">
+                        <span className="nexus-portal-dot" style={{ background: '#ea4335' }} />
+                        <span>Google Maps Location URL</span>
+                      </label>
+                      <input
+                        type="url"
+                        className="nexus-portal-input"
+                        placeholder="https://maps.google.com/?q=Robomiracle+Coimbatore"
+                        value={portalFormUrls.maps || ''}
+                        onChange={(e) => setPortalFormUrls((prev) => ({ ...prev, maps: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="nexus-portal-field">
+                      <label className="nexus-portal-label">
+                        <span className="nexus-portal-dot" style={{ background: '#ffffff' }} />
+                        <span>Threads URL</span>
+                      </label>
+                      <input
+                        type="url"
+                        className="nexus-portal-input"
+                        placeholder="https://www.threads.net/@robomiracle"
+                        value={portalFormUrls.threads || ''}
+                        onChange={(e) => setPortalFormUrls((prev) => ({ ...prev, threads: e.target.value }))}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* QR Cards Grid */}
-                <div className="adm-weblinks-grid">
-                  {filteredWeblinks.length === 0 ? (
-                    <div className="adm-empty-state">
-                      <QrCode size={40} color="#00ffff" />
-                      <p>No QR portals match your search or filter.</p>
-                      <button className="adm-btn-action" onClick={handleOpenAddLink}>
-                        <Plus size={16} />
-                        <span>Add First QR Portal</span>
-                      </button>
-                    </div>
-                  ) : (
-                    filteredWeblinks.map((link) => (
+                {/* Live Preview Cards Grid */}
+                <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid rgba(0, 213, 255, 0.15)' }}>
+                  <h4 style={{ fontSize: '15px', color: '#00ffff', fontWeight: '700', marginBottom: '14px', letterSpacing: '0.5px' }}>
+                    LIVE SCANNABLE QR PORTALS PREVIEW (8 CHANNELS)
+                  </h4>
+                  <div className="nexus-admin-qr-grid">
+                    {weblinks.map((link) => (
                       <div
                         key={link.id}
-                        className={`adm-weblink-card ${!link.isEnabled ? 'disabled' : ''}`}
-                        style={{ '--link-accent': link.accentColor || '#00ffff' }}
+                        className="nexus-admin-card"
+                        style={{ borderLeft: `3px solid ${link.tagColor || '#00ffff'}` }}
                       >
-                        <div className="adm-weblink-qr-thumb-wrap">
-                          {adminQrMap[link.id] ? (
-                            <img
-                              src={adminQrMap[link.id]}
-                              alt={`QR for ${link.title}`}
-                              className="adm-weblink-qr-thumb"
-                            />
-                          ) : (
-                            <div className="adm-weblink-qr-loading">
-                              <QrCode size={32} color="#00ffff" />
-                            </div>
-                          )}
+                        <div className="nexus-card-top-row">
+                          <div className="nexus-card-icon-container">
+                            {adminQrMap[link.id] ? (
+                              <img
+                                src={adminQrMap[link.id]}
+                                alt={link.title}
+                                style={{ width: '40px', height: '40px', borderRadius: '4px' }}
+                              />
+                            ) : (
+                              <QrCode size={20} color="#00ffff" />
+                            )}
+                          </div>
                           <span
-                            className="adm-weblink-tag"
+                            className="nexus-enable-badge"
                             style={{
-                              backgroundColor: `${link.tagColor || '#00ffff'}22`,
+                              background: `${link.tagColor || '#00ffff'}22`,
+                              borderColor: `${link.tagColor || '#00ffff'}66`,
                               color: link.tagColor || '#00ffff',
-                              borderColor: `${link.tagColor || '#00ffff'}55`,
                             }}
                           >
-                            {link.tag || 'LINK'}
+                            {link.tag || 'PORTAL'}
                           </span>
                         </div>
 
-                        <div className="adm-weblink-info">
-                          <div className="adm-weblink-title-row">
-                            <h4 className="adm-weblink-title">{link.title}</h4>
-                            <span className="adm-weblink-badge">{link.badge || 'Verified'}</span>
-                          </div>
-                          {link.subtitle && <p className="adm-weblink-subtitle">{link.subtitle}</p>}
-                          <div className="adm-weblink-url-row">
-                            <Link2 size={13} color="#00ffff" />
-                            <a
-                              href={link.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="adm-weblink-url"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {link.displayUrl || link.url}
-                            </a>
-                          </div>
-                          {link.description && (
-                            <p className="adm-weblink-desc">{link.description}</p>
-                          )}
+                        <div className="nexus-card-body">
+                          <h4 className="nexus-card-title">{link.title}</h4>
+                          <p className="nexus-card-desc">
+                            {portalFormUrls[link.id] || link.url}
+                          </p>
                         </div>
 
-                        <div className="adm-weblink-actions">
-                          {/* Toggle Active Switch */}
-                          <div className="adm-weblink-switch-wrap" title={link.isEnabled ? 'Active on Kiosk' : 'Hidden on Kiosk'}>
-                            <button
-                              className={`adm-switch-btn ${link.isEnabled ? 'active' : ''}`}
-                              onClick={() => handleToggleLinkActive(link)}
-                            >
-                              <div className="adm-switch-thumb" />
-                            </button>
-                            <span className="adm-switch-label">
-                              {link.isEnabled ? 'Active' : 'Hidden'}
+                        <div className="nexus-card-bottom-row">
+                          <div className="nexus-toggle-wrap">
+                            <label className="nexus-toggle-switch">
+                              <input
+                                type="checkbox"
+                                checked={link.isEnabled !== false}
+                                onChange={() => handleToggleLinkActive(link)}
+                              />
+                              <span className="nexus-slider" />
+                            </label>
+                            <span className="nexus-toggle-label">
+                              {link.isEnabled !== false ? 'Enable' : 'Disable'}
                             </span>
                           </div>
 
-                          <div className="adm-weblink-btn-group">
+                          <div className="nexus-card-actions">
+                            <a
+                              href={portalFormUrls[link.id] || link.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="nexus-icon-edit-btn"
+                              title="Test URL in new window"
+                              style={{ textDecoration: 'none' }}
+                            >
+                              <ExternalLink size={14} />
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 10. PUBLIC FACILITIES MANAGEMENT (NEXUS AI STYLE) */}
+          {activeTab === 'facilities' && (
+            <div className="adm-tab-panel">
+              <div className="nexus-adm-panel-wrap">
+                <div className="nexus-admin-fac-header">
+                  <div>
+                    <h3 className="nexus-admin-fac-title">Public Facilities Management</h3>
+                    <p className="nexus-admin-fac-subtitle">
+                      (Max 9 cards displayed on public facilities screen)
+                    </p>
+                  </div>
+                  <div className="nexus-admin-fac-actions">
+                    <button
+                      className="nexus-adm-btn secondary"
+                      onClick={handleResetFacilities}
+                      title="Reset to 9 default public facilities"
+                    >
+                      <RotateCcw size={15} />
+                      <span>Set Default Facilities</span>
+                    </button>
+                    <button
+                      className="nexus-adm-btn danger-outline"
+                      onClick={handleClearAllFacilities}
+                      title="Clear all facilities"
+                    >
+                      <Trash2 size={15} />
+                      <span>Clear All</span>
+                    </button>
+                    <button
+                      className="nexus-adm-btn primary"
+                      onClick={handleOpenAddFacility}
+                      title="Create a new public facility card"
+                    >
+                      <Plus size={15} />
+                      <span>+ New Facility</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Grid of Public Facilities (Nexus Style 4-columns) */}
+                {facilities.length === 0 ? (
+                  <div className="adm-empty-box" style={{ padding: '40px 20px', textAlign: 'center' }}>
+                    <Building2 size={44} color="#00ffff" />
+                    <p style={{ marginTop: '12px', color: '#94a3b8' }}>No facilities configured yet.</p>
+                    <button className="nexus-adm-btn secondary" onClick={handleResetFacilities}>
+                      Load Default 9 Facilities
+                    </button>
+                  </div>
+                ) : (
+                  <div className="nexus-admin-fac-grid">
+                    {facilities.map((fac, idx) => (
+                      <div
+                        key={fac.id || idx}
+                        className={`nexus-admin-card ${fac.isEnabled === false ? 'is-disabled' : ''}`}
+                      >
+                        <div className="nexus-admin-card-header">
+                          <div className="nexus-admin-card-icon-title">
+                            <div className="nexus-admin-icon-box">
+                              {renderFacilityIcon(fac.icon, idx, 18, '#00ffff')}
+                            </div>
+                            <h4 className="nexus-admin-card-title">{fac.title || fac.name}</h4>
+                          </div>
+                          <span className={`nexus-admin-status-badge ${fac.isEnabled !== false ? 'enabled' : 'disabled'}`}>
+                            <CheckCircle2 size={12} />
+                            <span>{fac.isEnabled !== false ? 'ENABLE' : 'DISABLE'}</span>
+                          </span>
+                        </div>
+
+                        <p className="nexus-admin-card-desc">{fac.description}</p>
+
+                        <div className="nexus-admin-card-footer">
+                          <label className="nexus-toggle-switch">
+                            <input
+                              type="checkbox"
+                              checked={fac.isEnabled !== false}
+                              onChange={(e) => handleToggleFacility(fac.id, e.target.checked)}
+                            />
+                            <span className="nexus-slider" />
+                            <span className="nexus-toggle-label">Enable</span>
+                          </label>
+
+                          <div className="nexus-card-action-btns">
                             <button
-                              className="adm-mini-btn edit"
-                              title="Edit link details and QR"
-                              onClick={() => handleOpenEditLink(link)}
+                              className="nexus-icon-edit-btn"
+                              onClick={() => handleOpenEditFacility(fac)}
+                              title="Edit facility"
                             >
                               <Edit2 size={14} />
-                              <span>Edit</span>
                             </button>
                             <button
-                              className="adm-mini-btn danger"
-                              title="Delete link"
-                              onClick={() => handleDeleteLink(link.id, link.title)}
+                              className="nexus-icon-trash-btn"
+                              onClick={() => handleDeleteFacility(fac.id, fac.title || fac.name)}
+                              title="Delete facility"
                             >
                               <Trash2 size={14} />
                             </button>
                           </div>
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 10. PUBLIC FACILITIES & ROOM DIRECTORY TAB */}
-          {activeTab === 'facilities' && (
-            <div className="adm-tab-panel">
-              <div className="adm-card-panel">
-                <div className="adm-panel-header-row">
-                  <div>
-                    <h3 className="adm-panel-title">Campus Public Facilities & Room Directory</h3>
-                    <p className="adm-panel-desc">
-                      Manage campus floor rooms, restrooms, cafeterias, robotics labs, boardrooms, and spoken walking directions for kiosk visitors.
-                    </p>
-                  </div>
-                  <div className="adm-actions-btn-group">
-                    <button className="adm-btn-action" onClick={handleOpenAddFacility}>
-                      <Plus size={16} />
-                      <span>Add Facility / Room</span>
-                    </button>
-                    <button className="adm-btn-action" onClick={() => onNavigate?.('/facilities')}>
-                      <ExternalLink size={16} />
-                      <span>View on Kiosk</span>
-                    </button>
-                    <button className="adm-btn-action danger-outline" onClick={handleResetFacilities} title="Reset to default campus facilities">
-                      <RotateCcw size={16} />
-                      <span>Reset Defaults</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Filter and Search Bar */}
-                <div className="adm-filter-bar-row">
-                  <div className="adm-search-input-wrap">
-                    <Search size={16} />
-                    <input
-                      type="text"
-                      placeholder="Search facility name, room code, wing, or directions..."
-                      value={facilitySearch}
-                      onChange={(e) => setFacilitySearch(e.target.value)}
-                    />
-                    {facilitySearch && (
-                      <button className="adm-search-clear-btn" onClick={() => setFacilitySearch('')}>
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="adm-filter-pill-group">
-                    {['all', 'ground', 'first', 'second'].map((flr) => (
-                      <button
-                        key={flr}
-                        className={`adm-filter-pill ${facilityFloorFilter === flr ? 'active' : ''}`}
-                        onClick={() => setFacilityFloorFilter(flr)}
-                      >
-                        {flr === 'all' ? 'All Floors' :
-                         flr === 'ground' ? 'Ground Floor (L0)' :
-                         flr === 'first' ? 'Level 1 (R&D)' : 'Level 2 (Executive)'}
-                      </button>
                     ))}
                   </div>
-                </div>
-
-                {/* Facilities List Grid */}
-                <div className="adm-weblinks-grid">
-                  {filteredFacilitiesAdmin.length === 0 ? (
-                    <div className="adm-empty-box" style={{ gridColumn: '1 / -1' }}>
-                      <Building2 size={40} color="#00ffff" />
-                      <p>No facilities found matching current filters.</p>
-                      <button className="adm-btn-secondary" onClick={() => { setFacilitySearch(''); setFacilityFloorFilter('all'); }}>
-                        Clear Filters
-                      </button>
-                    </div>
-                  ) : (
-                    filteredFacilitiesAdmin.map((fac) => (
-                      <div key={fac.id} className={`adm-weblink-card ${fac.isEnabled === false ? 'disabled' : ''}`}>
-                        <div className="adm-weblink-card-header">
-                          <div className="adm-weblink-icon-title">
-                            <span className="adm-category-tag">{fac.code}</span>
-                            <span className="adm-weblink-category">{fac.floorLabel}</span>
-                          </div>
-                          <div className="adm-weblink-card-controls">
-                            <button
-                              className={`adm-icon-btn ${fac.isEnabled !== false ? 'active' : ''}`}
-                              onClick={() => handleToggleFacility(fac.id, fac.isEnabled === false)}
-                              title={fac.isEnabled !== false ? 'Enabled (Click to Disable)' : 'Disabled (Click to Enable)'}
-                            >
-                              {fac.isEnabled !== false ? <Eye size={16} /> : <EyeOff size={16} />}
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="adm-weblink-body">
-                          <h4 className="adm-weblink-title">{fac.name}</h4>
-                          <div style={{ fontSize: '11.5px', color: '#38bdf8', marginBottom: '6px', fontWeight: 600 }}>
-                            📍 {fac.wing} &bull; {fac.distanceMeters}m walk ({fac.hours})
-                          </div>
-                          <p className="adm-weblink-desc" style={{ WebkitLineClamp: 3 }}>
-                            {fac.directions}
-                          </p>
-                          {fac.amenities && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
-                              {(Array.isArray(fac.amenities) ? fac.amenities : []).slice(0, 3).map((a, i) => (
-                                <span key={i} style={{ fontSize: '10px', background: 'rgba(0,255,255,0.08)', color: '#93c5fd', padding: '2px 6px', borderRadius: '4px' }}>
-                                  {a}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="adm-weblink-card-footer">
-                          <button
-                            className="adm-mini-btn"
-                            style={{ color: '#00ffff' }}
-                            onClick={() => speakWithVoice(`${fac.name}, Room ${fac.code}. Directions: ${fac.directions}`)}
-                            title="Test Spoken Audio Guide"
-                          >
-                            <Volume2 size={14} />
-                            <span>Test Voice</span>
-                          </button>
-                          <button
-                            className="adm-mini-btn edit"
-                            onClick={() => handleOpenEditFacility(fac)}
-                            title="Edit Facility Details"
-                          >
-                            <Edit2 size={14} />
-                            <span>Edit</span>
-                          </button>
-                          <button
-                            className="adm-mini-btn danger"
-                            onClick={() => handleDeleteFacility(fac.id, fac.name)}
-                            title="Delete Facility"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                )}
               </div>
 
               {/* Add / Edit Facility Modal */}
               {showFacilityModal && (
                 <div className="adm-modal-overlay" onClick={() => setShowFacilityModal(false)}>
-                  <div className="adm-modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
-                    <div className="adm-modal-header">
-                      <h3>{facilityModalMode === 'add' ? 'Add New Campus Facility' : 'Edit Facility & Directions'}</h3>
-                      <button className="adm-modal-close-btn" onClick={() => setShowFacilityModal(false)}>
+                  <div className="adm-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '540px', background: '#051020', border: '1px solid rgba(0, 213, 255, 0.4)', borderRadius: '16px', boxShadow: '0 16px 48px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 213, 255, 0.15)', color: '#e2e8f0', overflow: 'hidden' }}>
+                    <div className="adm-modal-header" style={{ borderBottom: '1px solid rgba(0, 213, 255, 0.2)', background: 'rgba(3, 12, 23, 0.7)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ color: '#00ffff', margin: 0, fontSize: '18px', fontWeight: 700 }}>
+                        {facilityModalMode === 'add' ? 'Add New Facility' : 'Edit Facility'}
+                      </h3>
+                      <button className="adm-modal-close-btn" onClick={() => setShowFacilityModal(false)} style={{ background: 'transparent', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#8da4be', borderRadius: '8px', padding: '4px', cursor: 'pointer' }}>
                         <X size={20} />
                       </button>
                     </div>
 
-                    <form onSubmit={handleSaveFacility} className="adm-modal-form">
-                      <div className="adm-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
-                        <div className="adm-form-group">
-                          <label className="adm-form-label">ROOM CODE *</label>
-                          <input
-                            type="text"
-                            className="adm-form-input"
-                            value={facilityForm.code}
-                            onChange={(e) => setFacilityForm({ ...facilityForm, code: e.target.value })}
-                            placeholder="e.g. G-04, L1-02"
-                            required
-                          />
-                        </div>
-                        <div className="adm-form-group">
-                          <label className="adm-form-label">FACILITY / ROOM NAME *</label>
-                          <input
-                            type="text"
-                            className="adm-form-input"
-                            value={facilityForm.name}
-                            onChange={(e) => setFacilityForm({ ...facilityForm, name: e.target.value })}
-                            placeholder="e.g. Executive Boardroom Alpha"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="adm-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                        <div className="adm-form-group">
-                          <label className="adm-form-label">FLOOR LEVEL *</label>
-                          <select
-                            className="adm-form-input"
-                            value={facilityForm.floor}
-                            onChange={(e) => setFacilityForm({ ...facilityForm, floor: e.target.value })}
-                          >
-                            <option value="ground">Ground Floor (Level 0)</option>
-                            <option value="first">First Floor (Level 1)</option>
-                            <option value="second">Second Floor (Level 2)</option>
-                            <option value="outdoor">Outdoor / Rooftop</option>
-                          </select>
-                        </div>
-                        <div className="adm-form-group">
-                          <label className="adm-form-label">CAMPUS WING *</label>
-                          <input
-                            type="text"
-                            className="adm-form-input"
-                            value={facilityForm.wing}
-                            onChange={(e) => setFacilityForm({ ...facilityForm, wing: e.target.value })}
-                            placeholder="e.g. East Wing, North Courtyard"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="adm-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                        <div className="adm-form-group">
-                          <label className="adm-form-label">CATEGORY *</label>
-                          <select
-                            className="adm-form-input"
-                            value={facilityForm.category}
-                            onChange={(e) => {
-                              const cat = e.target.value;
-                              const label =
-                                cat === 'restroom' ? 'Restroom & Hygiene' :
-                                cat === 'dining' ? 'Cafeteria & Dining' :
-                                cat === 'lab' ? 'Robotics & Demo' :
-                                cat === 'meeting' ? 'Meeting & Boardrooms' :
-                                cat === 'utility' ? 'Utility & Elevators' :
-                                cat === 'medical' ? 'First Aid & Safety' :
-                                cat === 'executive' ? 'Executive & Management' : 'Reception & Check-In';
-                              setFacilityForm({ ...facilityForm, category: cat, categoryLabel: label });
-                            }}
-                          >
-                            <option value="reception">Reception & Check-In</option>
-                            <option value="restroom">Restroom & Hygiene</option>
-                            <option value="dining">Cafeteria & Dining</option>
-                            <option value="lab">Robotics & Demo Bay</option>
-                            <option value="meeting">Meeting & Boardrooms</option>
-                            <option value="utility">Utility & Elevators</option>
-                            <option value="medical">First Aid & Health</option>
-                            <option value="executive">Executive Suite</option>
-                          </select>
-                        </div>
-
-                        <div className="adm-form-group">
-                          <label className="adm-form-label">OPERATIONAL HOURS</label>
-                          <input
-                            type="text"
-                            className="adm-form-input"
-                            value={facilityForm.hours}
-                            onChange={(e) => setFacilityForm({ ...facilityForm, hours: e.target.value })}
-                            placeholder="e.g. 9:00 AM – 6:00 PM / 24/7"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="adm-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                        <div className="adm-form-group">
-                          <label className="adm-form-label">DISTANCE (METERS)</label>
-                          <input
-                            type="number"
-                            className="adm-form-input"
-                            value={facilityForm.distanceMeters}
-                            onChange={(e) => setFacilityForm({ ...facilityForm, distanceMeters: e.target.value })}
-                            placeholder="15"
-                          />
-                        </div>
-                        <div className="adm-form-group">
-                          <label className="adm-form-label">WALK TIME ESTIMATE</label>
-                          <input
-                            type="text"
-                            className="adm-form-input"
-                            value={facilityForm.walkTime}
-                            onChange={(e) => setFacilityForm({ ...facilityForm, walkTime: e.target.value })}
-                            placeholder="e.g. 30 sec walk"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="adm-form-group">
-                        <label className="adm-form-label">SPOKEN WALKING DIRECTIONS FROM KIOSK *</label>
-                        <textarea
-                          rows={3}
+                    <form onSubmit={handleSaveFacility} className="adm-modal-form" style={{ padding: '22px' }}>
+                      <div className="adm-form-group" style={{ marginBottom: '16px' }}>
+                        <label className="adm-form-label" style={{ color: '#00ffff', fontWeight: 700, fontSize: '11.5px', letterSpacing: '0.8px', marginBottom: '6px', display: 'block' }}>
+                          FACILITY TITLE *
+                        </label>
+                        <input
+                          type="text"
                           className="adm-form-input"
-                          value={facilityForm.directions}
-                          onChange={(e) => setFacilityForm({ ...facilityForm, directions: e.target.value })}
-                          placeholder="e.g. Turn left from reception, walk 15 meters along the West corridor; entrance is on the left opposite the elevator."
+                          style={{ background: 'rgba(0, 213, 255, 0.05)', border: '1px solid rgba(0, 213, 255, 0.3)', color: '#ffffff', width: '100%', padding: '10px 14px', borderRadius: '8px', boxSizing: 'border-box' }}
+                          value={facilityForm.title}
+                          onChange={(e) => setFacilityForm({ ...facilityForm, title: e.target.value })}
+                          placeholder="e.g. 1. AI Retail Solutions"
                           required
                         />
                       </div>
 
-                      <div className="adm-form-group">
-                        <label className="adm-form-label">AMENITIES (COMMA-SEPARATED)</label>
-                        <input
-                          type="text"
+                      <div className="adm-form-group" style={{ marginBottom: '16px' }}>
+                        <label className="adm-form-label" style={{ color: '#00ffff', fontWeight: 700, fontSize: '11.5px', letterSpacing: '0.8px', marginBottom: '6px', display: 'block' }}>
+                          DESCRIPTION *
+                        </label>
+                        <textarea
+                          rows={3}
                           className="adm-form-input"
-                          value={facilityForm.amenities}
-                          onChange={(e) => setFacilityForm({ ...facilityForm, amenities: e.target.value })}
-                          placeholder="e.g. Wheelchair Accessible, Wi-Fi, Touchless Sensor"
+                          style={{ background: 'rgba(0, 213, 255, 0.05)', border: '1px solid rgba(0, 213, 255, 0.3)', color: '#ffffff', width: '100%', padding: '10px 14px', borderRadius: '8px', boxSizing: 'border-box' }}
+                          value={facilityForm.description}
+                          onChange={(e) => setFacilityForm({ ...facilityForm, description: e.target.value })}
+                          placeholder="Smart robots designed to assist customers, provide guidance, and improve retail experiences."
+                          required
                         />
                       </div>
 
-                      <div className="adm-modal-actions">
-                        <button type="button" className="adm-btn-secondary" onClick={() => setShowFacilityModal(false)}>
+                      <div className="adm-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+                        <div className="adm-form-group">
+                          <label className="adm-form-label" style={{ color: '#00ffff', fontWeight: 700, fontSize: '11.5px', letterSpacing: '0.8px', marginBottom: '6px', display: 'block' }}>
+                            ICON
+                          </label>
+                          <select
+                            className="adm-form-input"
+                            style={{ background: '#051426', border: '1px solid rgba(0, 213, 255, 0.3)', color: '#ffffff', width: '100%', padding: '10px 14px', borderRadius: '8px', boxSizing: 'border-box' }}
+                            value={facilityForm.icon}
+                            onChange={(e) => setFacilityForm({ ...facilityForm, icon: e.target.value })}
+                          >
+                            <option value="ShoppingBag">Shopping Bag (Retail)</option>
+                            <option value="HeartPulse">Heart Pulse (Healthcare)</option>
+                            <option value="Bed">Bed (Hospitality)</option>
+                            <option value="GraduationCap">Graduation Cap (Education)</option>
+                            <option value="MapPin">Location Pin (Guide &amp; Reception)</option>
+                            <option value="Ticket">Ticket (Events &amp; Exhibition)</option>
+                            <option value="Settings">Settings / Gear (Custom Development)</option>
+                            <option value="Key">Key (Robot Rental)</option>
+                            <option value="Cloud">Cloud (RaaS / Service)</option>
+                            <option value="Bot">Robot (Bot)</option>
+                            <option value="Building2">Building</option>
+                            <option value="Sparkles">Sparkles</option>
+                          </select>
+                        </div>
+
+                        <div className="adm-form-group">
+                          <label className="adm-form-label" style={{ color: '#00ffff', fontWeight: 700, fontSize: '11.5px', letterSpacing: '0.8px', marginBottom: '6px', display: 'block' }}>
+                            SORT ORDER (1-9)
+                          </label>
+                          <input
+                            type="number"
+                            className="adm-form-input"
+                            style={{ background: 'rgba(0, 213, 255, 0.05)', border: '1px solid rgba(0, 213, 255, 0.3)', color: '#ffffff', width: '100%', padding: '10px 14px', borderRadius: '8px', boxSizing: 'border-box' }}
+                            value={facilityForm.sortOrder}
+                            onChange={(e) => setFacilityForm({ ...facilityForm, sortOrder: e.target.value })}
+                            min={1}
+                            max={99}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="adm-form-group" style={{ marginBottom: '20px' }}>
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#cbd5e1', fontWeight: 600, fontSize: '13px' }}>
+                          <input
+                            type="checkbox"
+                            checked={facilityForm.isEnabled !== false}
+                            onChange={(e) => setFacilityForm({ ...facilityForm, isEnabled: e.target.checked })}
+                          />
+                          <span>Enable and display on public screen</span>
+                        </label>
+                      </div>
+
+                      <div className="adm-modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                        <button
+                          type="button"
+                          className="adm-btn-secondary"
+                          onClick={() => setShowFacilityModal(false)}
+                          style={{ padding: '8px 18px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.2)', color: '#cbd5e1', cursor: 'pointer' }}
+                        >
                           Cancel
                         </button>
-                        <button type="submit" className="adm-submit-btn">
-                          <Save size={16} />
+                        <button
+                          type="submit"
+                          className="nexus-adm-btn primary"
+                        >
+                          <Save size={15} />
                           <span>{facilityModalMode === 'add' ? 'Save Facility' : 'Update Facility'}</span>
                         </button>
                       </div>

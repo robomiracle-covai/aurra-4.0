@@ -1,1097 +1,266 @@
 /* ==========================================================================
-   PUBLIC FACILITIES & FLOOR DIRECTORY - CYBER GLASSMORPHIC STYLING
-   Optimized for Locked 90 FPS Redmi Pad 2 Tablet Display & Desktop Browser
+   PUBLIC FACILITIES VIEW - AURRA DARK CYBER THEME
+   3x3 Grid (Max 9 Cards) with Dark Sci-Fi HUD Architecture
    ========================================================================== */
 
-.public-facilities-view {
-  min-height: 100vh;
+.nexus-facilities-viewport {
   width: 100%;
-  background: radial-gradient(circle at 50% 0%, #06162d 0%, #030a16 60%, #01040a 100%);
-  color: #e2e8f0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  padding: 24px 32px;
-  /* CRITICAL KIOSK CLEARANCE: Ensure bottom action buttons never collide with floating voice bar */
-  padding-bottom: 140px !important;
+  min-height: 100vh;
   box-sizing: border-box;
-  overflow-x: hidden;
+  background-color: #06090e;
+  background-image: 
+    radial-gradient(circle at 50% 12%, rgba(0, 213, 255, 0.1) 0%, #060a14 55%, #03060a 100%),
+    linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 36px 36px, 36px 36px;
   position: relative;
-}
-
-/* Cyber ambient glow backdrop */
-.public-facilities-view::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 20%;
-  width: 60%;
-  height: 350px;
-  background: radial-gradient(circle, rgba(0, 255, 255, 0.08) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* ── Top Header Navigation Bar ─────────────────────────────────────────── */
-.fac-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-  position: relative;
-  z-index: 2;
-  gap: 20px;
-}
-
-.fac-header-left {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.fac-back-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(10, 25, 47, 0.7);
-  border: 1px solid rgba(0, 255, 255, 0.3);
-  color: #00ffff;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  padding: 12px 18px;
-  border-radius: 12px;
-  cursor: pointer;
-  backdrop-filter: blur(12px);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
-}
-
-.fac-back-btn:hover,
-.fac-back-btn:active {
-  background: rgba(0, 255, 255, 0.15);
-  border-color: #00ffff;
-  transform: translateX(-3px);
-  box-shadow: 0 0 18px rgba(0, 255, 255, 0.4);
-}
-
-.fac-title-wrap {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.fac-badge-row {
-  display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: flex-start;
+  padding: 24px 36px 140px 36px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #f1f5f9;
 }
 
-.fac-cyber-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(0, 255, 255, 0.1);
-  border: 1px solid rgba(0, 255, 255, 0.35);
-  color: #00ffff;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  padding: 4px 10px;
-  border-radius: 20px;
-}
-
-.fac-count-pill {
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  color: #38bdf8;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 20px;
-  letter-spacing: 0.8px;
-}
-
-.fac-main-title {
-  margin: 0;
-  font-size: 26px;
-  font-weight: 800;
-  color: #ffffff;
-  letter-spacing: -0.5px;
-}
-
-.fac-gradient-text {
-  background: linear-gradient(135deg, #00ffff 0%, #38bdf8 50%, #818cf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.fac-header-right {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.fac-audio-guide-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(139, 92, 246, 0.12);
-  border: 1px solid rgba(139, 92, 246, 0.4);
-  color: #c084fc;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 10px 18px;
-  border-radius: 12px;
-  cursor: pointer;
-  backdrop-filter: blur(10px);
-  transition: all 0.2s ease;
-}
-
-.fac-audio-guide-btn:hover {
-  background: rgba(139, 92, 246, 0.25);
-  box-shadow: 0 0 16px rgba(168, 85, 247, 0.4);
-}
-
-.fac-audio-guide-btn.speaking {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: #ef4444;
-  color: #fca5a5;
-  animation: pulseSpeaking 1.5s infinite;
-}
-
-@keyframes pulseSpeaking {
-  0%, 100% { box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
-  50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.8); }
-}
-
-.fac-view-switcher {
-  display: flex;
-  background: rgba(10, 25, 47, 0.8);
-  border: 1px solid rgba(0, 255, 255, 0.25);
-  border-radius: 12px;
-  padding: 3px;
-}
-
-.fac-mode-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 8px 16px;
-  border-radius: 9px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.fac-mode-btn.active {
-  background: linear-gradient(135deg, rgba(0, 255, 255, 0.25) 0%, rgba(14, 165, 233, 0.35) 100%);
-  color: #ffffff;
-  border: 1px solid rgba(0, 255, 255, 0.5);
-  box-shadow: 0 2px 10px rgba(0, 255, 255, 0.2);
-}
-
-/* ── Search & Floor Controls ────────────────────────────────────────────── */
-.fac-controls-bar {
+/* ── Top Header Bar ───────────────────────────────────────────────────── */
+.nexus-facilities-top-bar {
+  width: 100%;
+  max-width: 1400px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 28px;
   position: relative;
-  z-index: 2;
-  flex-wrap: wrap;
+  z-index: 10;
 }
 
-.fac-search-box {
-  flex: 1;
-  min-width: 320px;
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.fac-search-icon {
-  position: absolute;
-  left: 16px;
-  color: #00ffff;
-  pointer-events: none;
-}
-
-.fac-search-input {
-  width: 100%;
-  background: rgba(10, 25, 47, 0.65);
-  border: 1px solid rgba(0, 255, 255, 0.25);
-  border-radius: 14px;
-  padding: 14px 44px 14px 44px;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 500;
-  backdrop-filter: blur(12px);
-  outline: none;
-  transition: all 0.25s ease;
-  box-sizing: border-box;
-}
-
-.fac-search-input:focus {
-  border-color: #00ffff;
-  box-shadow: 0 0 18px rgba(0, 255, 255, 0.3);
-  background: rgba(10, 25, 47, 0.85);
-}
-
-.fac-search-input::placeholder {
-  color: #64748b;
-}
-
-.fac-search-clear {
-  position: absolute;
-  right: 14px;
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
+/* Back Button */
+.nexus-fac-back-btn {
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  width: 24px;
-  height: 24px;
+  background: rgba(10, 18, 36, 0.85);
+  border: 1.5px solid rgba(0, 255, 255, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
   cursor: pointer;
-}
-
-.fac-floor-tabs {
-  display: flex;
-  background: rgba(10, 25, 47, 0.7);
-  border: 1px solid rgba(0, 255, 255, 0.2);
-  border-radius: 14px;
-  padding: 4px;
-  gap: 4px;
-}
-
-.fac-floor-tab {
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 10px 18px;
-  border-radius: 10px;
-  cursor: pointer;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.15);
   transition: all 0.2s ease;
-  white-space: nowrap;
+  backdrop-filter: blur(10px);
 }
 
-.fac-floor-tab.active {
-  background: rgba(0, 255, 255, 0.2);
-  color: #00ffff;
-  border: 1px solid rgba(0, 255, 255, 0.4);
-  box-shadow: 0 0 12px rgba(0, 255, 255, 0.2);
+.nexus-fac-back-btn:hover,
+.nexus-fac-back-btn:active {
+  transform: translateX(-2px) scale(1.04);
+  background: rgba(15, 25, 48, 0.95);
+  border-color: #00ffff;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.35);
 }
 
-/* ── Category Quick-Filter Bar ─────────────────────────────────────────── */
-.fac-category-pills-bar {
-  display: flex;
+/* Center Brand Pill: PUBLIC FACILITIES */
+.nexus-fac-brand-pill {
+  background: rgba(10, 18, 36, 0.85);
+  border: 1.5px solid rgba(0, 255, 255, 0.35);
+  border-radius: 9999px;
+  padding: 4px 6px 4px 20px;
+  display: inline-flex;
+  align-items: center;
   gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-  margin-bottom: 24px;
-  position: relative;
-  z-index: 2;
-  scrollbar-width: none;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
 }
 
-.fac-category-pills-bar::-webkit-scrollbar {
-  display: none;
-}
-
-.fac-cat-pill {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #cbd5e1;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 8px 16px;
-  border-radius: 20px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s ease;
-  backdrop-filter: blur(8px);
-}
-
-.fac-cat-pill:hover {
-  background: rgba(0, 255, 255, 0.1);
-  border-color: rgba(0, 255, 255, 0.3);
+.brand-primary-text {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
   color: #ffffff;
 }
 
-.fac-cat-pill.active {
-  background: linear-gradient(135deg, rgba(0, 255, 255, 0.25) 0%, rgba(56, 189, 248, 0.3) 100%);
-  border-color: #00ffff;
-  color: #00ffff;
+.brand-accent-badge {
+  background: linear-gradient(135deg, #00d5ff 0%, #0284c7 100%);
+  color: #ffffff;
+  font-size: 12.5px;
   font-weight: 700;
-  box-shadow: 0 0 14px rgba(0, 255, 255, 0.25);
+  letter-spacing: 1px;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  box-shadow: 0 0 14px rgba(0, 213, 255, 0.4);
 }
 
-/* ── Directory Cards Grid ──────────────────────────────────────────────── */
-.fac-directory-section {
-  position: relative;
-  z-index: 2;
+/* Battery Indicator Pill */
+.nexus-fac-battery-pill {
+  background: rgba(10, 18, 36, 0.85);
+  border: 1.5px solid rgba(34, 197, 94, 0.4);
+  border-radius: 9999px;
+  padding: 7px 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.15);
+  backdrop-filter: blur(10px);
 }
 
-.fac-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: 20px;
+.nexus-battery-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
 }
 
-.fac-card {
-  background: rgba(10, 25, 47, 0.7);
-  border: 1px solid rgba(0, 255, 255, 0.18);
-  border-radius: 18px;
-  padding: 22px;
+.nexus-battery-pct {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #4ade80;
+  letter-spacing: 0.5px;
+}
+
+/* ── Main Grid Section ────────────────────────────────────────────────── */
+.nexus-facilities-main {
+  width: 100%;
+  max-width: 1400px;
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(14px);
-  cursor: pointer;
+  align-items: center;
+}
+
+.nexus-facilities-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  width: 100%;
+}
+
+/* Facility Card */
+.nexus-facility-card {
+  background: #0a0f1c;
+  border: 1.5px solid rgba(0, 255, 255, 0.35);
+  border-radius: 20px;
+  padding: 22px 24px;
+  box-shadow: 0 0 16px rgba(0, 255, 255, 0.08), inset 0 0 10px rgba(0, 255, 255, 0.02);
+  display: flex;
+  flex-direction: column;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
   position: relative;
   overflow: hidden;
 }
 
-.fac-card::after {
+.nexus-facility-card::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
-  width: 4px;
-  height: 100%;
-  background: linear-gradient(180deg, #00ffff 0%, #38bdf8 100%);
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #00ffff, #0284c7);
   opacity: 0;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.2s ease;
 }
 
-.fac-card:hover {
-  border-color: rgba(0, 255, 255, 0.5);
+.nexus-facility-card:hover,
+.nexus-facility-card:active {
   transform: translateY(-4px);
-  box-shadow: 0 12px 30px rgba(0, 255, 255, 0.18);
-  background: rgba(12, 30, 56, 0.8);
+  border-color: #00ffff;
+  box-shadow: 0 0 25px rgba(0, 255, 255, 0.32), inset 0 0 15px rgba(0, 255, 255, 0.06);
 }
 
-.fac-card:hover::after,
-.fac-card.active::after {
+.nexus-facility-card:hover::before,
+.nexus-facility-card:active::before {
   opacity: 1;
 }
 
-.fac-card.active {
-  border-color: #00ffff;
-  box-shadow: 0 0 24px rgba(0, 255, 255, 0.25);
-  background: rgba(14, 35, 66, 0.85);
-}
-
-.fac-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-
-.fac-icon-box {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: rgba(0, 255, 255, 0.1);
-  border: 1px solid rgba(0, 255, 255, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.fac-room-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  flex: 1;
-  margin-left: 12px;
-}
-
-.fac-room-code {
-  font-size: 15px;
-  font-weight: 800;
-  color: #00ffff;
-  letter-spacing: 0.8px;
-}
-
-.fac-floor-pill {
-  font-size: 11px;
-  color: #94a3b8;
-  font-weight: 600;
-}
-
-.fac-status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 4px 10px;
-  border-radius: 12px;
-}
-
-.fac-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.fac-status-dot.open {
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
-}
-
-.fac-status-dot.busy {
-  background: #f59e0b;
-  box-shadow: 0 0 8px #f59e0b;
-}
-
-.fac-status-text {
-  font-size: 11px;
-  font-weight: 700;
-  color: #e2e8f0;
-  text-transform: uppercase;
-}
-
-.fac-card-name {
-  margin: 0 0 6px 0;
-  font-size: 18px;
-  font-weight: 700;
-  color: #ffffff;
-  line-height: 1.3;
-}
-
-.fac-wing-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: #94a3b8;
-  margin-bottom: 14px;
-}
-
-.fac-pin-icon {
-  color: #38bdf8;
-}
-
-.fac-dot-sep {
-  color: #475569;
-}
-
-.fac-cat-tag {
-  color: #38bdf8;
-  font-weight: 600;
-}
-
-.fac-meta-stats {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.fac-stat-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #cbd5e1;
-}
-
-.fac-directions-box {
-  background: rgba(2, 6, 23, 0.6);
-  border-left: 3px solid #00ffff;
-  border-radius: 6px;
-  padding: 10px 12px;
-  margin-bottom: 14px;
-}
-
-.fac-directions-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #00ffff;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.8px;
-  margin-bottom: 4px;
-}
-
-.fac-directions-text {
-  margin: 0;
-  font-size: 12px;
-  color: #e2e8f0;
-  line-height: 1.45;
-}
-
-.fac-amenities-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 18px;
-}
-
-.fac-amenity-tag {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(0, 255, 255, 0.06);
-  border: 1px solid rgba(0, 255, 255, 0.15);
-  color: #93c5fd;
-  font-size: 10.5px;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 6px;
-}
-
-.fac-card-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: auto;
-}
-
-.fac-action-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 10px 8px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-}
-
-.fac-action-btn.speak-btn {
-  background: rgba(0, 255, 255, 0.12);
-  border: 1px solid rgba(0, 255, 255, 0.3);
-  color: #00ffff;
-}
-
-.fac-action-btn.speak-btn:hover {
-  background: rgba(0, 255, 255, 0.25);
-  box-shadow: 0 0 12px rgba(0, 255, 255, 0.3);
-}
-
-.fac-action-btn.speak-btn.speaking {
-  background: rgba(239, 68, 68, 0.25);
-  border-color: #ef4444;
-  color: #fca5a5;
-}
-
-.fac-action-btn.map-btn {
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  color: #38bdf8;
-}
-
-.fac-action-btn.map-btn:hover {
-  background: rgba(56, 189, 248, 0.25);
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
-}
-
-.fac-action-btn.qr-btn {
-  background: rgba(168, 85, 247, 0.12);
-  border: 1px solid rgba(168, 85, 247, 0.3);
-  color: #c084fc;
-}
-
-.fac-action-btn.qr-btn:hover {
-  background: rgba(168, 85, 247, 0.25);
-  box-shadow: 0 0 12px rgba(168, 85, 247, 0.3);
-}
-
-/* ── Holographic Architectural Blueprint Map View ──────────────────────── */
-.fac-map-section {
-  position: relative;
-  z-index: 2;
-}
-
-.fac-map-container {
-  background: rgba(6, 18, 38, 0.85);
-  border: 1px solid rgba(0, 255, 255, 0.3);
-  border-radius: 20px;
-  padding: 24px;
-  backdrop-filter: blur(16px);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.fac-map-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-  border-bottom: 1px solid rgba(0, 255, 255, 0.15);
-  padding-bottom: 16px;
-}
-
-.fac-map-title-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.fac-map-title-row h2 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.fac-floor-active-text {
-  color: #00ffff;
-  font-weight: 800;
-}
-
-.fac-map-legend {
+/* Card Header: Icon + Title */
+.nexus-card-top-row {
   display: flex;
   align-items: center;
   gap: 14px;
-  flex-wrap: wrap;
+  margin-bottom: 12px;
 }
 
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  color: #cbd5e1;
-  font-weight: 600;
-}
-
-.legend-box {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-}
-
-.legend-box.k-kiosk { background: #00ffff; box-shadow: 0 0 8px #00ffff; }
-.legend-box.k-restroom { background: #38bdf8; }
-.legend-box.k-lab { background: #10b981; }
-.legend-box.k-dining { background: #f59e0b; }
-.legend-box.k-meeting { background: #8b5cf6; }
-.legend-box.k-utility { background: #64748b; }
-
-.fac-svg-wrapper {
-  width: 100%;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid rgba(0, 255, 255, 0.2);
-  background: #020612;
-  position: relative;
-}
-
-.fac-blueprint-svg {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-/* SVG Room Box Styles */
-.map-room-group {
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.map-room-box {
-  stroke-width: 2;
-  transition: all 0.25s ease;
-}
-
-.map-room-box.r-dining { fill: rgba(245, 158, 11, 0.15); stroke: rgba(245, 158, 11, 0.6); }
-.map-room-box.r-lab { fill: rgba(16, 185, 129, 0.15); stroke: rgba(16, 185, 129, 0.6); }
-.map-room-box.r-meeting { fill: rgba(139, 92, 246, 0.15); stroke: rgba(139, 92, 246, 0.6); }
-.map-room-box.r-utility { fill: rgba(100, 116, 139, 0.25); stroke: rgba(148, 163, 184, 0.5); }
-.map-room-box.r-medical { fill: rgba(239, 68, 68, 0.15); stroke: rgba(239, 68, 68, 0.6); }
-.map-room-box.r-restroom { fill: rgba(56, 189, 248, 0.15); stroke: rgba(56, 189, 248, 0.6); }
-
-.map-room-group:hover .map-room-box {
-  fill: rgba(0, 255, 255, 0.3);
-  stroke: #00ffff;
-  stroke-width: 3;
-}
-
-.map-room-group.active-room .map-room-box {
-  fill: rgba(0, 255, 255, 0.35);
-  stroke: #00ffff;
-  stroke-width: 3.5;
-  filter: drop-shadow(0 0 14px rgba(0, 255, 255, 0.6));
-}
-
-.map-room-title {
-  fill: #ffffff;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.6px;
-  pointer-events: none;
-}
-
-.map-room-sub {
-  fill: #94a3b8;
-  font-size: 9.5px;
-  font-weight: 600;
-  pointer-events: none;
-}
-
-/* Animated Walking Trail on SVG */
-.animated-walking-trail {
-  animation: walkDash 1.2s linear infinite;
-}
-
-@keyframes walkDash {
-  to {
-    stroke-dashoffset: -28;
-  }
-}
-
-/* Kiosk Radar Rings Animation */
-.kiosk-radar-ring1 {
-  animation: radarPulse 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
-}
-
-.kiosk-radar-ring2 {
-  animation: radarPulse 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite 0.7s;
-}
-
-@keyframes radarPulse {
-  0% { r: 10px; opacity: 1; }
-  100% { r: 60px; opacity: 0; }
-}
-
-/* Selected Facility Drawer below Map */
-.fac-map-drawer {
-  background: rgba(10, 25, 47, 0.85);
-  border: 1px solid rgba(0, 255, 255, 0.3);
-  border-radius: 14px;
-  padding: 18px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
-}
-
-.fac-drawer-info {
-  flex: 1;
-}
-
-.fac-drawer-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
-}
-
-.fac-drawer-code {
-  font-size: 14px;
-  font-weight: 800;
-  color: #00ffff;
-  background: rgba(0, 255, 255, 0.1);
-  border: 1px solid rgba(0, 255, 255, 0.3);
-  padding: 2px 8px;
-  border-radius: 6px;
-}
-
-.fac-drawer-floor {
-  font-size: 12px;
-  color: #94a3b8;
-  font-weight: 600;
-}
-
-.fac-drawer-dist {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #38bdf8;
-  font-weight: 700;
-}
-
-.fac-drawer-title {
-  margin: 0 0 6px 0;
-  font-size: 18px;
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.fac-drawer-directions {
-  margin: 0;
-  font-size: 13px;
-  color: #cbd5e1;
-  line-height: 1.4;
-}
-
-.fac-drawer-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.fac-drawer-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(0, 255, 255, 0.15);
-  border: 1px solid rgba(0, 255, 255, 0.4);
-  color: #00ffff;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 12px 18px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.fac-drawer-btn:hover {
-  background: rgba(0, 255, 255, 0.25);
-  box-shadow: 0 0 14px rgba(0, 255, 255, 0.3);
-}
-
-.fac-drawer-btn.active {
-  background: rgba(239, 68, 68, 0.25);
-  border-color: #ef4444;
-  color: #fca5a5;
-}
-
-.fac-drawer-btn.qr {
-  background: rgba(168, 85, 247, 0.15);
-  border-color: rgba(168, 85, 247, 0.4);
-  color: #c084fc;
-}
-
-.fac-drawer-btn.qr:hover {
-  background: rgba(168, 85, 247, 0.25);
-  box-shadow: 0 0 14px rgba(168, 85, 247, 0.3);
-}
-
-/* ── Empty State ───────────────────────────────────────────────────────── */
-.fac-empty-state {
-  background: rgba(10, 25, 47, 0.6);
-  border: 1px dashed rgba(0, 255, 255, 0.3);
-  border-radius: 20px;
-  padding: 60px 24px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.fac-empty-state h3 {
-  margin: 0;
-  font-size: 20px;
-  color: #ffffff;
-}
-
-.fac-empty-state p {
-  margin: 0;
-  font-size: 14px;
-  color: #94a3b8;
-  max-width: 480px;
-}
-
-.fac-reset-filter-btn {
-  background: rgba(0, 255, 255, 0.15);
-  border: 1px solid rgba(0, 255, 255, 0.4);
-  color: #00ffff;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 10px 20px;
-  border-radius: 10px;
-  cursor: pointer;
-  margin-top: 10px;
-}
-
-/* ── Mobile Directions QR Code Modal ───────────────────────────────────── */
-.fac-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(1, 4, 10, 0.85);
-  backdrop-filter: blur(14px);
+.nexus-card-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(0, 255, 255, 0.08);
+  border: 1px solid rgba(0, 255, 255, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
-  padding: 20px;
-  animation: fadeIn 0.2s ease;
+  flex-shrink: 0;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.nexus-facility-card:hover .nexus-card-icon-box {
+  transform: scale(1.08);
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.3);
 }
 
-.fac-modal-card {
-  background: #0a192f;
-  border: 1px solid #00ffff;
-  box-shadow: 0 0 35px rgba(0, 255, 255, 0.35);
-  border-radius: 22px;
-  padding: 30px;
-  max-width: 440px;
-  width: 100%;
+.nexus-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.35;
+  letter-spacing: -0.2px;
+  text-align: left;
+}
+
+/* Card Description */
+.nexus-card-description {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #94a3b8;
+  text-align: left;
+  font-weight: 400;
+}
+
+/* Loading & Empty States */
+.nexus-facilities-loading,
+.nexus-facilities-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  position: relative;
-  text-align: center;
-  animation: popIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  justify-content: center;
+  min-height: 300px;
+  gap: 14px;
+  color: #94a3b8;
 }
 
-@keyframes popIn {
-  from { transform: scale(0.9); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-
-.fac-modal-close-btn {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  border-radius: 50%;
+.nexus-loading-spinner {
   width: 36px;
   height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #cbd5e1;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  border: 3px solid rgba(0, 255, 255, 0.25);
+  border-top-color: #00ffff;
+  border-radius: 50%;
+  animation: nexus-spin 0.8s linear infinite;
 }
 
-.fac-modal-close-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
-}
-
-.fac-modal-header h3 {
-  margin: 10px 0 4px 0;
-  font-size: 20px;
-  color: #ffffff;
-}
-
-.fac-modal-header p {
-  margin: 0;
-  font-size: 13px;
-  color: #94a3b8;
-}
-
-.fac-modal-qr-container {
-  background: #ffffff;
-  padding: 14px;
-  border-radius: 16px;
-  margin: 20px 0;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-
-.fac-qr-image {
-  width: 220px;
-  height: 220px;
-  display: block;
-}
-
-.fac-qr-placeholder {
-  width: 220px;
-  height: 220px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.fac-modal-details {
-  width: 100%;
-  text-align: left;
-  margin-bottom: 20px;
-}
-
-.fac-modal-details h4 {
-  margin: 0 0 4px 0;
-  font-size: 16px;
-  color: #00ffff;
-}
-
-.fac-modal-details p {
-  margin: 0 0 10px 0;
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-.fac-modal-directions-box {
-  background: rgba(2, 6, 23, 0.7);
-  border-left: 3px solid #00ffff;
-  padding: 10px 12px;
-  border-radius: 6px;
-  font-size: 12.5px;
-  color: #e2e8f0;
-  line-height: 1.45;
-}
-
-.fac-modal-done-btn {
-  width: 100%;
-  background: linear-gradient(135deg, #00ffff 0%, #0284c7 100%);
-  border: none;
-  color: #021526;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.8px;
-  padding: 14px;
-  border-radius: 12px;
-  cursor: pointer;
-  box-shadow: 0 4px 18px rgba(0, 255, 255, 0.4);
-  transition: all 0.2s ease;
-}
-
-.fac-modal-done-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(0, 255, 255, 0.6);
-}
-
-/* ── Responsiveness for 10.6" / 11" Redmi Pad 2 Tablet ────────────────── */
-@media (max-width: 900px) {
-  .public-facilities-view {
-    padding: 16px;
-    padding-bottom: 140px !important;
+@keyframes nexus-spin {
+  to {
+    transform: rotate(360deg);
   }
+}
 
-  .fac-cards-grid {
+/* ── Responsive Queries ───────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .nexus-facilities-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 680px) {
+  .nexus-facilities-grid {
     grid-template-columns: 1fr;
   }
-
-  .fac-map-drawer {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .fac-drawer-actions {
-    width: 100%;
-  }
-
-  .fac-drawer-btn {
-    flex: 1;
-    justify-content: center;
+  .nexus-facilities-viewport {
+    padding: 16px 18px 120px 18px;
   }
 }

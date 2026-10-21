@@ -1,27 +1,30 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Mic, Volume2, VolumeX, Sparkles } from 'lucide-react';
+import {
+  ArrowLeft,
+  Send,
+  Mic,
+  Volume2,
+  VolumeX,
+  Sparkles,
+  Battery,
+  BatteryCharging
+} from 'lucide-react';
 import { voiceNavigationService } from '../../services/voiceNavigationService';
 import { cancelSpeech, speakWithVoice } from '../../utils/speechSynthesis';
 import { offlineVisitorService } from '../../db/offlineServices';
-import { kioskConfigService, DEFAULT_FORM_FIELDS } from '../../services/kioskConfigService';
+import { kioskConfigService } from '../../services/kioskConfigService';
 import { raspberryPiService } from '../../services/raspberryPiService';
 import { logger } from '../../services/logger';
 import './VisitorRegistration.css';
 
-// ── Static Pure Utility Functions (Zero-Allocation on Re-renders) ──
+// ── Static Pure Utility Functions ──
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-// Conversational sentence prefixes for speech extraction
 const NAME_PREFIXES = [
-  // "my full name is", "my name is", "my good name is", "my real name is", "my official name is", "my first name is", "my name's", "my name"
   /^(?:my\s+(?:full\s+|real\s+|good\s+|official\s+|first\s+)?name\s*(?:is|'s)?)\s+/i,
-  // "full name is", "real name is", "good name is", "official name is", "name is", "name called", "name would be"
   /^(?:(?:full\s+|real\s+|good\s+|official\s+)?name\s+(?:is|called|would\s+be))\s+/i,
-  // "this is", "myself", "it is", "it's", "its"
   /^(?:this\s+is|myself|it\s+is|it's|its)\s+/i,
-  // "i am", "i'm", "im"
   /^(?:i\s+am|i'm|im)\s+/i,
-  // "you can call me", "they call me", "people call me", "call me", "known as", "i go by"
   /^(?:(?:you\s+can\s+)?call\s+me|they\s+call\s+me|people\s+call\s+me|known\s+as|i\s+go\s+by)\s+/i,
 ];
 
@@ -44,16 +47,11 @@ const EMAIL_PREFIXES = [
 const cleanConversationalPrefix = (text, specificPrefixes = []) => {
   if (!text) return '';
   let res = text.trim();
-
-  // Strip greetings: "hello", "hi", "hey", "good morning", etc.
   res = res.replace(/^(?:hello|hi|hey|good\s+morning|good\s+afternoon|good\s+evening)[,\s]+/i, '');
-
-  // Strip conversational preamble like "actually", "well", "i told you", "i said that"
   res = res.replace(/^(?:actually|well|yeah|yes|ok|okay)[,\s]+/i, '');
   res = res.replace(/^(?:i\s+(?:already\s+)?(?:told|tol|said)(?:\s+(?:you|that))*[,\s]+)/i, '');
   res = res.replace(/^(?:actually|well|yeah|yes|ok|okay)[,\s]+/i, '');
 
-  // Strip field-specific conversational prefix
   for (const prefixRegex of specificPrefixes) {
     if (prefixRegex.test(res)) {
       res = res.replace(prefixRegex, '').trim();
@@ -61,11 +59,8 @@ const cleanConversationalPrefix = (text, specificPrefixes = []) => {
     }
   }
 
-  // Strip trailing name or place declarations
   res = res.replace(/\s+(?:is\s+(?:my\s+)?(?:full\s+)?name|this\s+side|here|speaking)$/i, '');
   res = res.replace(/\s+(?:is\s+my\s+(?:native|place|city|hometown)|is\s+where\s+i\s+come\s+from)$/i, '');
-
-  // Strip trailing polite filler: "please", "sir", "madam", "thank you", "thanks"
   res = res.replace(/\s+(?:please|sir|madam|thank\s+you|thanks)$/i, '');
   return res.trim();
 };
@@ -88,7 +83,6 @@ const formatField = (key, text, type = 'text') => {
   const clean = text.trim();
   const keyLower = (key || '').toLowerCase();
 
-  // 1. Mobile / Phone
   if (keyLower === 'mobile' || keyLower === 'phone' || type === 'tel') {
     let phoneStr = clean.toLowerCase();
     phoneStr = phoneStr.replace(/\bdouble\s+(\w+)/g, '$1$1');
@@ -100,7 +94,6 @@ const formatField = (key, text, type = 'text') => {
     return phoneStr.replace(/\D/g, '').slice(0, 10);
   }
 
-  // 2. Email
   if (keyLower === 'email' || type === 'email') {
     let email = cleanConversationalPrefix(clean, EMAIL_PREFIXES).toLowerCase();
     email = email.replace(/\s+(?:at(?:\s+the)?\s+rate|at)\s+/gi, '@');
@@ -111,28 +104,22 @@ const formatField = (key, text, type = 'text') => {
     return email;
   }
 
-  // 3. Name (strips "my full name is", "my name is", "i am", "myself", phonetic "eragunath" -> "ragunath")
   if (keyLower === 'name') {
     let name = cleanConversationalPrefix(clean, NAME_PREFIXES);
     name = name.replace(/^e(?=ragunath\b)/i, '');
     return toTitleCase(name);
   }
 
-  // 4. Place / Location / City (strips "i am coming from", "from", normalizes "salen" -> "Salem")
   if (keyLower === 'place' || keyLower === 'city' || keyLower === 'location' || keyLower === 'from') {
     let place = cleanConversationalPrefix(clean, PLACE_PREFIXES);
-    if (place.toLowerCase() === 'salen') {
-      place = 'Salem';
-    }
+    if (place.toLowerCase() === 'salen') place = 'Salem';
     return toTitleCase(place);
   }
 
-  // 5. Purpose of Visit / Visit - Completely take all without changing words as requested!
   if (keyLower === 'visit' || keyLower === 'purpose') {
     return clean.charAt(0).toUpperCase() + clean.slice(1);
   }
 
-  // Generic fallback
   let generic = clean.replace(/^(?:hello|hi|hey|good\s+morning|good\s+afternoon|good\s+evening)[,\s]+/i, '');
   return toTitleCase(generic);
 };
@@ -184,7 +171,7 @@ const validateField = (field, rawVal) => {
         speechError: 'Please tell me your name clearly.',
       };
     }
-  } else if (keyLower === 'visit') {
+  } else if (keyLower === 'visit' || keyLower === 'purpose') {
     if (val.length < 2) {
       return {
         valid: false,
@@ -200,26 +187,15 @@ const validateField = (field, rawVal) => {
         speechError: 'Please tell me where you are coming from.',
       };
     }
-  } else if (isRequired && val.length < 1) {
-    return {
-      valid: false,
-      error: `${field.label} is compulsory`,
-      speechError: `Please tell me your ${field.label}.`,
-    };
   }
 
   return { valid: true };
 };
 
-// ── Voice Intent Detectors (Field Editing & Submission) ──
+// ── Voice Intent Detectors (Field Editing / Re-entering While Submitting) ──
 const detectFieldToEdit = (text, fields) => {
   if (!text) return -1;
   const t = text.toLowerCase().trim();
-
-  const changeIndicators = [
-    'change', 'edit', 'update', 'modify', 'correct', 'wrong', 'fix',
-    'reenter', 're-enter', 'redo', 'replace', 'new', 'different', 'switch'
-  ];
 
   // 1. Name
   if (
@@ -232,12 +208,9 @@ const detectFieldToEdit = (text, fields) => {
     t.includes('re-enter name') ||
     t.includes('wish to change name') ||
     t.includes('want to change name') ||
-    t.includes('change the name') ||
     t.includes('correct my name') ||
-    t.includes('enter name again') ||
     t === 'name' ||
-    t === 'full name' ||
-    t === 'my name'
+    t === 'full name'
   ) {
     const idx = fields.findIndex((f) => f.key.toLowerCase() === 'name');
     if (idx !== -1) return idx;
@@ -256,15 +229,12 @@ const detectFieldToEdit = (text, fields) => {
     t.includes('wrong number') ||
     t.includes('reenter mobile') ||
     t.includes('reenter number') ||
-    t.includes('wish to change mobile') ||
-    t.includes('want to change mobile') ||
-    t.includes('want to change number') ||
     t.includes('change my number') ||
     t.includes('change my mobile') ||
     t === 'mobile' ||
     t === 'phone' ||
     t === 'number' ||
-    t === 'mobile number'
+    t === 'phone number'
   ) {
     const idx = fields.findIndex((f) => f.key.toLowerCase() === 'mobile' || f.key.toLowerCase() === 'phone' || f.type === 'tel');
     if (idx !== -1) return idx;
@@ -279,8 +249,6 @@ const detectFieldToEdit = (text, fields) => {
     t.includes('wrong email') ||
     t.includes('wrong mail') ||
     t.includes('reenter email') ||
-    t.includes('wish to change email') ||
-    t.includes('want to change email') ||
     t.includes('change my email') ||
     t === 'email' ||
     t === 'mail' ||
@@ -296,12 +264,8 @@ const detectFieldToEdit = (text, fields) => {
     t.includes('edit visit') ||
     t.includes('change purpose') ||
     t.includes('edit purpose') ||
-    t.includes('change reason') ||
     t.includes('wrong purpose') ||
     t.includes('wrong visit') ||
-    t.includes('wish to change visit') ||
-    t.includes('want to change purpose') ||
-    t.includes('want to change visit') ||
     t === 'visit' ||
     t === 'purpose' ||
     t === 'purpose of visit'
@@ -310,7 +274,7 @@ const detectFieldToEdit = (text, fields) => {
     if (idx !== -1) return idx;
   }
 
-  // 5. Place / Location / Origin
+  // 5. Place / Location
   if (
     t.includes('change place') ||
     t.includes('edit place') ||
@@ -319,34 +283,13 @@ const detectFieldToEdit = (text, fields) => {
     t.includes('change location') ||
     t.includes('wrong place') ||
     t.includes('wrong city') ||
-    t.includes('wish to change place') ||
-    t.includes('want to change place') ||
-    t.includes('change where i came from') ||
     t === 'place' ||
     t === 'city' ||
-    t === 'location'
+    t === 'location' ||
+    t === 'place of visit'
   ) {
     const idx = fields.findIndex((f) => f.key.toLowerCase() === 'place' || f.key.toLowerCase() === 'city');
     if (idx !== -1) return idx;
-  }
-
-  // 6. Custom dynamic fields
-  const hasChangeWord = changeIndicators.some((ind) => t.includes(ind));
-  for (let i = 0; i < fields.length; i++) {
-    const f = fields[i];
-    const keyL = (f.key || '').toLowerCase();
-    const lblL = (f.label || '').toLowerCase();
-    if (
-      t === keyL ||
-      t === lblL ||
-      t.includes(`change ${lblL}`) ||
-      t.includes(`edit ${lblL}`) ||
-      t.includes(`change ${keyL}`) ||
-      t.includes(`edit ${keyL}`) ||
-      (hasChangeWord && (t.includes(lblL) || t.includes(keyL)))
-    ) {
-      return i;
-    }
   }
 
   return -1;
@@ -356,7 +299,6 @@ const isSubmitCommand = (text) => {
   if (!text) return false;
   const t = text.toLowerCase().trim();
 
-  // If user mentions changing, editing, waiting, or negation, NEVER submit!
   if (
     t.includes('change') ||
     t.includes('edit') ||
@@ -366,7 +308,6 @@ const isSubmitCommand = (text) => {
     t.includes('correct') ||
     t.includes('wait') ||
     t.includes('stop') ||
-    t.includes('hold on') ||
     t.includes('no ') ||
     t === 'no' ||
     t.includes('cancel')
@@ -374,7 +315,6 @@ const isSubmitCommand = (text) => {
     return false;
   }
 
-  // Explicit submit phrases only
   return (
     t.includes('submit') ||
     t === 'yes' ||
@@ -385,32 +325,77 @@ const isSubmitCommand = (text) => {
     t === 'yes submit' ||
     t === 'please submit' ||
     t === 'save and submit' ||
-    t === 'save registration' ||
-    t === 'proceed to submit'
+    t === 'save registration'
   );
 };
 
 export default function VisitorRegistration({ onNavigate }) {
-  // Master kiosk settings cached safely in ref to prevent re-render invalidation
   const kioskConfigRef = useRef(kioskConfigService.getConfig());
   const kioskConfig = kioskConfigRef.current;
   const voiceGender = kioskConfig?.voiceGender || 'female';
   const speechRate = kioskConfig?.speechRate || 1.0;
   const speechPitch = kioskConfig?.speechPitch || 1.05;
 
-  // Active form fields memoized once on mount for absolute 60 FPS stability
-  const activeFields = useMemo(() => {
-    return (kioskConfig?.formFields && Array.isArray(kioskConfig.formFields) && kioskConfig.formFields.length > 0)
-      ? kioskConfig.formFields.filter((f) => f.enabled !== false)
-      : DEFAULT_FORM_FIELDS;
-  }, [kioskConfig]);
+  // Exact 5 fields matching Nexus skeleton without gender
+  const formFields = useMemo(() => [
+    {
+      id: 'name',
+      key: 'Name',
+      label: 'Full Name',
+      type: 'text',
+      placeholder: 'Enter your full name',
+      required: true,
+      prompt: 'Please tell me your full name.',
+      retryPrompt: "I didn't catch your name. Please speak your full name clearly.",
+    },
+    {
+      id: 'mobile',
+      key: 'Mobile',
+      label: 'Phone Number',
+      type: 'tel',
+      placeholder: 'Enter 10-digit number',
+      required: true,
+      prompt: 'What is your 10 digit mobile number?',
+      retryPrompt: 'Please tell me your 10 digit mobile number.',
+    },
+    {
+      id: 'email',
+      key: 'Email',
+      label: 'Email Address',
+      type: 'email',
+      placeholder: 'example@domain.com',
+      required: true,
+      prompt: 'Please tell me your email address.',
+      retryPrompt: 'Please tell me your valid email address, like user at gmail dot com.',
+    },
+    {
+      id: 'visit',
+      key: 'Visit',
+      label: 'Purpose of Visit',
+      type: 'text',
+      placeholder: 'Please enter the purpose of your visit...',
+      required: true,
+      prompt: 'What is the purpose of your visit?',
+      retryPrompt: 'Please tell me the purpose of your visit.',
+    },
+    {
+      id: 'place',
+      key: 'Place',
+      label: 'Place of Visit',
+      type: 'text',
+      placeholder: 'Where are you from? / Enter location',
+      required: true,
+      prompt: 'Where are you coming from?',
+      retryPrompt: 'Please tell me where you are coming from.',
+    },
+  ], []);
 
-  const [formData, setFormData] = useState(() => {
-    const init = {};
-    activeFields.forEach((f) => {
-      init[f.key] = '';
-    });
-    return init;
+  const [formData, setFormData] = useState({
+    Name: '',
+    Mobile: '',
+    Email: '',
+    Visit: '',
+    Place: '',
   });
 
   const [fieldErrors, setFieldErrors] = useState({});
@@ -419,21 +404,21 @@ export default function VisitorRegistration({ onNavigate }) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceAutoPilot, setVoiceAutoPilot] = useState(true);
-  const [statusMessage, setStatusMessage] = useState('Initializing voice registration...');
-  const [fps, setFps] = useState(60);
+  const [statusMessage, setStatusMessage] = useState('Welcome! Please provide your details.');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const isSubmittingRef = useRef(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
-  const [showLogViewer, setShowLogViewer] = useState(false);
-  const [logs, setLogs] = useState([]);
 
-  // Refs for safe async state
+  // Battery State: dynamically fetched from Android Launcher or Web Battery API
+  const [batteryLevel, setBatteryLevel] = useState(null);
+  const [isCharging, setIsCharging] = useState(false);
+
   const isMounted = useRef(true);
   const activeStepRef = useRef(0);
   const formDataRef = useRef(formData);
   const voiceAutoPilotRef = useRef(true);
   const recognitionRef = useRef(null);
   const lastTranscriptRef = useRef('');
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     isSubmittingRef.current = isSubmitting;
@@ -451,36 +436,48 @@ export default function VisitorRegistration({ onNavigate }) {
     activeStepRef.current = activeStep;
   }, [activeStep]);
 
+  // ── Real-Time Battery Query ──
+  const updateBatteryStatus = useCallback(async () => {
+    // 1. Android Native LauncherBridge check
+    if (window.AndroidLauncher && typeof window.AndroidLauncher.getBatteryLevel === 'function') {
+      try {
+        const lvl = window.AndroidLauncher.getBatteryLevel();
+        if (lvl > 0 && lvl <= 100) {
+          setBatteryLevel(lvl);
+          return;
+        }
+      } catch (err) {
+        logger.warn('BATTERY_BRIDGE', err.message);
+      }
+    }
+
+    // 2. Standard Web Battery API check
+    if ('getBattery' in navigator) {
+      try {
+        const b = await navigator.getBattery();
+        setBatteryLevel(Math.round(b.level * 100));
+        setIsCharging(b.charging);
+        return;
+      } catch {}
+    }
+
+    // 3. Fallback to 100% if undetectable
+    setBatteryLevel((prev) => (prev !== null ? prev : 100));
+  }, []);
+
+  useEffect(() => {
+    updateBatteryStatus();
+    const interval = setInterval(updateBatteryStatus, 15000);
+    return () => clearInterval(interval);
+  }, [updateBatteryStatus]);
+
   const showToast = useCallback((message, type = 'success') => {
-    logger.info('FORM_UI', `Toast: [${type}] ${message}`);
     setToast({ show: true, message, type });
     setTimeout(() => {
       if (isMounted.current) setToast({ show: false, message: '', type: 'success' });
     }, 3000);
   }, []);
 
-  // ── Lightweight Real FPS Counter Loop ──
-  useEffect(() => {
-    let frameCount = 0;
-    let lastTime = performance.now();
-    let animId;
-
-    const measure = (now) => {
-      frameCount++;
-      if (now - lastTime >= 1000) {
-        const calculatedFps = Math.round((frameCount * 1000) / (now - lastTime));
-        setFps(calculatedFps);
-        frameCount = 0;
-        lastTime = now;
-      }
-      animId = requestAnimationFrame(measure);
-    };
-
-    animId = requestAnimationFrame(measure);
-    return () => cancelAnimationFrame(animId);
-  }, []);
-
-  // Safely stop speech and recognition
   const stopAudio = useCallback(() => {
     cancelSpeech();
     setIsSpeaking(false);
@@ -497,26 +494,25 @@ export default function VisitorRegistration({ onNavigate }) {
   stopAudioRef.current = stopAudio;
   const submitFormDirectlyRef = useRef(null);
 
-  // ── Conversational Step Executor with Voice Editing & Compulsory Retry Loop ──
+  // ── Conversational Step Executor with Re-entering & Voice Editing ──
   const runVoiceStep = useCallback(
     async (stepIndex, isRetry = false, isEditingMode = false, retrySpeechPrompt = '', clearOnMic = false) => {
       if (!isMounted.current || !voiceAutoPilotRef.current) return;
 
       // Completion stage: check if all fields satisfy compulsory requirements
-      if (stepIndex >= activeFields.length) {
-        const firstInvalidIdx = activeFields.findIndex((f) => {
+      if (stepIndex >= formFields.length) {
+        const firstInvalidIdx = formFields.findIndex((f) => {
           const val = formDataRef.current[f.key];
           return !validateField(f, val).valid;
         });
 
         if (firstInvalidIdx !== -1) {
-          const missingField = activeFields[firstInvalidIdx];
+          const missingField = formFields[firstInvalidIdx];
           const valRes = validateField(missingField, formDataRef.current[missingField.key]);
           const promptToSpeak = missingField.retryPrompt || `Please provide your ${missingField.label}.`;
           setStatusMessage(`Missing: ${missingField.label}`);
           showToast(valRes.error || `Please enter ${missingField.label}`, 'error');
           setFieldErrors((prev) => ({ ...prev, [missingField.key]: true }));
-          logger.speech('VALIDATION_MISSING', `Step check failed for ${missingField.key}`);
 
           await speakWithVoice(promptToSpeak, {
             gender: voiceGender,
@@ -536,9 +532,8 @@ export default function VisitorRegistration({ onNavigate }) {
           return;
         }
 
-        // All fields verified and filled
+        // All fields verified and filled: user can now say "Submit" OR say "Change Name / Change Phone" to re-enter!
         setStatusMessage('All details recorded! Say "Submit" to confirm, or say "Change Name" to edit.');
-        logger.info('VOICE_FLOW', 'Completed all form fields. Listening for voice submit confirmation or edit commands.');
 
         const startSubmitMic = () => {
           if (!isMounted.current || !voiceAutoPilotRef.current || isSubmittingRef.current) return;
@@ -561,7 +556,6 @@ export default function VisitorRegistration({ onNavigate }) {
               if (!isMounted.current) return;
               setIsListening(true);
               setStatusMessage('Say "Submit" to finish, or say "Change Name" to edit...');
-              logger.speech('MIC_START', 'Listening for submit confirmation or edit command');
             };
 
             let lastSubmitUtterance = '';
@@ -570,19 +564,18 @@ export default function VisitorRegistration({ onNavigate }) {
             const handleDecision = (text) => {
               if (isHandled || !text) return false;
 
-              // 1. Did the user request to edit a specific field? (e.g. "change name", "i want to change name", "wrong email")
-              const editIdx = detectFieldToEdit(text, activeFields);
+              // 1. Did the user request to re-enter/edit a specific field while submitting?
+              const editIdx = detectFieldToEdit(text, formFields);
               if (editIdx !== -1) {
                 isHandled = true;
                 try { rec.abort(); } catch {}
                 setIsListening(false);
-                const targetField = activeFields[editIdx];
-                logger.speech('VOICE_EDIT_REQUEST', `User requested to edit field: ${targetField.key}`);
+                const targetField = formFields[editIdx];
 
-                // Clear current value of the field for fresh input
+                // Clear current value of the field for fresh re-entry
                 setFormData((prev) => ({ ...prev, [targetField.key]: '' }));
 
-                // Directly run the step in editing mode with single clean prompt
+                // Directly run the step in editing mode with clean prompt
                 runVoiceStepRef.current?.(editIdx, false, true);
                 return true;
               }
@@ -593,29 +586,6 @@ export default function VisitorRegistration({ onNavigate }) {
                 try { rec.abort(); } catch {}
                 setIsListening(false);
                 submitFormDirectlyRef.current?.();
-                return true;
-              }
-
-              // 3. Did user say a general change request ("i want to change", "edit") without naming the field?
-              if (text.includes('change') || text.includes('edit') || text.includes('modify')) {
-                isHandled = true;
-                try { rec.abort(); } catch {}
-                setIsListening(false);
-                speakWithVoice('Which detail would you like to change? You can say Name, Mobile, Email, Purpose of Visit, or Place.', {
-                  gender: voiceGender,
-                  rate: speechRate,
-                  pitch: speechPitch,
-                  onEnd: () => {
-                    if (isMounted.current && voiceAutoPilotRef.current) {
-                      startSubmitMic();
-                    }
-                  },
-                  onError: () => {
-                    if (isMounted.current && voiceAutoPilotRef.current) {
-                      startSubmitMic();
-                    }
-                  },
-                });
                 return true;
               }
 
@@ -631,16 +601,13 @@ export default function VisitorRegistration({ onNavigate }) {
               const clean = heard.toLowerCase().trim();
               lastSubmitUtterance = clean;
               const isFinal = !!e.results[e.results.length - 1]?.isFinal;
-              logger.speech('MIC_CONFIRM', `Heard input at submit stage: "${clean}" (isFinal: ${isFinal})`);
 
-              // If a specific field was mentioned, handle immediately even mid-speech
-              const editIdx = detectFieldToEdit(clean, activeFields);
+              const editIdx = detectFieldToEdit(clean, formFields);
               if (editIdx !== -1) {
                 handleDecision(clean);
                 return;
               }
 
-              // Only process submit or general fallback when utterance is finalized
               if (isFinal) {
                 handleDecision(clean);
               }
@@ -654,19 +621,15 @@ export default function VisitorRegistration({ onNavigate }) {
               if (!isMounted.current) return;
               setIsListening(false);
 
-              // Check unprocessed final speech if present
               if (!isHandled && lastSubmitUtterance) {
-                if (handleDecision(lastSubmitUtterance)) {
-                  return;
-                }
+                if (handleDecision(lastSubmitUtterance)) return;
               }
 
-              // Patiently restart listening if still on submit review screen and not submitting
               setTimeout(() => {
                 if (
                   isMounted.current &&
                   voiceAutoPilotRef.current &&
-                  activeStepRef.current >= activeFields.length &&
+                  activeStepRef.current >= formFields.length &&
                   !isSubmittingRef.current &&
                   !isHandled
                 ) {
@@ -684,6 +647,7 @@ export default function VisitorRegistration({ onNavigate }) {
         const visitorName = formDataRef.current?.Name
           ? formatField('Name', formDataRef.current.Name, 'text')
           : 'Visitor';
+
         await speakWithVoice(
           `Thank you ${visitorName}! Please say Submit to complete your registration, or say Change Name to edit any field.`,
           {
@@ -697,7 +661,7 @@ export default function VisitorRegistration({ onNavigate }) {
         return;
       }
 
-      const current = activeFields[stepIndex];
+      const current = formFields[stepIndex];
       setActiveStep(stepIndex);
       activeStepRef.current = stepIndex;
       lastTranscriptRef.current = '';
@@ -709,15 +673,15 @@ export default function VisitorRegistration({ onNavigate }) {
 
       let spokenPrompt = '';
       if (isRetry) {
-        spokenPrompt = retrySpeechPrompt || current.retryPrompt || (isMobile ? 'Please tell me your 10-digit Mobile Number.' : `Please tell me your ${current.label}.`);
+        spokenPrompt = retrySpeechPrompt || current.retryPrompt || (isMobile ? 'Please tell me your 10-digit Mobile Number.' : `Please provide your ${current.label}.`);
       } else if (isEditingMode) {
         if (isMobile) {
-          spokenPrompt = 'Sure, please tell me your 10-digit Mobile Number.';
+          spokenPrompt = 'Sure, please tell me your 10-digit Phone Number.';
         } else if (isEmail) {
           spokenPrompt = 'Sure, please tell me your Email address.';
-        } else if (current.key.toLowerCase() === 'place') {
+        } else if (current.key === 'Place') {
           spokenPrompt = 'Sure, where are you coming from?';
-        } else if (current.key.toLowerCase() === 'visit') {
+        } else if (current.key === 'Visit') {
           spokenPrompt = 'Sure, what is the purpose of your visit?';
         } else {
           spokenPrompt = `Sure, please tell me your new ${current.label}.`;
@@ -728,17 +692,11 @@ export default function VisitorRegistration({ onNavigate }) {
 
       setStatusMessage(`Aurra: "${spokenPrompt}"`);
       setIsSpeaking(true);
-      logger.speech(
-        'VOICE_PROMPT',
-        `Step ${stepIndex + 1}/${activeFields.length} (${current.key}): "${spokenPrompt}"`
-      );
 
       const startMic = () => {
         if (!isMounted.current || !voiceAutoPilotRef.current) return;
         setIsSpeaking(false);
 
-        // When mic starts on retry (e.g. incomplete number) or editing mode,
-        // clear the field so that the old wrong/incomplete value is cleared for new speech!
         if (isRetry || isEditingMode || clearOnMic) {
           setFormData((prev) => ({ ...prev, [current.key]: '' }));
           lastTranscriptRef.current = '';
@@ -747,7 +705,6 @@ export default function VisitorRegistration({ onNavigate }) {
         const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRec) {
           setStatusMessage('Microphone STT unavailable. Please type manually.');
-          logger.warn('VOICE_STT', 'SpeechRecognition API not available in WebView');
           return;
         }
 
@@ -762,7 +719,6 @@ export default function VisitorRegistration({ onNavigate }) {
             if (!isMounted.current) return;
             setIsListening(true);
             setStatusMessage(`Listening for ${current.label}... speak now`);
-            logger.speech('MIC_START', `Listening for field: ${current.key}`);
           };
 
           rec.onresult = (e) => {
@@ -778,11 +734,8 @@ export default function VisitorRegistration({ onNavigate }) {
             }
           };
 
-          rec.onerror = (err) => {
-            logger.warn('MIC_ERROR', `STT Error on ${current.key}: ${err?.error || 'unknown'}`);
-            if (isMounted.current) {
-              setIsListening(false);
-            }
+          rec.onerror = () => {
+            if (isMounted.current) setIsListening(false);
           };
 
           rec.onend = () => {
@@ -792,12 +745,11 @@ export default function VisitorRegistration({ onNavigate }) {
             const rawVal = lastTranscriptRef.current || formDataRef.current[current.key] || '';
             const val = formatField(current.key, rawVal, current.type);
             setFormData((prev) => ({ ...prev, [current.key]: val }));
-            logger.speech('MIC_END', `Field ${current.key} value: "${val}"`);
 
-            // Check if user spoke a command to switch/edit any field
-            const switchIdx = detectFieldToEdit(val, activeFields);
+            // Check if user requested to switch or re-enter another field
+            const switchIdx = detectFieldToEdit(val, formFields);
             if (switchIdx !== -1) {
-              const nextField = activeFields[switchIdx];
+              const nextField = formFields[switchIdx];
               setFormData((prev) => ({ ...prev, [nextField.key]: '' }));
               runVoiceStepRef.current?.(switchIdx, false, true);
               return;
@@ -806,31 +758,29 @@ export default function VisitorRegistration({ onNavigate }) {
             const valRes = validateField(current, val);
 
             if (valRes.valid && (val || !current.required)) {
-              // Valid entry! Clear error
               setFieldErrors((prev) => ({ ...prev, [current.key]: false }));
               setFieldErrorsText((prev) => ({ ...prev, [current.key]: '' }));
 
-              // Check if all other fields are already valid
-              const allOthersValid = activeFields.every((f, idx) => {
+              const allOthersValid = formFields.every((f, idx) => {
                 if (idx === stepIndex) return true;
                 const v = formDataRef.current[f.key];
                 return validateField(f, v).valid;
               });
 
               if (isEditingMode || allOthersValid) {
-                // Return to final review & submission step!
+                // Return to final review and submission step!
                 speakWithVoice(`Updated your ${current.label}! Say Submit to confirm, or tell me if you want to change any other detail.`, {
                   gender: voiceGender,
                   rate: speechRate,
                   pitch: speechPitch,
                   onEnd: () => {
                     if (isMounted.current && voiceAutoPilotRef.current) {
-                      runVoiceStepRef.current?.(activeFields.length);
+                      runVoiceStepRef.current?.(formFields.length);
                     }
                   },
                   onError: () => {
                     if (isMounted.current && voiceAutoPilotRef.current) {
-                      runVoiceStepRef.current?.(activeFields.length);
+                      runVoiceStepRef.current?.(formFields.length);
                     }
                   },
                 });
@@ -843,7 +793,6 @@ export default function VisitorRegistration({ onNavigate }) {
                 }
               }, 400);
             } else {
-              // Compulsory field is empty or failed validation
               setFieldErrors((prev) => ({ ...prev, [current.key]: true }));
               setFieldErrorsText((prev) => ({ ...prev, [current.key]: valRes.error }));
               const speechPrompt = valRes.speechError || current.retryPrompt || valRes.error;
@@ -866,7 +815,7 @@ export default function VisitorRegistration({ onNavigate }) {
 
           rec.start();
         } catch (err) {
-          logger.error('MIC_EXCEPTION', `Failed to start STT: ${err.message}`);
+          logger.error('MIC_EXCEPTION', err.message);
           setIsListening(false);
         }
       };
@@ -879,49 +828,41 @@ export default function VisitorRegistration({ onNavigate }) {
         onError: startMic,
       });
     },
-    [activeFields, voiceGender, speechRate, speechPitch, stopAudio]
+    [formFields, voiceGender, speechRate, speechPitch, stopAudio, showToast]
   );
 
   const runVoiceStepRef = useRef(runVoiceStep);
   runVoiceStepRef.current = runVoiceStep;
 
-  // ── Lifecycle on Mount ──
   useEffect(() => {
     isMounted.current = true;
-    logger.info('FORM_LIFECYCLE', 'VisitorRegistration mounted (No camera, pure lightweight UI)');
 
-    // Pause global voice navigation to prevent background dual-mic audio conflicts
     if (voiceNavigationService?.stopListening) {
       voiceNavigationService.stopListening(true);
-      logger.info('VOICE_NAV', 'Paused background voiceNavigationService for form');
     }
 
-    // Start auto voice conversation after small delay
     const startTimer = setTimeout(() => {
       if (isMounted.current && voiceAutoPilotRef.current) {
         runVoiceStepRef.current?.(0);
       }
-    }, 500);
+    }, 600);
 
     return () => {
       isMounted.current = false;
       clearTimeout(startTimer);
       stopAudioRef.current?.();
-      logger.info('FORM_LIFECYCLE', 'VisitorRegistration unmounted cleanly');
     };
-  }, []); // Run strictly ONCE on component mount!
+  }, []);
 
-  // User taps an input field or Edit button directly to edit
+  // User taps an input field or Edit button directly to re-enter
   const handleSelectField = (index) => {
-    const targetField = activeFields[index];
+    const targetField = formFields[index];
     if (!targetField) return;
-    logger.info('USER_TAP', `User tapped to edit field: ${targetField.key}`);
     stopAudio();
     setFormData((prev) => ({ ...prev, [targetField.key]: '' }));
     runVoiceStep(index, false, true);
   };
 
-  // Manual input edit
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -929,35 +870,13 @@ export default function VisitorRegistration({ onNavigate }) {
     setFieldErrorsText((prev) => ({ ...prev, [name]: '' }));
   };
 
-  // Toggle voice auto-pilot
-  const toggleVoiceAutoPilot = () => {
-    if (voiceAutoPilot) {
-      stopAudio();
-      setVoiceAutoPilot(false);
-      setStatusMessage('Voice auto-pilot paused. Manual typing enabled.');
-      logger.info('VOICE_TOGGLE', 'Voice auto-pilot paused by user');
-    } else {
-      setVoiceAutoPilot(true);
-      logger.info('VOICE_TOGGLE', 'Voice auto-pilot resumed by user');
-      runVoiceStep(activeStep);
-    }
-  };
-
-  // View diagnostic logs modal
-  const handleOpenLogs = () => {
-    setLogs(logger.getLogs());
-    setShowLogViewer(true);
-  };
-
-  // Submit Registration directly (called via voice confirmation or touch button)
   const submitFormDirectly = async () => {
     if (!isMounted.current || isSubmitting) return;
 
     const current = formDataRef.current;
 
-    // Validate all compulsory fields
-    for (let i = 0; i < activeFields.length; i++) {
-      const f = activeFields[i];
+    for (let i = 0; i < formFields.length; i++) {
+      const f = formFields[i];
       const res = validateField(f, current[f.key]);
       if (!res.valid) {
         showToast(res.error, 'error');
@@ -976,20 +895,14 @@ export default function VisitorRegistration({ onNavigate }) {
       phone: (current.Mobile || '').replace(/\D/g, '').slice(0, 10),
       mobile: (current.Mobile || '').replace(/\D/g, '').slice(0, 10),
       email: formatField('Email', current.Email || '', 'email'),
-      gender: '',
-      purpose: current.Visit?.trim() || current.purpose || 'Visitor Admission',
-      visit: current.Visit?.trim() || current.purpose || 'Visitor Admission',
+      purpose: current.Visit?.trim() || 'Visitor Admission',
+      visit: current.Visit?.trim() || 'Visitor Admission',
       place: formatField('Place', current.Place || '', 'text'),
-      company: formatField('Place', current.Place || '', 'text') || 'Visitor',
       host: 'Reception Desk',
       badgeType: 'Standard Visitor',
-      photo: null,
       status: 'ACTIVE',
-      ...current, // Stores any custom fields as well
+      createdAt: new Date().toISOString(),
     };
-
-    logger.info('FORM_SUBMIT', record);
-    logger.breadcrumb('FORM', `Submitted visitor registration: ${record.name} (${record.phone || 'No phone'})`);
 
     try {
       await offlineVisitorService.registerVisitor(record);
@@ -1002,12 +915,9 @@ export default function VisitorRegistration({ onNavigate }) {
       const navigateHome = () => {
         if (navigated) return;
         navigated = true;
-        if (onNavigate) {
-          onNavigate('/');
-        }
+        if (onNavigate) onNavigate('/');
       };
 
-      // Fallback timer: in case onEnd never triggers, navigate home safely after 6 seconds
       const fallbackTimer = setTimeout(navigateHome, 6000);
 
       speakWithVoice(`Thank you ${record.name}. Your form has been submitted successfully.`, {
@@ -1024,11 +934,7 @@ export default function VisitorRegistration({ onNavigate }) {
         },
       });
     } catch (err) {
-      logger.error('FORM_SUBMIT_ERROR', err, {
-        origin: 'VisitorRegistration.jsx:submitFormDirectly',
-        context: { name: record.name, phone: record.phone },
-        suggestedFix: 'Check Dexie.js visitors table schema or IndexedDB storage quota.',
-      });
+      logger.error('FORM_SUBMIT_ERROR', err);
       showToast('Failed to submit. Please try again.', 'error');
       setIsSubmitting(false);
     }
@@ -1041,274 +947,265 @@ export default function VisitorRegistration({ onNavigate }) {
     submitFormDirectly();
   };
 
-  const currentActiveKey = activeFields[activeStep]?.key;
-
   return (
-    <div className="simple-form-page">
-      {/* ── TOP HEADER WITH LIVE FPS & LOGS BUTTON ── */}
-      <header className="simple-header">
+    <div className="aurra-nexus-reg-page">
+      {/* ── TOP HEADER (EXACT NEXUS ARCHITECTURE WITH REAL LIVE BATTERY PERCENTAGE) ── */}
+      <header className="nexus-reg-topbar">
+        {/* Left Back Arrow */}
         <button
           type="button"
-          className="simple-back-btn"
+          className="nexus-back-arrow-btn"
           onClick={() => {
             stopAudio();
             onNavigate?.('/');
           }}
+          title="Back"
         >
-          ← Back
+          <ArrowLeft size={22} />
         </button>
 
-        <div className="simple-header-title">
-          <h1>Visitor Registration</h1>
+        {/* Center Pill: AURRA + App-Adapted Cyan/Blue VISITOR REGISTRATION */}
+        <div className="nexus-brand-title-pill">
+          <span className="brand-text-aurra">AURRA</span>
+          <span className="badge-reg-label">VISITOR REGISTRATION</span>
         </div>
 
-        <div className="simple-header-right">
-          <button
-            type="button"
-            className="simple-fps-badge"
-            onClick={handleOpenLogs}
-            title="Click to view background diagnostic logs"
-          >
-            <span className="fps-indicator-dot"></span>
-            <span>{fps} FPS</span>
-            <span className="logs-tag">Logs</span>
-          </button>
+        {/* Right Battery & Status Indicator with Real Percentage */}
+        <div className="nexus-top-battery-badge" title={`Battery: ${batteryLevel ?? '--'}%`}>
+          <span className={`battery-status-dot ${isCharging ? 'charging' : ''}`} />
+          <span className="battery-pct-text">
+            {batteryLevel !== null ? `${batteryLevel}%` : '--%'}
+          </span>
+          {isCharging ? (
+            <BatteryCharging size={18} className="battery-icon charging" />
+          ) : (
+            <Battery size={18} className="battery-icon" />
+          )}
         </div>
       </header>
 
-      {/* ── CENTRAL CLEAN FORM CARD ── */}
-      <main className="simple-card">
-        {/* Voice Conversational Status Banner with Google Gemini Style Agent Waves */}
-        <div className={`simple-voice-banner ${isListening ? 'listening' : ''} ${isSpeaking ? 'speaking' : ''}`}>
-          {/* Gemini Voice Agent Animated Wave / Interactive Mic Visualizer */}
-          <div className="gemini-visualizer-col">
-            {isSpeaking ? (
-              <div className="gemini-agent-waves" title="Aurra Speaking (Gemini Voice Agent)">
-                <span className="gemini-wave-bar wave-1"></span>
-                <span className="gemini-wave-bar wave-2"></span>
-                <span className="gemini-wave-bar wave-3"></span>
-                <span className="gemini-wave-bar wave-4"></span>
-                <span className="gemini-wave-bar wave-5"></span>
-              </div>
-            ) : isListening ? (
-              <div className="gemini-agent-listening" title="Now you can speak now">
-                <div className="listening-orb-halo">
-                  <Mic size={18} className="listening-mic-icon" />
-                </div>
-                <div className="listening-live-bars">
-                  <span className="listen-bar l1"></span>
-                  <span className="listen-bar l2"></span>
-                  <span className="listen-bar l3"></span>
-                  <span className="listen-bar l4"></span>
-                </div>
-              </div>
-            ) : (
-              <div className="gemini-agent-idle" title="Voice auto-pilot ready">
-                <Sparkles size={18} color="#00ffff" />
-              </div>
-            )}
-          </div>
-
-          <div className="gemini-message-col">
-            <div className="gemini-status-pill-row">
+      {/* ── MAIN CONTENT CONTAINER (ROBOT SCENE BACKGROUND + FLOATING FORM CARD) ── */}
+      <div className="nexus-reg-body">
+        <main className="nexus-reg-card">
+          {/* Conversational Status Banner with Live Indicator */}
+          <div className="nexus-voice-chip-row">
+            <div className={`nexus-voice-chip ${isListening ? 'listening' : ''} ${isSpeaking ? 'speaking' : ''}`}>
               {isSpeaking ? (
-                <span className="gemini-status-badge speaking">
-                  <Sparkles size={11} />
-                  <span>AURRA IS SPEAKING...</span>
-                </span>
+                <>
+                  <Volume2 size={14} className="pulse-icon" />
+                  <span>{statusMessage}</span>
+                </>
               ) : isListening ? (
-                <span className="gemini-status-badge listening">
-                  <span className="mic-live-pulse-dot"></span>
-                  <strong>NOW YOU CAN SPEAK NOW</strong>
-                </span>
+                <>
+                  <Mic size={14} className="pulse-icon" />
+                  <span>Now you can speak now... ({formFields[activeStep]?.label || 'Answer'})</span>
+                </>
               ) : (
-                <span className="gemini-status-badge idle">
-                  <span>VOICE AUTO-PILOT</span>
-                </span>
+                <>
+                  <Sparkles size={14} color="#00f0ff" />
+                  <span>{statusMessage}</span>
+                </>
               )}
             </div>
-            <div className="gemini-voice-text">
-              {isListening
-                ? (statusMessage.startsWith('Listening for') ? statusMessage : `🎙️ Now you can speak now... (${activeFields[activeStep]?.label || 'Answer'})`)
-                : statusMessage
-              }
-            </div>
-          </div>
 
-          <div className="gemini-actions-col">
-            {isSpeaking && (
-              <button
-                type="button"
-                className="gemini-skip-voice-btn"
-                onClick={() => stopAudio()}
-                title="Mute / Skip Aurra speech"
-              >
-                <VolumeX size={13} />
-                <span>Mute</span>
-              </button>
-            )}
-            {!isListening && !isSpeaking && (
-              <button
-                type="button"
-                className="gemini-speak-now-btn"
-                onClick={() => runVoiceStep(activeStep, true)}
-                title="Tap to speak now"
-              >
-                <Mic size={13} />
-                <span>Speak Now</span>
-              </button>
-            )}
             <button
               type="button"
-              className={`voice-toggle-btn ${voiceAutoPilot ? 'active' : ''}`}
-              onClick={toggleVoiceAutoPilot}
-              title={voiceAutoPilot ? 'Pause voice assistant' : 'Enable voice assistant'}
+              className="nexus-mute-btn"
+              onClick={stopAudio}
+              title="Stop voice"
             >
-              {voiceAutoPilot ? 'Voice: ON' : 'Voice: PAUSED'}
+              <VolumeX size={15} />
             </button>
           </div>
-        </div>
 
-        <form onSubmit={handleSubmit} noValidate>
-          {/* Dynamic Form Fields */}
-          {activeFields.map((field, idx) => {
-            const isActive = currentActiveKey === field.key;
-            const hasError = !!fieldErrors[field.key];
-            return (
-              <div
-                key={field.id || field.key}
-                className={`simple-field ${isActive ? 'active-step' : ''} ${hasError ? 'has-error' : ''}`}
-              >
-                <label htmlFor={`field-${field.key}`}>
-                  <span>
-                    {field.label}
-                    {field.required && (
-                      <span className="field-required-star" title="Compulsory field">
-                        *
-                      </span>
-                    )}
-                    {formData[field.key] && (
-                      <button
-                        type="button"
-                        className="field-edit-btn"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleSelectField(idx);
-                        }}
-                        title={`Click to edit ${field.label} by voice or typing`}
-                      >
-                        ✎ Edit
-                      </button>
-                    )}
-                  </span>
-                  {isActive && isListening && (
-                    <span className="listening-badge">● Speaking to fill</span>
-                  )}
-                </label>
-                <input
-                  id={`field-${field.key}`}
-                  type={field.type || 'text'}
-                  name={field.key}
-                  placeholder={field.placeholder || `Enter ${field.label}`}
-                  value={formData[field.key] || ''}
-                  onChange={handleChange}
-                  onClick={() => handleSelectField(idx)}
-                  maxLength={field.type === 'tel' ? 10 : undefined}
-                  autoComplete="off"
-                  required={field.required}
-                />
-                {hasError && (
-                  <span className="field-error-text">
-                    {fieldErrorsText[field.key] ||
-                      (field.key.toLowerCase() === 'email'
-                        ? 'Valid email address required (e.g. name@domain.com)'
-                        : field.key.toLowerCase() === 'mobile'
-                        ? '10-digit mobile number required'
-                        : `${field.label} is compulsory`)}
-                  </span>
+          <form onSubmit={handleSubmit} noValidate>
+            {/* 1. Full Name */}
+            <div className={`nexus-form-group ${fieldErrors.Name ? 'has-error' : ''}`}>
+              <div className="field-label-row">
+                <label className="nexus-field-label">Full Name</label>
+                {formData.Name && (
+                  <button
+                    type="button"
+                    className="field-reenter-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleSelectField(0);
+                    }}
+                    title="Click to re-enter Name"
+                  >
+                    ✎ Edit
+                  </button>
                 )}
               </div>
-            );
-          })}
-
-          {/* Submit Button */}
-          <div className="simple-submit-row">
-            <button
-              type="submit"
-              className="simple-submit-btn"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit Registration'}
-            </button>
-          </div>
-        </form>
-      </main>
-
-
-      {/* ── TOAST ALERT ── */}
-      {toast.show && (
-        <div className={`simple-toast ${toast.type}`}>
-          <span>{toast.type === 'success' ? '✓' : '⚠'}</span>
-          <span>{toast.message}</span>
-        </div>
-      )}
-
-      {/* ── DIAGNOSTIC LOGS MODAL (TAP FPS BADGE TO OPEN) ── */}
-      {showLogViewer && (
-        <div className="simple-log-modal-backdrop" onClick={() => setShowLogViewer(false)}>
-          <div className="simple-log-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="log-modal-header">
-              <h3>Tablet Diagnostic Logs ({logs.length})</h3>
-              <button
-                type="button"
-                className="log-modal-close"
-                onClick={() => setShowLogViewer(false)}
-              >
-                ✕
-              </button>
-            </div>
-            <div className="log-modal-content">
-              {logs.length === 0 ? (
-                <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>No log entries recorded yet.</div>
-              ) : (
-                logs.slice().reverse().map((entry) => (
-                  <div key={entry.id} className={`log-entry ${entry.level.toLowerCase()}`}>
-                    <span className="log-time">{entry.time}</span>
-                    <span className={`log-level-badge ${entry.level.toLowerCase()}`}>{entry.level}</span>
-                    <span className="log-tag">[{entry.tag}]</span>
-                    <span className="log-msg">{entry.message}</span>
-                  </div>
-                ))
+              <input
+                type="text"
+                name="Name"
+                className="nexus-text-input"
+                placeholder="Enter your full name"
+                value={formData.Name}
+                onChange={handleChange}
+                onClick={() => handleSelectField(0)}
+                autoComplete="off"
+              />
+              {fieldErrors.Name && (
+                <span className="field-error-msg">{fieldErrorsText.Name || 'Full Name is required'}</span>
               )}
             </div>
-            <div className="log-modal-footer">
+
+            {/* 2. Phone Number & Email Address (2-Column Row as in Nexus) */}
+            <div className="nexus-form-row-2col">
+              <div className={`nexus-form-group ${fieldErrors.Mobile ? 'has-error' : ''}`}>
+                <div className="field-label-row">
+                  <label className="nexus-field-label">Phone Number</label>
+                  {formData.Mobile && (
+                    <button
+                      type="button"
+                      className="field-reenter-btn"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleSelectField(1);
+                      }}
+                      title="Click to re-enter Phone Number"
+                    >
+                      ✎ Edit
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="tel"
+                  name="Mobile"
+                  className="nexus-text-input"
+                  placeholder="Enter 10-digit number"
+                  maxLength={10}
+                  value={formData.Mobile}
+                  onChange={handleChange}
+                  onClick={() => handleSelectField(1)}
+                  autoComplete="off"
+                />
+                {fieldErrors.Mobile && (
+                  <span className="field-error-msg">{fieldErrorsText.Mobile || '10-digit number required'}</span>
+                )}
+              </div>
+
+              <div className={`nexus-form-group ${fieldErrors.Email ? 'has-error' : ''}`}>
+                <div className="field-label-row">
+                  <label className="nexus-field-label">Email Address</label>
+                  {formData.Email && (
+                    <button
+                      type="button"
+                      className="field-reenter-btn"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleSelectField(2);
+                      }}
+                      title="Click to re-enter Email"
+                    >
+                      ✎ Edit
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="email"
+                  name="Email"
+                  className="nexus-text-input"
+                  placeholder="example@domain.com"
+                  value={formData.Email}
+                  onChange={handleChange}
+                  onClick={() => handleSelectField(2)}
+                  autoComplete="off"
+                />
+                {fieldErrors.Email && (
+                  <span className="field-error-msg">{fieldErrorsText.Email || 'Valid email required'}</span>
+                )}
+              </div>
+            </div>
+
+            {/* 3. Purpose of Visit */}
+            <div className={`nexus-form-group ${fieldErrors.Visit ? 'has-error' : ''}`}>
+              <div className="field-label-row">
+                <label className="nexus-field-label">Purpose of Visit</label>
+                {formData.Visit && (
+                  <button
+                    type="button"
+                    className="field-reenter-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleSelectField(3);
+                    }}
+                    title="Click to re-enter Purpose"
+                  >
+                    ✎ Edit
+                  </button>
+                )}
+              </div>
+              <input
+                type="text"
+                name="Visit"
+                className="nexus-text-input"
+                placeholder="Please enter the purpose of your visit..."
+                value={formData.Visit}
+                onChange={handleChange}
+                onClick={() => handleSelectField(3)}
+                autoComplete="off"
+              />
+              {fieldErrors.Visit && (
+                <span className="field-error-msg">{fieldErrorsText.Visit || 'Purpose of visit is required'}</span>
+              )}
+            </div>
+
+            {/* 4. Place of Visit */}
+            <div className={`nexus-form-group ${fieldErrors.Place ? 'has-error' : ''}`}>
+              <div className="field-label-row">
+                <label className="nexus-field-label">Place of Visit</label>
+                {formData.Place && (
+                  <button
+                    type="button"
+                    className="field-reenter-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleSelectField(4);
+                    }}
+                    title="Click to re-enter Place"
+                  >
+                    ✎ Edit
+                  </button>
+                )}
+              </div>
+              <input
+                type="text"
+                name="Place"
+                className="nexus-text-input"
+                placeholder="Where are you from? / Enter location"
+                value={formData.Place}
+                onChange={handleChange}
+                onClick={() => handleSelectField(4)}
+                autoComplete="off"
+              />
+              {fieldErrors.Place && (
+                <span className="field-error-msg">{fieldErrorsText.Place || 'Place of visit is required'}</span>
+              )}
+            </div>
+
+            {/* 5. Submit Button */}
+            <div className="nexus-submit-row">
               <button
-                type="button"
-                className="log-action-btn"
-                onClick={() => {
-                  logger.clearLogs();
-                  setLogs([]);
-                }}
+                type="submit"
+                className="nexus-submit-btn"
+                disabled={isSubmitting}
               >
-                Clear Logs
-              </button>
-              <button
-                type="button"
-                className="log-action-btn"
-                onClick={() => setLogs(logger.getLogs())}
-              >
-                Refresh
-              </button>
-              <button
-                type="button"
-                className="log-action-btn close"
-                onClick={() => setShowLogViewer(false)}
-              >
-                Done
+                <span>{isSubmitting ? 'SUBMITTING...' : 'SUBMIT'}</span>
+                <Send size={16} className="submit-icon" />
               </button>
             </div>
-          </div>
+          </form>
+        </main>
+      </div>
+
+      {/* ── TOAST NOTIFICATION ── */}
+      {toast.show && (
+        <div className={`nexus-toast ${toast.type}`}>
+          <span>{toast.type === 'success' ? '✓' : '⚠'}</span>
+          <span>{toast.message}</span>
         </div>
       )}
     </div>

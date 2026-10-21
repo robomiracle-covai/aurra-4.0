@@ -262,6 +262,26 @@ db.version(10).stores({
   await tx.table('facilities').bulkAdd(DEFAULT_FACILITIES);
 });
 
+// Version 11: Re-seed with Nexus 9 Public Facilities
+db.version(11).stores({
+  userFaces: '++id, name',
+  cards: '++id, title, href, isEnabled, voiceAccessEnabled',
+  images: '++id, title, isSelected',
+  headers: '++id, headerName',
+  qaQuestions: '++id, question, category',
+  visitors: '++id, name, phone, email, company, purpose, host, badgeType, badgeNumber, checkInTime, checkOutTime, status',
+  weblinks: 'id, title, category, url, isEnabled, sortOrder',
+  tourStops: '++id, name, area, orderIndex, isEnabled',
+  robotTours: 'id, slug, title, orderIndex, isEnabled',
+  chatSessions: 'id, title, createdAt, updatedAt, messageCount',
+  chatMessages: '++id, sessionId, role, text, timestamp, inputType, source, confidence',
+  facilities: 'id, code, name, floor, category, isEnabled, sortOrder',
+}).upgrade(async (tx) => {
+  await tx.table('facilities').clear();
+  await tx.table('facilities').bulkAdd(DEFAULT_FACILITIES);
+});
+
+
 
 
 

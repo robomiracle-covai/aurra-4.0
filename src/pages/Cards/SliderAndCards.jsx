@@ -224,12 +224,6 @@ export default function SliderAndCards({
 
   return (
     <div className="home-container">
-      {/* HUD Futuristic Framing Accents */}
-      <div className="hud-corner-tag top-left">&gt;&gt; ROBOMIRACLE_AURRA_v2 &lt;&lt;</div>
-      <div className="hud-corner-tag top-right">STATUS: OPERATIONAL</div>
-      <div className="hud-corner-tag bottom-left">FPS: {fps} | HELIO_G100</div>
-      <div className="hud-corner-tag bottom-right">VOICE_ENGINE: ACTIVE</div>
-
       {/* Top Cyber Header Bar - Center Holographic Capsule */}
       <header className="kiosk-top-bar">
         <div

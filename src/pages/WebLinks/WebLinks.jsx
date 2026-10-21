@@ -1,682 +1,350 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import {
   ArrowLeft,
-  Globe,
-  QrCode,
-  ExternalLink,
-  BookOpen,
-  Share2,
+  Battery,
+  Zap,
+  CheckCircle2,
   Copy,
   Check,
-  Search,
-  Sparkles,
-  Maximize2,
   X,
-  Volume2,
-  VolumeX,
-  Smartphone,
-  ShieldCheck,
-  Layers,
-  Cpu,
-  Tv,
-  Eye,
-  FileText,
-  MessageCircle,
-  Video
+  ExternalLink,
+  Globe
 } from 'lucide-react';
-import { OFFICIAL_WEBLINKS, BROCHURE_SECTIONS } from './weblinksData';
+import { OFFICIAL_CHANNELS, DEFAULT_PORTAL_LINKS } from './weblinksData';
 import { offlineWebLinksService } from '../../db/offlineServices';
-import { speakWithVoice, cancelSpeech } from '../../utils/speechSynthesis';
 import { logger } from '../../services/logger';
 import './WebLinks.css';
 
+// Brand SVGs matching official vector guidelines
+function ChannelLogo({ type }) {
+  switch (type) {
+    case 'linkedin':
+      return (
+        <div className="nexus-brand-icon-box" style={{ background: '#0a66c2' }}>
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="#ffffff">
+            <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.65 1.65 0 1 0 0-3.3 1.65 1.65 0 0 0 0 3.3m1.39 9.74v-8.37H5.07v8.37h2.78z" />
+          </svg>
+        </div>
+      );
+    case 'youtube':
+      return (
+        <div className="nexus-brand-icon-box" style={{ background: '#ff0000' }}>
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="#ffffff">
+            <path d="M21.58 7.19a2.5 2.5 0 0 0-1.76-1.77C18.25 5 12 5 12 5s-6.25 0-7.82.42A2.5 2.5 0 0 0 2.42 7.2 26.2 26.2 0 0 0 2 12a26.2 26.2 0 0 0 .42 4.81 2.5 2.5 0 0 0 1.76 1.77C5.75 19 12 19 12 19s6.25 0 7.82-.42a2.5 2.5 0 0 0 1.76-1.77A26.2 26.2 0 0 0 22 12a26.2 26.2 0 0 0-.42-4.81zM10 15V9l5.2 3L10 15z" />
+          </svg>
+        </div>
+      );
+    case 'facebook':
+      return (
+        <div className="nexus-brand-icon-box" style={{ background: '#1877f2', borderRadius: '50%' }}>
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="#ffffff">
+            <path d="M12 2.04C6.5 2.04 2 6.53 2 12.06C2 17.06 5.66 21.21 10.44 21.96V14.96H7.9V12.06H10.44V9.85C10.44 7.34 11.93 5.96 14.22 5.96C15.31 5.96 16.45 6.15 16.45 6.15V8.62H15.19C13.95 8.62 13.56 9.39 13.56 10.18V12.06H16.34L15.89 14.96H13.56V21.96A10 10 0 0 0 22 12.06C22 6.53 17.5 2.04 12 2.04Z" />
+          </svg>
+        </div>
+      );
+    case 'instagram':
+      return (
+        <div
+          className="nexus-brand-icon-box"
+          style={{
+            background: 'radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%)',
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+          </svg>
+        </div>
+      );
+    case 'maps':
+      return (
+        <div className="nexus-brand-icon-box" style={{ background: '#ea4335' }}>
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="#ffffff">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+          </svg>
+        </div>
+      );
+    case 'website':
+      return (
+        <div className="nexus-brand-icon-box" style={{ background: 'linear-gradient(135deg, #00d5ff 0%, #0284c7 100%)' }}>
+          <Globe size={26} color="#ffffff" />
+        </div>
+      );
+    case 'twitter':
+      return (
+        <div className="nexus-brand-icon-box" style={{ background: '#000000', border: '1px solid rgba(255,255,255,0.2)' }}>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="#ffffff">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+          </svg>
+        </div>
+      );
+    case 'threads':
+      return (
+        <div className="nexus-brand-icon-box" style={{ background: '#000000', border: '1px solid rgba(255,255,255,0.2)' }}>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="#ffffff">
+            <path d="M12.001 2c-5.523 0-10 4.477-10 10s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10zm4.843 11.272c-.067 1.488-.707 2.656-1.849 3.376-.893.56-1.996.79-3.212.67-1.428-.142-2.583-.758-3.344-1.782-.74-1-1.026-2.316-.826-3.804.24-1.78 1.256-3.195 2.784-3.882.898-.403 1.94-.57 3.018-.485 1.096.086 2.062.455 2.793 1.066l-1.055 1.244c-.538-.456-1.25-.733-2.072-.8-1.408-.114-2.736.634-2.947 2.193-.16 1.185.27 2.378 1.124 3.107.604.516 1.403.766 2.315.722.97-.047 1.832-.42 2.366-1.026.43-.49.658-1.173.664-1.98h-3.41v-1.61h5.112c.078.697.11 1.348.093 1.991z" />
+          </svg>
+        </div>
+      );
+    default:
+      return (
+        <div className="nexus-brand-icon-box" style={{ background: '#00d5ff' }}>
+          <Globe size={24} color="#ffffff" />
+        </div>
+      );
+  }
+}
+
 export default function WebLinks({ onNavigate }) {
-  const [weblinks, setWeblinks] = useState(OFFICIAL_WEBLINKS);
-  const [activeCategory, setActiveCategory] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [qrCodeDataUrls, setQrCodeDataUrls] = useState({});
-  const [highContrastMode, setHighContrastMode] = useState(false);
-  
-  // Modals state
-  const [activeQrModal, setActiveQrModal] = useState(null);
-  const [isBrochureOpen, setIsBrochureOpen] = useState(false);
-  const [activeBrochureTab, setActiveBrochureTab] = useState('overview');
-  
-  // Custom QR tool state
-  const [customQrText, setCustomQrText] = useState('https://robomiracle.com');
-  const [customQrUrl, setCustomQrUrl] = useState('');
-  
-  // Feedback state
-  const [copiedId, setCopiedId] = useState(null);
-  const [isVoiceSpoken, setIsVoiceSpoken] = useState(false);
+  const [portalUrls, setPortalUrls] = useState(DEFAULT_PORTAL_LINKS);
+  const [batteryLevel, setBatteryLevel] = useState(null);
+  const [isCharging, setIsCharging] = useState(false);
+  const [selectedChannel, setSelectedChannel] = useState(null);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
+  const [copied, setCopied] = useState(false);
 
-  // Load links from IndexedDB
-  const loadLinks = async () => {
-    try {
-      const items = await offlineWebLinksService.getWebLinks();
-      if (items && items.length > 0) {
-        const enabled = items.filter((item) => item.isEnabled !== false);
-        setWeblinks(enabled.length > 0 ? enabled : items);
-      }
-    } catch (e) {
-      console.warn('Failed loading weblinks from DB:', e);
-    }
-  };
-
+  // Load saved links from offline storage
   useEffect(() => {
-    loadLinks();
+    let isMounted = true;
+    const loadUrls = async () => {
+      try {
+        const loaded = await offlineWebLinksService.getPortalLinks();
+        if (isMounted && loaded) {
+          setPortalUrls(loaded);
+        }
+      } catch (err) {
+        logger.warn('WEBLINKS', `Failed loading portal links: ${err.message}`);
+      }
+    };
+    loadUrls();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Generate QR codes for all links
+  // Tablet Battery Monitor (aligned with PublicFacilitiesView)
   useEffect(() => {
-    let isCancelled = false;
-
-    const generateCodes = async () => {
-      const generated = {};
-      const fgColor = highContrastMode ? '#000000' : '#00ffff';
-      const bgColor = highContrastMode ? '#ffffff' : '#030c17';
-
-      for (const item of weblinks) {
-        try {
-          const dataUrl = await QRCode.toDataURL(item.url, {
-            width: 280,
-            margin: 1.5,
-            color: {
-              dark: fgColor,
-              light: bgColor,
-            },
-            errorCorrectionLevel: 'M',
-          });
-          generated[item.id] = dataUrl;
-        } catch (err) {
-          logger.error('WEBLINKS', `Failed generating QR for ${item.id}: ${err.message}`);
+    let isMounted = true;
+    const fetchBattery = async () => {
+      try {
+        if (window.LauncherBridge?.getBatteryLevel) {
+          const level = window.LauncherBridge.getBatteryLevel();
+          if (level >= 0 && isMounted) {
+            setBatteryLevel(level);
+            setIsCharging(true);
+            return;
+          }
         }
-      }
-
-      if (!isCancelled) {
-        setQrCodeDataUrls(generated);
+        if (window.AndroidBridge?.getBatteryLevel) {
+          const level = window.AndroidBridge.getBatteryLevel();
+          if (level >= 0 && isMounted) {
+            setBatteryLevel(level);
+            return;
+          }
+        }
+        if (navigator.getBattery) {
+          const b = await navigator.getBattery();
+          if (isMounted) {
+            setBatteryLevel(Math.round(b.level * 100));
+            setIsCharging(b.charging);
+          }
+        }
+      } catch {
+        // Battery API unavailable
       }
     };
 
-    generateCodes();
-
+    fetchBattery();
+    const timer = setInterval(fetchBattery, 5000);
     return () => {
-      isCancelled = true;
+      isMounted = false;
+      clearInterval(timer);
     };
-  }, [weblinks, highContrastMode]);
+  }, []);
 
-  // Generate Custom QR code
+  // Generate QR code whenever selectedChannel opens
   useEffect(() => {
-    if (!customQrText.trim()) return;
-    const fgColor = highContrastMode ? '#000000' : '#00ffff';
-    const bgColor = highContrastMode ? '#ffffff' : '#030c17';
+    if (!selectedChannel) {
+      setQrCodeDataUrl('');
+      setCopied(false);
+      return;
+    }
 
-    QRCode.toDataURL(customQrText.trim(), {
+    const currentUrl = portalUrls[selectedChannel.key] || selectedChannel.defaultUrl;
+    QRCode.toDataURL(currentUrl, {
       width: 320,
       margin: 1.5,
       color: {
-        dark: fgColor,
-        light: bgColor,
+        dark: '#00ffff',
+        light: '#030c17',
       },
       errorCorrectionLevel: 'M',
     })
-      .then((url) => setCustomQrUrl(url))
-      .catch((err) => logger.warn('WEBLINKS', `Custom QR error: ${err.message}`));
-  }, [customQrText, highContrastMode]);
+      .then((url) => setQrCodeDataUrl(url))
+      .catch((err) => logger.warn('WEBLINKS', `Failed generating QR: ${err.message}`));
+  }, [selectedChannel, portalUrls]);
 
-  // Spoken narration on initial entry
-  useEffect(() => {
-    const welcomeMsg = 'Welcome to Robomiracle digital hub. You can scan any of these high-contrast holographic QR codes on your smartphone to access our website, videos, and product brochure.';
-    logger.speech('WEBLINKS', 'Aurra speaking digital hub overview');
-    
-    speakWithVoice(welcomeMsg);
-    setIsVoiceSpoken(true);
-
-    return () => {
-      // Clean up TTS if navigating away
-      cancelSpeech();
-    };
-  }, []);
-
-  const handleSpeakOverview = () => {
-    const msg = 'Scan any QR code on this screen with your smartphone camera to instantly open Robomiracle links on your mobile device, or tap Open In Kiosk to read the brochure here.';
-    speakWithVoice(msg);
+  const handleCardClick = (ch) => {
+    setSelectedChannel(ch);
   };
 
-  const handleCopyLink = (item) => {
+  const handleCopy = () => {
+    if (!selectedChannel) return;
+    const currentUrl = portalUrls[selectedChannel.key] || selectedChannel.defaultUrl;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(item.url);
-      setCopiedId(item.id);
-      setTimeout(() => setCopiedId(null), 2500);
-      logger.info('WEBLINKS', `Copied link: ${item.url}`);
-    }
-  };
-
-  const handleOpenLink = (url) => {
-    try {
-      window.open(url, '_blank', 'noopener,noreferrer');
-      logger.info('WEBLINKS', `Opened external URL: ${url}`);
-    } catch {
-      window.location.href = url;
-    }
-  };
-
-  // Filter links
-  const filteredLinks = weblinks.filter((item) => {
-    const matchCat = activeCategory === 'ALL' || item.category === activeCategory;
-    const query = searchQuery.toLowerCase().trim();
-    const matchQuery =
-      !query ||
-      item.title.toLowerCase().includes(query) ||
-      (item.subtitle && item.subtitle.toLowerCase().includes(query)) ||
-      (item.description && item.description.toLowerCase().includes(query)) ||
-      (item.displayUrl && item.displayUrl.toLowerCase().includes(query));
-    return matchCat && matchQuery;
-  });
-
-  const getCategoryIcon = (category) => {
-    switch (category) {
-      case 'web':
-        return <Globe size={18} />;
-      case 'brochure':
-        return <BookOpen size={18} />;
-      case 'media':
-        return <Video size={18} />;
-      case 'social':
-        return <Share2 size={18} />;
-      case 'tech':
-        return <Cpu size={18} />;
-      case 'contact':
-        return <MessageCircle size={18} />;
-      default:
-        return <Globe size={18} />;
+      navigator.clipboard.writeText(currentUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
     }
   };
 
   return (
-    <div className="weblinks-container">
-      {/* HUD Corner Telemetry Tags */}
-      <div className="hud-corner-tag top-left">&gt;&gt; ROBOMIRACLE_DIGITAL_HUB &lt;&lt;</div>
-      <div className="hud-corner-tag top-right">PORTALS: ONLINE</div>
-      <div className="hud-corner-tag bottom-left">SECURE_QR: V3_OFFLINE</div>
-      <div className="hud-corner-tag bottom-right">WQXGA_OPTIMIZED</div>
-
-      {/* Cyber Header Bar */}
-      <header className="weblinks-header-bar">
+    <div className="nexus-weblinks-viewport">
+      {/* Top Header Bar */}
+      <header className="nexus-facilities-top-bar">
+        {/* Back Button */}
         <button
-          className="weblinks-back-btn"
+          className="nexus-fac-back-btn"
           onClick={() => onNavigate?.('/')}
           aria-label="Back to home"
+          title="Return to Main Reception"
         >
-          <ArrowLeft size={18} />
-          <span>Home</span>
+          <ArrowLeft size={22} color="#00ffff" />
         </button>
 
-        <div className="weblinks-title-center">
-          <div className="weblinks-badge-pill">
-            <Sparkles size={14} color="#00ffff" />
-            <span>OFFICIAL ROBOMIRACLE CHANNELS</span>
-          </div>
-          <h1 className="weblinks-main-title">Digital Hub &amp; Scannable Portals</h1>
-          <p className="weblinks-subtitle">
-            Point your smartphone camera at any holographic QR code to open instantly on your mobile device
-          </p>
+        {/* Center Brand Pill: WEBSITE PORTAL */}
+        <div className="nexus-fac-brand-pill">
+          <span className="brand-primary-text">WEBSITE</span>
+          <span className="brand-accent-badge">PORTAL</span>
         </div>
 
-        <div className="weblinks-header-actions">
-          {/* Audio narration button */}
-          <button
-            className="weblinks-action-icon-btn"
-            onClick={handleSpeakOverview}
-            title="Listen to Aurra spoken guide"
-          >
-            <Volume2 size={18} color="#00ffff" />
-          </button>
-
-          {/* High-contrast QR switch (Crucial for kiosk scanning under different lighting) */}
-          <button
-            className={`weblinks-contrast-toggle ${highContrastMode ? 'active' : ''}`}
-            onClick={() => setHighContrastMode(!highContrastMode)}
-            title="Toggle high-contrast white QR background for faster phone scanning"
-          >
-            <QrCode size={18} />
-            <span>{highContrastMode ? 'Inverted (White)' : 'Cyber (Cyan)'}</span>
-          </button>
+        {/* Battery Indicator Pill */}
+        <div className="nexus-fac-battery-pill">
+          <span className="nexus-battery-dot" />
+          <span className="nexus-battery-pct">
+            {batteryLevel !== null ? `${batteryLevel}%` : '--%'}
+          </span>
+          {isCharging ? (
+            <Zap size={15} color="#22c55e" style={{ marginLeft: '2px' }} />
+          ) : (
+            <Battery size={17} color="#22c55e" style={{ marginLeft: '2px' }} />
+          )}
         </div>
       </header>
 
-      {/* Filter and Search Bar */}
-      <section className="weblinks-toolbar-section">
-        <div className="weblinks-search-wrap">
-          <Search size={18} color="#00D5FF" />
-          <input
-            type="text"
-            className="weblinks-search-input"
-            placeholder="Search portals, brochure, demos, or support..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button
-              className="weblinks-search-clear"
-              onClick={() => setSearchQuery('')}
+      {/* Main Title Section */}
+      <div className="nexus-weblinks-header">
+        <h1 className="nexus-weblinks-main-title">Explore Our Official Channels</h1>
+        <p className="nexus-weblinks-subtitle">
+          Connect with us across all major platforms and stay updated.
+        </p>
+        <div className="nexus-weblinks-accent-bar" />
+      </div>
+
+      {/* 8 Official Channels Grid (4 Columns x 2 Rows) */}
+      <div className="nexus-channels-grid">
+        {OFFICIAL_CHANNELS.map((ch) => {
+          const liveUrl = portalUrls[ch.key] || ch.defaultUrl;
+          return (
+            <div
+              key={ch.id}
+              className="nexus-channel-card"
+              onClick={() => handleCardClick(ch)}
+              role="button"
+              tabIndex={0}
+              title={`Tap to view QR code for ${ch.title}`}
             >
-              <X size={16} />
-            </button>
-          )}
-        </div>
-
-        <div className="weblinks-filter-pills">
-          {[
-            { id: 'ALL', label: 'All Portals' },
-            { id: 'web', label: 'Official Web' },
-            { id: 'brochure', label: 'Brochure' },
-            { id: 'media', label: 'Videos & Demos' },
-            { id: 'social', label: 'LinkedIn' },
-            { id: 'tech', label: 'Developer SDK' },
-            { id: 'contact', label: 'Reception Concierge' },
-          ].map((cat) => (
-            <button
-              key={cat.id}
-              className={`weblinks-filter-pill ${activeCategory === cat.id ? 'active' : ''}`}
-              onClick={() => setActiveCategory(cat.id)}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* Main Portals Grid */}
-      <main className="weblinks-main-content">
-        <div className="weblinks-grid">
-          {filteredLinks.map((item) => {
-            const qrImage = qrCodeDataUrls[item.id];
-
-            return (
-              <div
-                key={item.id}
-                className="weblink-card"
-                style={{ '--accent-color': item.accentColor }}
-              >
-                {/* Header Row: Category Badge & Direct Tag */}
-                <div className="weblink-card-top">
-                  <div className="weblink-category-tag">
-                    {getCategoryIcon(item.category)}
-                    <span>{item.tag}</span>
-                  </div>
-                  <span className="weblink-status-badge">{item.badge}</span>
-                </div>
-
-                {/* QR Code Presentation Box */}
-                <div className="weblink-qr-container">
-                  <div
-                    className={`weblink-qr-frame ${highContrastMode ? 'contrast-white' : ''}`}
-                    onClick={() => setActiveQrModal(item)}
-                    title="Tap to enlarge QR code for quick scanning"
-                  >
-                    {/* Laser scan animation line */}
-                    <div className="weblink-laser-bar"></div>
-
-                    {/* Corner Reticle Accents */}
-                    <div className="qr-reticle top-left" />
-                    <div className="qr-reticle top-right" />
-                    <div className="qr-reticle bottom-left" />
-                    <div className="qr-reticle bottom-right" />
-
-                    {qrImage ? (
-                      <img
-                        src={qrImage}
-                        alt={`${item.title} QR Code`}
-                        className="weblink-qr-image"
-                      />
-                    ) : (
-                      <div className="weblink-qr-loading">
-                        <QrCode size={48} color="#00ffff" />
-                        <span>Rendering QR...</span>
-                      </div>
-                    )}
-
-                    <div className="weblink-tap-to-expand">
-                      <Maximize2 size={14} />
-                      <span>TAP TO ENLARGE</span>
-                    </div>
-                  </div>
-
-                  <div className="weblink-scan-helper">
-                    <Smartphone size={14} color="#00D5FF" />
-                    <span>Scan with Phone Camera</span>
-                  </div>
-                </div>
-
-                {/* Information Body */}
-                <div className="weblink-info-body">
-                  <h3 className="weblink-title">{item.title}</h3>
-                  <p className="weblink-subtitle">{item.subtitle}</p>
-                  <p className="weblink-desc">{item.description}</p>
-                  
-                  <div className="weblink-url-display">
-                    <Globe size={14} color="#00ffff" />
-                    <span className="weblink-url-text">{item.displayUrl}</span>
-                  </div>
-                </div>
-
-                {/* Action Buttons Row */}
-                <div className="weblink-card-actions">
-                  {item.hasInKioskPreview && (
-                    <button
-                      className="weblink-btn-primary"
-                      onClick={() => setIsBrochureOpen(true)}
-                    >
-                      <BookOpen size={16} />
-                      <span>Read In Kiosk</span>
-                    </button>
-                  )}
-
-                  <button
-                    className="weblink-btn-action"
-                    onClick={() => setActiveQrModal(item)}
-                  >
-                    <Maximize2 size={16} />
-                    <span>Large QR</span>
-                  </button>
-
-                  <button
-                    className="weblink-btn-action"
-                    onClick={() => handleCopyLink(item)}
-                  >
-                    {copiedId === item.id ? (
-                      <>
-                        <Check size={16} color="#00ff88" />
-                        <span style={{ color: '#00ff88' }}>Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={16} />
-                        <span>Copy</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    className="weblink-btn-action external"
-                    onClick={() => handleOpenLink(item.url)}
-                    title="Open external webpage"
-                  >
-                    <ExternalLink size={16} />
-                  </button>
-                </div>
+              <div className="nexus-channel-icon-wrap">
+                <ChannelLogo type={ch.iconType} />
               </div>
-            );
-          })}
-
-          {/* Quick Custom Visitor QR Code Generator Card */}
-          <div className="weblink-card custom-qr-card">
-            <div className="weblink-card-top">
-              <div className="weblink-category-tag">
-                <Sparkles size={18} />
-                <span>KIOSK UTILITY</span>
-              </div>
-              <span className="weblink-status-badge">Live Generator</span>
-            </div>
-
-            <div className="weblink-qr-container">
-              <div className={`weblink-qr-frame ${highContrastMode ? 'contrast-white' : ''}`}>
-                <div className="weblink-laser-bar"></div>
-                <div className="qr-reticle top-left" />
-                <div className="qr-reticle top-right" />
-                <div className="qr-reticle bottom-left" />
-                <div className="qr-reticle bottom-right" />
-
-                {customQrUrl ? (
-                  <img
-                    src={customQrUrl}
-                    alt="Custom QR Code"
-                    className="weblink-qr-image"
-                  />
-                ) : (
-                  <div className="weblink-qr-loading">
-                    <QrCode size={48} color="#00ffff" />
-                  </div>
-                )}
-              </div>
-              <div className="weblink-scan-helper">
-                <span>Instant Mobile Transfer</span>
+              <div className="nexus-channel-text-wrap">
+                <h3 className="nexus-channel-title">{ch.title}</h3>
+                <p className="nexus-channel-subtitle">{ch.subtitle}</p>
               </div>
             </div>
+          );
+        })}
+      </div>
 
-            <div className="weblink-info-body">
-              <h3 className="weblink-title">Custom QR Link Transfer</h3>
-              <p className="weblink-desc">
-                Type any URL or phone number to beam it directly to your mobile phone via scannable QR.
-              </p>
+      {/* Bottom Pill */}
+      <div className="nexus-links-bottom-pill">
+        <CheckCircle2 size={16} color="#00ffff" />
+        <span>Scan the QR code to visit our official channel instantly.</span>
+      </div>
 
-              <div className="custom-qr-input-wrap">
-                <input
-                  type="text"
-                  className="custom-qr-input"
-                  placeholder="https://..."
-                  value={customQrText}
-                  onChange={(e) => setCustomQrText(e.target.value)}
-                />
-              </div>
-
-              <div className="custom-qr-presets">
-                <button
-                  className="preset-btn"
-                  onClick={() => setCustomQrText('https://robomiracle.com')}
-                >
-                  Robomiracle
-                </button>
-                <button
-                  className="preset-btn"
-                  onClick={() => setCustomQrText('https://maps.google.com/?q=Robomiracle+Technologies')}
-                >
-                  Google Map
-                </button>
-                <button
-                  className="preset-btn"
-                  onClick={() => setCustomQrText('tel:+919876543210')}
-                >
-                  Reception Tel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* ── MODAL 1: Full-Screen Laser QR Scanner Modal ── */}
-      {activeQrModal && (
-        <div className="weblinks-modal-overlay" onClick={() => setActiveQrModal(null)}>
+      {/* Holographic QR Code Modal */}
+      {selectedChannel && (
+        <div className="nexus-qr-modal-overlay" onClick={() => setSelectedChannel(null)}>
           <div
-            className="weblinks-qr-modal-dialog"
+            className="nexus-qr-modal-container"
             onClick={(e) => e.stopPropagation()}
+            style={{ '--channel-accent': selectedChannel.brandColor || '#00ffff' }}
           >
-            <button
-              className="weblinks-modal-close-btn"
-              onClick={() => setActiveQrModal(null)}
-              aria-label="Close QR Modal"
-            >
-              <X size={20} />
-            </button>
-
-            <div className="modal-header-pill">
-              <Smartphone size={16} color="#00ffff" />
-              <span>POINT PHONE CAMERA AT SCREEN</span>
+            {/* Modal Header */}
+            <div className="nexus-qr-modal-header">
+              <div className="nexus-qr-modal-brand">
+                <ChannelLogo type={selectedChannel.iconType} />
+                <div>
+                  <h3 className="nexus-qr-modal-title">{selectedChannel.title}</h3>
+                  <p className="nexus-qr-modal-sub">{selectedChannel.subtitle}</p>
+                </div>
+              </div>
+              <button
+                className="nexus-qr-close-btn"
+                onClick={() => setSelectedChannel(null)}
+                aria-label="Close QR Modal"
+              >
+                <X size={20} color="#00ffff" />
+              </button>
             </div>
 
-            <h2 className="modal-qr-title">{activeQrModal.title}</h2>
-            <p className="modal-qr-subtitle">{activeQrModal.subtitle}</p>
-
-            {/* Giant High-Res QR Display */}
-            <div className={`modal-qr-display-box ${highContrastMode ? 'contrast-white' : ''}`}>
-              <div className="modal-laser-sweep"></div>
-              <div className="qr-reticle top-left" />
-              <div className="qr-reticle top-right" />
-              <div className="qr-reticle bottom-left" />
-              <div className="qr-reticle bottom-right" />
-
-              {qrCodeDataUrls[activeQrModal.id] && (
+            {/* QR Code Graphic Frame */}
+            <div className="nexus-qr-frame">
+              {qrCodeDataUrl ? (
                 <img
-                  src={qrCodeDataUrls[activeQrModal.id]}
-                  alt={activeQrModal.title}
-                  className="modal-giant-qr-img"
+                  src={qrCodeDataUrl}
+                  alt={`QR Code for ${selectedChannel.title}`}
+                  className="nexus-qr-image"
                 />
+              ) : (
+                <div className="nexus-qr-loading">Generating Scannable Portal...</div>
               )}
             </div>
 
-            <div className="modal-qr-url-pill">
-              <Globe size={16} color="#00ffff" />
-              <span>{activeQrModal.url}</span>
-            </div>
+            {/* Instruction Callout */}
+            <p className="nexus-qr-instruction">
+              Scan with your smartphone camera to open link instantly
+            </p>
 
-            <div className="modal-instructions-box">
-              <ShieldCheck size={18} color="#00ff88" />
-              <span>No app installation required. Works with standard camera on iOS &amp; Android.</span>
-            </div>
-
-            <div className="modal-actions-row">
-              <button
-                className="modal-btn-contrast"
-                onClick={() => setHighContrastMode(!highContrastMode)}
-              >
-                <QrCode size={16} />
-                <span>{highContrastMode ? 'Switch to Cyber Cyan' : 'High-Contrast White Mode'}</span>
-              </button>
-
-              <button
-                className="modal-btn-primary"
-                onClick={() => handleCopyLink(activeQrModal)}
-              >
-                {copiedId === activeQrModal.id ? (
-                  <>
-                    <Check size={16} color="#00ff88" />
-                    <span>Copied Link</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={16} />
-                    <span>Copy URL</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── MODAL 2: In-Kiosk Interactive Brochure Viewer ── */}
-      {isBrochureOpen && (
-        <div className="weblinks-modal-overlay" onClick={() => setIsBrochureOpen(false)}>
-          <div
-            className="weblinks-brochure-modal-dialog"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <header className="brochure-modal-header">
-              <div className="brochure-header-left">
-                <div className="brochure-avatar-pill">
-                  <BookOpen size={20} color="#00ffff" />
-                </div>
-                <div>
-                  <h2 className="brochure-title">Robomiracle Technologies - Product Catalog</h2>
-                  <span className="brochure-subtitle">Autonomous Humanoid Receptionist Architecture (Aurra 2.0)</span>
-                </div>
-              </div>
-
-              <div className="brochure-header-actions">
-                <button
-                  className="brochure-close-btn"
-                  onClick={() => setIsBrochureOpen(false)}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </header>
-
-            {/* Navigation Tabs */}
-            <div className="brochure-tabs-bar">
-              {BROCHURE_SECTIONS.map((sec) => (
-                <button
-                  key={sec.id}
-                  className={`brochure-tab-btn ${activeBrochureTab === sec.id ? 'active' : ''}`}
-                  onClick={() => setActiveBrochureTab(sec.id)}
-                >
-                  {sec.id === 'overview' && <Globe size={16} />}
-                  {sec.id === 'hardware' && <Cpu size={16} />}
-                  {sec.id === 'features' && <Layers size={16} />}
-                  <span>{sec.title.split(' ')[0]}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Active Content Body */}
-            <div className="brochure-tab-content">
-              {BROCHURE_SECTIONS.filter((s) => s.id === activeBrochureTab).map((sec) => (
-                <div key={sec.id} className="brochure-page-card">
-                  <div className="brochure-section-badge">{sec.subtitle}</div>
-                  <h3 className="brochure-section-heading">{sec.title}</h3>
-
-                  <ul className="brochure-bullets-list">
-                    {sec.bullets.map((bullet, idx) => (
-                      <li key={idx} className="brochure-bullet-item">
-                        <span className="bullet-cyan-check">✓</span>
-                        <p>{bullet}</p>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {/* Visual Architecture Diagram Spec */}
-                  {sec.id === 'hardware' && (
-                    <div className="brochure-spec-grid">
-                      <div className="brochure-spec-item">
-                        <span className="spec-label">MAIN SOC</span>
-                        <span className="spec-val">MediaTek Helio G100</span>
-                      </div>
-                      <div className="brochure-spec-item">
-                        <span className="spec-label">MCU BUS</span>
-                        <span className="spec-val">ESP32 2.4GHz SoftAP</span>
-                      </div>
-                      <div className="brochure-spec-item">
-                        <span className="spec-label">HEAD SERVOS</span>
-                        <span className="spec-val">5-Axis Animatronics</span>
-                      </div>
-                      <div className="brochure-spec-item">
-                        <span className="spec-label">RADAR ENVELOPE</span>
-                        <span className="spec-val">Dual 40kHz Ultrasonic</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {sec.id === 'overview' && (
-                    <div className="brochure-kiosk-callout">
-                      <strong>100% Offline Resilience:</strong> Aurra functions completely stand-alone inside enterprise facilities without requiring external internet or third-party cloud infrastructure.
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Footer Actions */}
-            <footer className="brochure-modal-footer">
-              <span className="brochure-footer-hint">
-                To download the full PDF to your phone, scan the brochure QR on the main screen.
+            {/* URL Display Box */}
+            <div className="nexus-qr-url-box">
+              <span className="nexus-qr-url-text">
+                {portalUrls[selectedChannel.key] || selectedChannel.defaultUrl}
               </span>
               <button
-                className="brochure-dismiss-btn"
-                onClick={() => setIsBrochureOpen(false)}
+                className="nexus-qr-copy-btn"
+                onClick={handleCopy}
+                title="Copy URL"
               >
-                Close Brochure
+                {copied ? <Check size={16} color="#22c55e" /> : <Copy size={16} color="#00ffff" />}
+                <span>{copied ? 'Copied' : 'Copy'}</span>
               </button>
-            </footer>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="nexus-qr-modal-actions">
+              <button
+                className="nexus-qr-btn-primary"
+                onClick={() => setSelectedChannel(null)}
+              >
+                Close Portal
+              </button>
+            </div>
           </div>
         </div>
       )}
-
-      {/* Bottom spacer for global floating voice bar clearance */}
-      <div className="bottom-global-voice-spacer" />
     </div>
   );
 }

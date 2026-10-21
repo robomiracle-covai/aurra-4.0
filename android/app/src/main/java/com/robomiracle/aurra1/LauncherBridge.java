@@ -91,4 +91,17 @@ public class LauncherBridge {
     public String httpRequest(String method, String url, String body) {
         return activity.httpRequestSync(method, url, body != null ? body : "");
     }
+
+    @JavascriptInterface
+    public int getBatteryLevel() {
+        try {
+            android.os.BatteryManager bm = (android.os.BatteryManager) activity.getSystemService(android.content.Context.BATTERY_SERVICE);
+            if (bm != null) {
+                int capacity = bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY);
+                if (capacity > 0 && capacity <= 100) return capacity;
+            }
+        } catch (Exception ignored) {}
+        return 100;
+    }
 }
+

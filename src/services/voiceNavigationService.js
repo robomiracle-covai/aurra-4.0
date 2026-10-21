@@ -368,7 +368,10 @@ class VoiceNavigationService {
     if (onToggleView) this.viewToggleHandler = onToggleView;
 
     if (this.isInitialized) {
-      // Handlers updated. Maintain existing listening / pause state across screen transitions.
+      // Handlers updated. If autoStart is requested and mic is not running or paused by user, resume listening
+      if (autoStart && !this.userPaused && !this.isListening) {
+        this.startListening(false);
+      }
       return true;
     }
 
@@ -534,6 +537,9 @@ class VoiceNavigationService {
       };
 
       this.isInitialized = true;
+      if (autoStart && !this.userPaused) {
+        this.startListening(true);
+      }
       return true;
     } catch (err) {
       logger.error('VOICE', `Init error: ${err.message}`);
@@ -606,28 +612,57 @@ class VoiceNavigationService {
       return;
     }
 
+    const cleanUtterance = utterance.replace(/[?.!,]/g, '').trim();
+
     const isCardsIntent =
-      utterance === 'cards' ||
-      utterance === 'action cards' ||
-      utterance.includes('show card') ||
-      utterance.includes('show cards') ||
-      utterance.includes('show feature') ||
-      utterance.includes('open cards');
+      cleanUtterance === 'features' ||
+      cleanUtterance === 'cards' ||
+      cleanUtterance === 'action cards' ||
+      cleanUtterance === 'show features' ||
+      cleanUtterance === 'show feature' ||
+      cleanUtterance === 'show cards' ||
+      cleanUtterance === 'show card' ||
+      cleanUtterance === 'open cards' ||
+      cleanUtterance === 'what can you do' ||
+      cleanUtterance === 'what do you do' ||
+      cleanUtterance.includes('what feature') ||
+      cleanUtterance.includes('what features') ||
+      cleanUtterance.includes('your features') ||
+      cleanUtterance.includes('tell me features') ||
+      cleanUtterance.includes('show me features') ||
+      cleanUtterance.includes('show features') ||
+      cleanUtterance.includes('show the features') ||
+      cleanUtterance.includes('list features') ||
+      cleanUtterance.includes('show card') ||
+      cleanUtterance.includes('show cards') ||
+      cleanUtterance.includes('open cards') ||
+      cleanUtterance.includes('what can you do') ||
+      cleanUtterance.includes('what capabilities') ||
+      cleanUtterance.includes('what services') ||
+      cleanUtterance.includes('show services') ||
+      cleanUtterance.includes('features screen') ||
+      cleanUtterance.includes('features do you have') ||
+      cleanUtterance.includes('features do you offer') ||
+      cleanUtterance.includes('current screen') ||
+      (cleanUtterance.includes('feature') && (cleanUtterance.includes('have') || cleanUtterance.includes('what') || cleanUtterance.includes('show') || cleanUtterance.includes('tell')));
 
     if (isCardsIntent) {
       this.cancelSpeech();
-      this.setFeedback('Switching to Action Cards');
+      const replyMsg = 'Here are the features and services I offer. You can tap any card or ask me to open a feature.';
+      this.setFeedback('Here are the features and services I offer');
       this.setInteractiveReply({
         query: rawUtterance,
-        reply: 'Switching to Action Cards',
+        reply: replyMsg,
         source: 'navigation',
         confidence: 100,
-        category: 'Navigation',
+        category: 'Features',
         timestamp: Date.now(),
       });
-      this.speak('Opening Action Cards');
+      this.speak(replyMsg);
       this.navigationHandler?.('/?view=cards');
       this.viewToggleHandler?.(false);
+      window.dispatchEvent(new CustomEvent('aurra_show_cards'));
+      window.dispatchEvent(new CustomEvent('aurra_close_fullscreen_voice'));
       return;
     }
 
@@ -827,7 +862,84 @@ class VoiceNavigationService {
     this.notify({ isThinking: true });
 
     try {
-      // 4. Direct Cloud AI Mode Override (Sends all queries straight to Groq LLM API using Admin API key)
+      // 4A. Active PDF Document AI Context Interceptor (When user is viewing a PDF document)
+      if (this.documentContext && this.documentContext.docId) {
+        const docId = this.documentContext.docId;
+        const docTitle = this.documentContext.title || 'Document';
+        this.notify({ isThinking: true, feedback: `Analyzing ${docTitle}...` });
+        logger.speech('VOICE', `[Document AI Mode] Searching chunks for: "${rawUtterance}" in doc ${docId}`);
+
+        // Immediate visual feedback to document chat view
+        if (typeof this.documentContext.onQuestion === 'function') {
+          this.documentContext.onQuestion(rawUtterance);
+        }
+
+        const relevantChunks = await offlinePdfService.searchChunks(docId, rawUtterance);
+        const answerResult = await llmService.generatePdfAnswer(
+          rawUtterance,
+          docTitle,
+          relevantChunks,
+          this.conversationHistory
+        );
+
+        this.isProcessing = false;
+        this.isThinking = false;
+        this.notify({ isThinking: false });
+
+        if (answerResult.success && answerResult.text) {
+          const answerText = answerResult.text;
+          const citations = answerResult.citations || (relevantChunks[0] ? [relevantChunks[0].pageNumber] : []);
+
+          this.setFeedback(answerText);
+          this.setInteractiveReply({
+            query: rawUtterance,
+            reply: answerText,
+            source: 'pdf-document-ai',
+            confidence: 100,
+            category: 'PDF Document AI',
+            citations,
+            timestamp: Date.now(),
+          });
+
+          if (typeof this.documentContext.onAnswer === 'function') {
+            this.documentContext.onAnswer({
+              query: rawUtterance,
+              answer: answerText,
+              citations,
+              model: answerResult.model,
+              provider: answerResult.provider,
+            });
+          }
+
+          this.speak(answerText);
+
+          chatHistoryService.addMessage({
+            role: 'assistant',
+            text: answerText,
+            inputType,
+            source: 'pdf-document-ai',
+            confidence: 100,
+            citations,
+          });
+
+          return;
+        } else {
+          const fallbackText = answerResult.text || 'I could not find an answer in this document.';
+          this.setFeedback(fallbackText);
+          this.speak(fallbackText);
+          if (typeof this.documentContext.onAnswer === 'function') {
+            this.documentContext.onAnswer({
+              query: rawUtterance,
+              answer: fallbackText,
+              citations: [],
+              model: 'Fallback',
+            });
+          }
+          return;
+        }
+      }
+
+      // 4B. Direct Cloud AI Mode Override (Sends all queries straight to Groq LLM API using Admin API key)
       if (this.forceLlmOnly) {
         if (!llmService.isConfigured()) {
           const noKeyMsg = "Cloud AI is not configured. Please enter your Groq API key in Admin Settings.";
@@ -1054,77 +1166,6 @@ class VoiceNavigationService {
         }
       }
 
-      // 5B. Active PDF Document AI Context Interceptor (When user is viewing a PDF document)
-      if (this.documentContext && this.documentContext.docId) {
-        const docId = this.documentContext.docId;
-        const docTitle = this.documentContext.title || 'Document';
-        this.notify({ isThinking: true, feedback: `Analyzing ${docTitle}...` });
-        logger.speech('VOICE', `[Document AI Mode] Searching chunks for: "${rawUtterance}" in doc ${docId}`);
-
-        const relevantChunks = await offlinePdfService.searchChunks(docId, rawUtterance);
-        const answerResult = await llmService.generatePdfAnswer(
-          rawUtterance,
-          docTitle,
-          relevantChunks,
-          this.conversationHistory
-        );
-
-        this.isProcessing = false;
-        this.isThinking = false;
-        this.notify({ isThinking: false });
-
-        if (answerResult.success && answerResult.text) {
-          const answerText = answerResult.text;
-          const citations = answerResult.citations || (relevantChunks[0] ? [relevantChunks[0].pageNumber] : []);
-
-          this.setFeedback(answerText);
-          this.setInteractiveReply({
-            query: rawUtterance,
-            reply: answerText,
-            source: 'pdf-document-ai',
-            confidence: 100,
-            category: 'PDF Document AI',
-            citations,
-            timestamp: Date.now(),
-          });
-
-          if (typeof this.documentContext.onAnswer === 'function') {
-            this.documentContext.onAnswer({
-              query: rawUtterance,
-              answer: answerText,
-              citations,
-              model: answerResult.model,
-              provider: answerResult.provider,
-            });
-          }
-
-          this.speak(answerText);
-
-          chatHistoryService.addMessage({
-            role: 'assistant',
-            text: answerText,
-            inputType,
-            source: 'pdf-document-ai',
-            confidence: 100,
-            citations,
-          });
-
-          return;
-        } else {
-          const fallbackText = answerResult.text || 'I could not find an answer in this document.';
-          this.setFeedback(fallbackText);
-          this.speak(fallbackText);
-          if (typeof this.documentContext.onAnswer === 'function') {
-            this.documentContext.onAnswer({
-              query: rawUtterance,
-              answer: fallbackText,
-              citations: [],
-              model: 'Fallback',
-            });
-          }
-          return;
-        }
-      }
 
       // 6. Conversational / Q&A Intent: Tier 1 - Universal Offline Q&A Matching (< 3ms IndexedDB)
       const qaResult = await offlineQaService.findBestAnswer(rawUtterance);
@@ -1351,6 +1392,7 @@ class VoiceNavigationService {
       feedback: this.lastFeedback,
       isThinking: this.isThinking,
       latestReply: this.latestInteractiveReply,
+      documentContext: this.documentContext,
     });
     return () => this.subscribers.delete(callback);
   }
@@ -1369,6 +1411,7 @@ class VoiceNavigationService {
           feedback: this.lastFeedback,
           isThinking: this.isThinking,
           latestReply: this.latestInteractiveReply,
+          documentContext: this.documentContext,
           ...data,
         });
       } catch {

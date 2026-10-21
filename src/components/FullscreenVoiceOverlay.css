@@ -9,7 +9,7 @@
   z-index: 99999;
   display: flex;
   flex-direction: column;
-  background-color: #030514;
+  background-color: #020817;
   color: #ffffff;
   overflow: hidden;
   user-select: none;
@@ -43,7 +43,7 @@
   transform: translate(-50%, -50%);
   width: 900px;
   height: 600px;
-  background: radial-gradient(circle, rgba(138, 43, 226, 0.28) 0%, rgba(26, 32, 90, 0.22) 45%, transparent 75%);
+  background: radial-gradient(circle, rgba(0, 123, 168, 0.30) 0%, rgba(6, 26, 46, 0.25) 45%, transparent 75%);
   filter: blur(60px);
   pointer-events: none;
 }
@@ -143,7 +143,7 @@
   box-shadow: 0 0 14px rgba(0, 255, 255, 0.15);
 }
 
-/* Main Center Stage */
+/* Main Center Stage - Anchored gracefully towards the bottom */
 .fs-center-stage {
   position: relative;
   z-index: 5;
@@ -151,10 +151,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   width: 100%;
-  padding-top: 16px;
-  padding-bottom: 24px;
+  padding-top: 10px;
+  padding-bottom: 20px;
   overflow: hidden;
 }
 
@@ -164,70 +164,185 @@
   flex-direction: column;
   align-items: center;
   width: 100%;
-  margin-top: 10px;
+  margin-bottom: 0px;
 }
 
-/* Concentric Glowing Mic Orb Container */
+/* Concentric Glowing Mic Orb Container (Enlarged for prominent visual impact) */
 .fs-mic-portal-container {
   position: relative;
-  width: 190px;
-  height: 190px;
+  width: 240px;
+  height: 240px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  margin-bottom: 24px;
-  transition: transform 0.3s ease;
+  margin-bottom: 4px;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), margin 0.35s ease;
 }
 
 .fs-mic-portal-container:hover {
   transform: scale(1.035);
 }
 
-/* Outer Concentric Cyan Ring */
+/* Gracefully scale down mic portal when speaking or listening so it never coincides with the wave */
+.fs-mic-portal-container.is-speaking,
+.fs-mic-portal-container.is-listening {
+  transform: scale(0.72);
+  margin-bottom: -18px;
+}
+
+/* Outer Concentric Cyan Ring (Very gentle, slow micro-movement in calm standby) */
 .fs-concentric-ring.ring-outer {
   position: absolute;
-  width: 180px;
-  height: 180px;
+  width: 220px;
+  height: 220px;
   border-radius: 50%;
-  border: 1.5px solid rgba(0, 210, 255, 0.38);
-  box-shadow: 0 0 25px rgba(0, 210, 255, 0.25), inset 0 0 15px rgba(0, 210, 255, 0.12);
-  animation: fsRingBreathOuter 3.2s ease-in-out infinite alternate;
+  border: 1.5px solid rgba(0, 210, 255, 0.30);
+  box-shadow: 0 0 16px rgba(0, 210, 255, 0.16);
+  opacity: 0.48;
+  pointer-events: none;
+  animation: fsRingCalmOuter 5.0s ease-in-out infinite alternate;
+}
+
+@keyframes fsRingCalmOuter {
+  0% { transform: scale(0.985); opacity: 0.42; }
+  100% { transform: scale(1.015); opacity: 0.56; }
+}
+
+/* Cyber Dotted Orbit Ring (Dotted line circling mic portal) */
+.fs-concentric-ring.ring-dotted {
+  position: absolute;
+  width: 196px;
+  height: 196px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(0, 207, 239, 0.45);
+  box-shadow: 0 0 14px rgba(0, 207, 239, 0.25);
+  opacity: 0.55;
+  pointer-events: none;
+  animation: fsRingRotateDotted 32s linear infinite;
+}
+
+@keyframes fsRingRotateDotted {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Middle Concentric Pure White Ring Layer (Luminescent pure white portal layer) */
+.fs-concentric-ring.ring-middle {
+  position: absolute;
+  width: 172px;
+  height: 172px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 22px rgba(255, 255, 255, 0.55), inset 0 0 12px rgba(255, 255, 255, 0.3);
+  opacity: 0.75;
+  pointer-events: none;
+  animation: fsRingCalmMid 4.2s ease-in-out infinite alternate;
+}
+
+@keyframes fsRingCalmMid {
+  0% { transform: scale(1.012); opacity: 0.65; box-shadow: 0 0 16px rgba(255, 255, 255, 0.45); }
+  100% { transform: scale(0.988); opacity: 0.85; box-shadow: 0 0 28px rgba(255, 255, 255, 0.75); }
+}
+
+/* Dynamic Expanding Ripple Waves (Calm & Hidden by default) */
+.fs-concentric-ring.ring-ripple-1,
+.fs-concentric-ring.ring-ripple-2 {
+  position: absolute;
+  width: 136px;
+  height: 136px;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Movement ONLY when Hearing (Listening) or Speaking */
+.is-listening .fs-concentric-ring.ring-outer,
+.is-speaking .fs-concentric-ring.ring-outer {
+  border-width: 2px;
+  border-color: rgba(0, 210, 255, 0.65);
+  box-shadow: 0 0 35px rgba(0, 210, 255, 0.45), inset 0 0 20px rgba(0, 210, 255, 0.25);
+  animation: fsRingBreathOuter 2.4s ease-in-out infinite alternate;
+  opacity: 0.95;
+}
+
+.is-listening .fs-concentric-ring.ring-dotted,
+.is-speaking .fs-concentric-ring.ring-dotted {
+  border-color: rgba(0, 229, 255, 0.85);
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.5);
+  animation: fsRingRotateDottedActive 12s linear infinite;
+  opacity: 0.9;
+}
+
+@keyframes fsRingRotateDottedActive {
+  0% { transform: rotate(0deg) scale(1.02); }
+  50% { transform: rotate(180deg) scale(0.98); }
+  100% { transform: rotate(360deg) scale(1.02); }
+}
+
+.is-listening .fs-concentric-ring.ring-middle,
+.is-speaking .fs-concentric-ring.ring-middle {
+  border-width: 2.5px;
+  border-color: #FFFFFF;
+  box-shadow: 0 0 38px rgba(255, 255, 255, 0.9), inset 0 0 22px rgba(255, 255, 255, 0.45);
+  animation: fsRingBreathMid 2.0s ease-in-out infinite alternate;
+  opacity: 1;
+}
+
+.is-listening .fs-concentric-ring.ring-ripple-1,
+.is-speaking .fs-concentric-ring.ring-ripple-1 {
+  border: 2px solid rgba(0, 240, 255, 0.75);
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.5);
+  animation: fsMicRippleWave 2.6s cubic-bezier(0.1, 0.4, 0.2, 1) infinite;
+}
+
+.is-listening .fs-concentric-ring.ring-ripple-2,
+.is-speaking .fs-concentric-ring.ring-ripple-2 {
+  border: 2px solid rgba(0, 168, 255, 0.75);
+  box-shadow: 0 0 25px rgba(0, 168, 255, 0.5);
+  animation: fsMicRippleWave 2.6s cubic-bezier(0.1, 0.4, 0.2, 1) infinite 1.3s;
 }
 
 @keyframes fsRingBreathOuter {
-  0% { transform: scale(0.97); opacity: 0.6; }
-  100% { transform: scale(1.03); opacity: 0.95; }
-}
-
-/* Middle Concentric Violet/Magenta Ring */
-.fs-concentric-ring.ring-middle {
-  position: absolute;
-  width: 142px;
-  height: 142px;
-  border-radius: 50%;
-  border: 2px solid rgba(192, 132, 252, 0.65);
-  box-shadow: 0 0 30px rgba(168, 85, 247, 0.45), inset 0 0 18px rgba(168, 85, 247, 0.2);
-  animation: fsRingBreathMid 2.6s ease-in-out infinite alternate;
+  0% { transform: scale(0.93) rotate(0deg); opacity: 0.65; border-color: rgba(0, 210, 255, 0.45); }
+  50% { transform: scale(1.05) rotate(180deg); opacity: 0.95; border-color: rgba(56, 189, 248, 0.85); }
+  100% { transform: scale(0.95) rotate(360deg); opacity: 0.7; border-color: rgba(0, 210, 255, 0.5); }
 }
 
 @keyframes fsRingBreathMid {
-  0% { transform: scale(1.02); opacity: 0.75; }
-  100% { transform: scale(0.98); opacity: 1; }
+  0% { transform: scale(1.06) rotate(360deg); opacity: 0.85; border-color: rgba(255, 255, 255, 0.8); box-shadow: 0 0 25px rgba(255, 255, 255, 0.6); }
+  50% { transform: scale(0.94) rotate(180deg); opacity: 1; border-color: #FFFFFF; box-shadow: 0 0 45px rgba(255, 255, 255, 0.95); }
+  100% { transform: scale(1.04) rotate(0deg); opacity: 0.9; border-color: rgba(220, 232, 245, 0.9); box-shadow: 0 0 30px rgba(255, 255, 255, 0.7); }
 }
 
-/* Inner Glowing Gradient Core Orb */
+@keyframes fsMicRippleWave {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.95;
+    border-width: 2.5px;
+  }
+  60% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.75);
+    opacity: 0;
+    border-width: 1px;
+  }
+}
+
+/* Inner Glowing Gradient Core Orb (Robomiracle Palette) */
 .fs-mic-core-orb {
   position: relative;
-  width: 104px;
-  height: 104px;
+  width: 132px;
+  height: 132px;
   border-radius: 50%;
-  background: radial-gradient(circle at 38% 32%, #181d45 0%, #080a21 65%, #040510 100%);
-  border: 2.5px solid #d946ef;
+  background: radial-gradient(circle at 38% 32%, #061A2E 0%, #020817 65%, #020817 100%);
+  border: 3px solid #00CFEF;
   box-shadow: 
-    0 0 25px rgba(217, 70, 239, 0.7),
-    0 0 50px rgba(0, 240, 255, 0.4),
-    inset 0 0 20px rgba(168, 85, 247, 0.45);
+    0 0 32px rgba(0, 207, 239, 0.75),
+    0 0 65px rgba(0, 168, 255, 0.45),
+    inset 0 0 25px rgba(0, 123, 168, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -236,10 +351,10 @@
 
 .fs-core-glass-reflection {
   position: absolute;
-  top: 4px;
-  left: 14px;
-  right: 14px;
-  height: 42px;
+  top: 6px;
+  left: 18px;
+  right: 18px;
+  height: 52px;
   border-radius: 50%;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.02) 100%);
   pointer-events: none;
@@ -251,16 +366,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.75));
+  filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.85));
 }
 
 .fs-core-pulse-aura {
   position: absolute;
-  inset: -8px;
+  inset: -10px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(0, 240, 255, 0.35) 0%, transparent 70%);
-  opacity: 0.6;
-  animation: fsCoreAuraPulse 2s ease-in-out infinite alternate;
+  background: radial-gradient(circle, rgba(0, 240, 255, 0.3) 0%, transparent 70%);
+  opacity: 0.25;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+.is-listening .fs-core-pulse-aura,
+.is-speaking .fs-core-pulse-aura {
+  opacity: 0.65;
+  animation: fsCoreAuraPulse 1.8s ease-in-out infinite alternate;
 }
 
 @keyframes fsCoreAuraPulse {
@@ -270,11 +392,11 @@
 
 /* State Reactions */
 .is-speaking .fs-mic-core-orb {
-  border-color: #00ffff;
+  border-color: #00E5FF;
   box-shadow: 
-    0 0 35px rgba(0, 255, 255, 0.85),
-    0 0 70px rgba(217, 70, 239, 0.5),
-    inset 0 0 25px rgba(0, 255, 255, 0.5);
+    0 0 38px rgba(0, 229, 255, 0.9),
+    0 0 75px rgba(0, 168, 255, 0.55),
+    inset 0 0 28px rgba(0, 207, 239, 0.55);
   animation: fsSpeakingPop 0.8s ease-in-out infinite alternate;
 }
 
@@ -283,7 +405,7 @@
   100% { transform: scale(1.05); }
 }
 
-/* Continuous Waving Laser Horizon Line Canvas */
+/* Continuous Waving Laser Horizon Line Canvas (Vertical clearance prevents collision) */
 .fs-wave-horizon-wrapper {
   position: relative;
   width: 100vw;
@@ -292,7 +414,7 @@
   align-items: center;
   justify-content: center;
   overflow: visible;
-  margin: -10px 0 16px 0;
+  margin: 14px 0 16px 0;
 }
 
 .fs-wave-horizon-canvas {
@@ -302,7 +424,7 @@
   pointer-events: none;
 }
 
-/* Status Content Area - Positioned down at the bottom side of the screen */
+/* Status Content Area - Positioned right below the lowered horizon line */
 .fs-status-content-area {
   display: flex;
   flex-direction: column;
@@ -311,8 +433,8 @@
   width: 100%;
   max-width: 1200px;
   padding: 0 24px;
-  margin-top: auto;
-  margin-bottom: 6px;
+  margin-top: 0;
+  margin-bottom: 4px;
 }
 
 .fs-listening-title {
@@ -338,7 +460,7 @@
 }
 
 .fs-thinking-text {
-  color: #c084fc;
+  color: #00CFEF;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -362,73 +484,129 @@
   100% { opacity: 1; text-shadow: 0 0 24px rgba(0, 240, 255, 0.95); }
 }
 
-/* Transcript & Speech Feedback Bubble */
-.fs-transcript-capsule {
-  margin-bottom: 16px;
-  padding: 10px 22px;
-  border-radius: 16px;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(0, 255, 255, 0.25);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
-  max-width: 620px;
-  animation: fsPopIn 0.25s ease-out;
+/* Dual Side-by-Side Q&A Panels (Exact Reference Screenshot UI) */
+.fs-dual-dialog-container {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 16px;
+  width: 95%;
+  max-width: 1080px;
+  margin-bottom: 20px;
+  animation: fsPopIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes fsPopIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.fs-heard-line {
-  font-size: 16px;
-  font-weight: 500;
-  color: #38bdf8;
-  font-style: italic;
-}
-
-.fs-reply-block {
+.fs-dialog-panel {
+  position: relative;
+  border-radius: 20px;
+  background: rgba(2, 8, 23, 0.82);
+  border: 1.5px solid #00CFEF;
+  box-shadow: 
+    0 0 24px rgba(0, 207, 239, 0.38),
+    inset 0 0 16px rgba(0, 207, 239, 0.12);
+  padding: 22px 28px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  overflow: hidden;
   text-align: left;
 }
 
-.fs-user-query-line {
-  font-size: 13px;
-  color: #94a3b8;
+/* Left Panel: Question + Embedded Waveform */
+.fs-question-panel {
+  flex: 0 0 38%;
+  min-width: 280px;
+  justify-content: space-between;
+  gap: 20px;
 }
 
-.fs-query-tag {
-  color: #38bdf8;
-  font-weight: 600;
-  margin-right: 4px;
-}
-
-.fs-aurra-reply-line {
-  font-size: 15px;
-  font-weight: 500;
-  color: #f1f5f9;
-  line-height: 1.4;
-}
-
-.fs-reply-tag {
-  color: #00ffff;
+.fs-panel-query-text {
+  font-size: 23px;
   font-weight: 700;
-  margin-right: 6px;
+  color: #FFFFFF;
+  line-height: 1.35;
+  letter-spacing: 0.2px;
 }
 
-/* Frosted Glass Waveform Equalizer Pill (from Screenshot) */
+/* Audio Waveform Embedded in Question Card */
+.fs-card-waveform {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3.5px;
+  height: 28px;
+  margin-top: auto;
+  padding: 4px 0;
+}
+
+.fs-card-wave-bar {
+  width: 2.2px;
+  height: var(--bar-h, 12px);
+  background: linear-gradient(180deg, #FFFFFF 0%, #00E5FF 45%, #007BA8 100%);
+  border-radius: 2px;
+  box-shadow: 0 0 5px rgba(0, 229, 255, 0.6);
+  transition: height 0.2s ease;
+}
+
+.fs-card-waveform.is-speaking .fs-card-wave-bar {
+  animation: fsCardWaveDance 0.85s ease-in-out infinite alternate var(--anim-delay, 0s);
+}
+
+.fs-card-waveform.is-listening .fs-card-wave-bar {
+  animation: fsCardWaveDance 1.3s ease-in-out infinite alternate var(--anim-delay, 0s);
+}
+
+@keyframes fsCardWaveDance {
+  0% { transform: scaleY(0.45); opacity: 0.65; }
+  100% { transform: scaleY(1.35); opacity: 1; box-shadow: 0 0 10px rgba(0, 229, 255, 0.95); }
+}
+
+/* Right Panel: Aurra Answer with Cyber Corner Accent */
+.fs-answer-panel {
+  flex: 1;
+  justify-content: center;
+  padding-right: 36px;
+}
+
+.fs-panel-answer-text {
+  font-size: 19px;
+  font-weight: 500;
+  color: #FFFFFF;
+  line-height: 1.6;
+  letter-spacing: 0.3px;
+}
+
+/* Top-Right Cyber Corner Accent */
+.fs-cyber-corner-accent {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  pointer-events: none;
+  filter: drop-shadow(0 0 6px rgba(0, 229, 255, 0.75));
+}
+
+/* Edge Neon Highlights on Both Panels */
+.fs-panel-edge-glow {
+  position: absolute;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00E5FF, #FFFFFF, #00E5FF, transparent);
+  box-shadow: 0 0 10px #00E5FF;
+  pointer-events: none;
+}
+
+/* High-Performance Frosted Glass Waveform Equalizer Pill (Zero GPU Blur Lag) */
 .fs-waveform-glass-capsule {
-  margin-top: 6px;
-  margin-bottom: 22px;
-  padding: 12px 28px;
+  margin-top: 2px;
+  margin-bottom: 16px;
+  padding: 10px 28px;
   border-radius: 9999px;
-  background: rgba(10, 15, 35, 0.55);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 16, 38, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 
-    0 10px 32px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    0 10px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -445,13 +623,14 @@
   width: 4px;
   height: 6px;
   border-radius: 3px;
-  /* Multi-color gradient spread across 28 bars */
+  /* Robomiracle White to Cyan to Blue Waveform */
   background: linear-gradient(
     180deg,
-    hsl(calc(185 + var(--bar-index) * 4.8), 100%, 65%) 0%,
-    hsl(calc(185 + var(--bar-index) * 4.8), 90%, 48%) 100%
+    #FFFFFF 0%,
+    #00E5FF 40%,
+    #007BA8 100%
   );
-  box-shadow: 0 0 6px hsl(calc(185 + var(--bar-index) * 4.8), 90%, 60%);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7), 0 0 14px rgba(0, 229, 255, 0.45);
   transform-origin: center;
   will-change: height, transform;
 }

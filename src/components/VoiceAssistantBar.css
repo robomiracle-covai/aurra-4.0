@@ -52,7 +52,8 @@
   left: -4px;
   right: -4px;
   bottom: -4px;
-  border: 2px solid #00ffff;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
   border-radius: 50%;
   animation: pulseMic 1.8s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
   pointer-events: none;

@@ -55,8 +55,13 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
 
   useEffect(() => {
     const handleOpenFs = () => setIsFullscreenOpen(true);
+    const handleCloseFs = () => setIsFullscreenOpen(false);
     window.addEventListener('aurra_open_fullscreen_voice', handleOpenFs);
-    return () => window.removeEventListener('aurra_open_fullscreen_voice', handleOpenFs);
+    window.addEventListener('aurra_close_fullscreen_voice', handleCloseFs);
+    return () => {
+      window.removeEventListener('aurra_open_fullscreen_voice', handleOpenFs);
+      window.removeEventListener('aurra_close_fullscreen_voice', handleCloseFs);
+    };
   }, []);
 
   useEffect(() => {
@@ -116,7 +121,7 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
         {isListening ? (
           <>
             <div className="pulse-ring"></div>
-            <Mic size={22} color="#00ffff" />
+            <Mic size={22} color="#ffffff" />
           </>
         ) : (
           <MicOff size={22} color="#ef4444" />

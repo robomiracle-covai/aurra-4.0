@@ -1044,7 +1044,56 @@ export const offlineFacilityService = {
 export const offlinePdfService = {
   getDocuments: async () => {
     try {
-      const docs = await db.pdfDocuments.toArray();
+      let docs = await db.pdfDocuments.toArray();
+      if (!docs || docs.length === 0) {
+        const defaultDocId = 'doc_aurra_tech_specs_2026';
+        const now = new Date().toISOString();
+        const defaultDoc = {
+          id: defaultDocId,
+          title: 'Aurra 4.0 Humanoid Receptionist — Technical & Architecture Manual',
+          fileName: 'Aurra_4.0_Technical_Specifications_Manual.pdf',
+          fileSize: 485200,
+          pageCount: 3,
+          createdAt: now,
+          updatedAt: now,
+          summary: 'Authoritative hardware architecture, vision sensors, motor degrees of freedom, battery runtime, and campus facilities directory for Aurra humanoid.',
+        };
+        await db.pdfDocuments.put(defaultDoc);
+        await db.pdfChunks.where('documentId').equals(defaultDocId).delete();
+        await db.pdfChunks.bulkAdd([
+          {
+            documentId: defaultDocId,
+            pageNumber: 1,
+            chunkIndex: 0,
+            text: 'ROBOMIRACLE TECHNOLOGIES — AURRA 4.0 TECHNICAL MANUAL\nChapter 1: Hardware Specifications & Architecture Overview\nDisplay: 12-inch Full HD (1920x1080) Waveshare Capacitive Multi-Touch Display running at 90 FPS with anti-glare tempered glass coating.\nBattery & Power System: High-capacity 25.9V / 31.5Ah Lithium-ion battery pack delivering 10 to 14 hours of continuous operational endurance. Dedicated 29.4V / 5A smart charger with thermal protection and overcharge safeguards.\nControl Architecture: Dual-mode wireless control supporting 2.4 GHz RC Remote control and Wi-Fi Web/Mobile Cockpit telemetry. A physical toggle switch toggles between Wi-Fi and RC modes.',
+          },
+          {
+            documentId: defaultDocId,
+            pageNumber: 1,
+            chunkIndex: 1,
+            text: 'Power Switch: Heavy-duty illuminated physical latching push button on the rear spine for master power cut-off.\nThermal Management: Active multi-duct brushless air ventilation circulation fans maintaining internal computing temperatures below 45 degrees Celsius.',
+          },
+          {
+            documentId: defaultDocId,
+            pageNumber: 2,
+            chunkIndex: 0,
+            text: 'Chapter 2: Motion, Actuation & Sensor Telemetry\nMobility & Degrees of Freedom: 5 DOF (Degrees of Freedom) motor kinematic architecture offering precision head yaw, pitch, dual-axis gesture arms, and torso orientation.\nBase Drive: 100mm heavy-duty dual-bearing industrial omni/caster wheel assembly providing smooth 360-degree zero-radius turning on corporate flooring and carpet.\nSensors: Array of high-precision ultrasonic distance sensors offering 360-degree obstacle detection, edge detection, and real-time collision prevention with a 15-millisecond response window.',
+          },
+          {
+            documentId: defaultDocId,
+            pageNumber: 2,
+            chunkIndex: 1,
+            text: 'Vision & Camera Subsystem: Crystal Pro HD Web Camera with USB interface, 3P optical lens, automatic low-light night vision enhancement, and integrated noise-cancelling directional microphone array.\nAudio Subsystem: Fielect 8 Ohm 20W high-definition external magnet neodymium loudspeaker (78mm diameter) tuned for clear human voice articulation.',
+          },
+          {
+            documentId: defaultDocId,
+            pageNumber: 3,
+            chunkIndex: 0,
+            text: 'Chapter 3: Campus Headquarters & Campus Directory\nCorporate Office: Robomiracle Technologies Private Limited, RS Puram, Coimbatore, Tamil Nadu, India.\nContact Hotline: +91 63804 73177, +91 79071 08559 | Email: sales@robomiracle.com\nCampus Facilities:\n- Ground Floor East Wing: [RD-01] R&D & Engineering Workspace, [HW-02] Hardware & Electronics Lab, [PR-04] 3D Rapid Prototyping.\n- Ground Floor Central Atrium: [TB-05] Robotics Demonstration Arena (10m straight ahead).\n- Ground Floor North Wing: [MC-07] Executive Conference Rooms.\n- First Floor Central Core: [SW-03] Software Development & AI Innovation Lab.\n- Second Floor Central: [IT-08] High-Speed IT Infrastructure & Climate-Controlled Server Racks.',
+          },
+        ]);
+        docs = [defaultDoc];
+      }
       return docs.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
     } catch (err) {
       console.warn('Failed to get PDF documents from IndexedDB:', err);

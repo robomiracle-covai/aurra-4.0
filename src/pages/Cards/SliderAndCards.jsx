@@ -35,26 +35,83 @@ import { LogViewerModal } from '../../components/LogViewerModal';
 import { esp32Service } from '../../services/esp32Service';
 import './SliderAndCards.css';
 
-// Feature Icon Resolver
-const getCardIcon = (href, className) => {
-  if (href?.includes('form')) return <FileText size={28} color="#00ffff" />;
-  if (href?.includes('qa')) return <HelpCircle size={28} color="#00ffff" />;
-  if (href?.includes('tour')) return <Compass size={28} color="#00ffff" />;
-  if (href?.includes('facilities')) return <Building2 size={28} color="#00ffff" />;
-  if (href?.includes('face') || href?.includes('greet')) return <Camera size={28} color="#00ffff" />;
-  if (href?.includes('control')) return <Sliders size={28} color="#00ffff" />;
-  if (href?.includes('testing-interaction')) return <FlaskConical size={28} color="#f59e0b" />;
-  if (href?.includes('interaction')) return <Eye size={28} color="#00ffff" />;
-  if (href?.includes('web')) return <Globe size={28} color="#00ffff" />;
-  if (href?.includes('hardware')) return <Activity size={28} color="#00ffff" />;
-  if (href?.includes('pdf')) return <FileText size={28} color="#ff3366" />;
-  return <Sparkles size={28} color="#00ffff" />;
+// Feature Icon Resolver with Dynamic Bubble Sizing
+const getCardIcon = (href, className, size = 26) => {
+  if (href?.includes('form')) return <FileText size={size} color="#00ffff" />;
+  if (href?.includes('qa')) return <HelpCircle size={size} color="#00ffff" />;
+  if (href?.includes('tour')) return <Compass size={size} color="#00ffff" />;
+  if (href?.includes('facilities')) return <Building2 size={size} color="#00ffff" />;
+  if (href?.includes('face') || href?.includes('greet')) return <Camera size={size} color="#00ffff" />;
+  if (href?.includes('control')) return <Sliders size={size} color="#00ffff" />;
+  if (href?.includes('testing-interaction')) return <FlaskConical size={size} color="#f59e0b" />;
+  if (href?.includes('interaction')) return <Eye size={size} color="#00ffff" />;
+  if (href?.includes('web')) return <Globe size={size} color="#00ffff" />;
+  if (href?.includes('hardware')) return <Activity size={size} color="#00ffff" />;
+  if (href?.includes('pdf')) return <FileText size={size} color="#ff3366" />;
+  return <Sparkles size={size} color="#00ffff" />;
+};
+
+// Organic Clustered Bubble Slots (Referenced directly from Design Spec: tightly nestled, even spacing, varying radii)
+const CLUSTER_CONFIGS = {
+  // If 5 cards:
+  5: [
+    { x: 0, y: -138, size: 116, iconSize: 25, fontSize: 10.5, labelMax: 90 }, // Top
+    { x: 132, y: -43, size: 126, iconSize: 28, fontSize: 11.5, labelMax: 96 }, // Top-Right
+    { x: 82, y: 114, size: 114, iconSize: 24, fontSize: 10.5, labelMax: 88 }, // Bottom-Right
+    { x: -82, y: 114, size: 106, iconSize: 22, fontSize: 10, labelMax: 84 }, // Bottom-Left
+    { x: -132, y: -43, size: 122, iconSize: 26, fontSize: 11, labelMax: 92 }, // Top-Left
+  ],
+  // If 6 cards:
+  6: [
+    { x: 0, y: -136, size: 118, iconSize: 26, fontSize: 11, labelMax: 92 }, // Top
+    { x: 126, y: -72, size: 128, iconSize: 28, fontSize: 11.5, labelMax: 98 }, // Top-Right
+    { x: 124, y: 72, size: 116, iconSize: 26, fontSize: 11, labelMax: 90 }, // Bottom-Right
+    { x: 0, y: 134, size: 104, iconSize: 22, fontSize: 10, labelMax: 84 }, // Bottom
+    { x: -120, y: 68, size: 110, iconSize: 24, fontSize: 10.5, labelMax: 86 }, // Bottom-Left
+    { x: -124, y: -72, size: 122, iconSize: 26, fontSize: 11, labelMax: 94 }, // Top-Left
+  ],
+  // If 7 cards:
+  7: [
+    { x: 0, y: -136, size: 116, iconSize: 26, fontSize: 11, labelMax: 92 }, // Top
+    { x: 114, y: -90, size: 124, iconSize: 28, fontSize: 11.5, labelMax: 98 }, // Top-Right
+    { x: 142, y: 32, size: 114, iconSize: 24, fontSize: 10.5, labelMax: 88 }, // Right
+    { x: 62, y: 130, size: 104, iconSize: 22, fontSize: 10, labelMax: 84 }, // Bottom-Right
+    { x: -62, y: 130, size: 100, iconSize: 22, fontSize: 10, labelMax: 82 }, // Bottom-Left
+    { x: -140, y: 32, size: 118, iconSize: 26, fontSize: 11, labelMax: 90 }, // Left-Bottom
+    { x: -114, y: -90, size: 112, iconSize: 24, fontSize: 10.5, labelMax: 86 }, // Left-Top
+  ],
+  // If 8 cards:
+  8: [
+    { x: 0, y: -136, size: 116, iconSize: 26, fontSize: 11, labelMax: 92 },
+    { x: 114, y: -90, size: 124, iconSize: 28, fontSize: 11.5, labelMax: 98 },
+    { x: 142, y: 32, size: 114, iconSize: 24, fontSize: 10.5, labelMax: 88 },
+    { x: 62, y: 130, size: 104, iconSize: 22, fontSize: 10, labelMax: 84 },
+    { x: -62, y: 130, size: 100, iconSize: 22, fontSize: 10, labelMax: 82 },
+    { x: -140, y: 32, size: 118, iconSize: 26, fontSize: 11, labelMax: 90 },
+    { x: -114, y: -90, size: 112, iconSize: 24, fontSize: 10.5, labelMax: 86 },
+    { x: 218, y: -12, size: 102, iconSize: 22, fontSize: 10, labelMax: 80 },
+  ],
+};
+
+const getBubbleSlot = (idx, total) => {
+  const config = CLUSTER_CONFIGS[total] || CLUSTER_CONFIGS[6];
+  if (config && config[idx]) return config[idx];
+  const angleDeg = (idx / total) * 360 - 90;
+  const angleRad = (angleDeg * Math.PI) / 180;
+  return {
+    x: Math.round(140 * Math.cos(angleRad)),
+    y: Math.round(140 * Math.sin(angleRad)),
+    size: 112,
+    iconSize: 24,
+    fontSize: 10.5,
+    labelMax: 88,
+  };
 };
 
 // Orbital Sphere Aesthetic Theme Resolver
 const getOrbTheme = (href, idx, card) => {
   if (href?.includes('face') || href?.includes('greet')) {
-    return { sysId: 'SYS_02', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.16)', border: '#c084fc', glow: 'rgba(168, 85, 247, 0.55)', label: card?.title || 'Face Recognition' };
+    return { sysId: 'SYS_02', color: '#00A8FF', bg: 'rgba(0, 168, 255, 0.16)', border: '#00E5FF', glow: 'rgba(0, 168, 255, 0.55)', label: card?.title || 'Face Recognition' };
   }
   if (href?.includes('tour')) {
     return { sysId: 'SYS_03', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.16)', border: '#22d3ee', glow: 'rgba(6, 182, 212, 0.55)', label: card?.title || 'Guided Tour' };
@@ -66,7 +123,7 @@ const getOrbTheme = (href, idx, card) => {
     return { sysId: 'SYS_05', color: '#00d2ff', bg: 'rgba(0, 210, 255, 0.16)', border: '#38bdf8', glow: 'rgba(0, 210, 255, 0.55)', label: card?.title || 'Visitor Form' };
   }
   if (href?.includes('web') || href?.includes('qr')) {
-    return { sysId: 'SYS_06', color: '#d946ef', bg: 'rgba(217, 70, 239, 0.16)', border: '#e879f9', glow: 'rgba(217, 70, 239, 0.55)', label: card?.title || 'QR Links' };
+    return { sysId: 'SYS_06', color: '#00CFEF', bg: 'rgba(0, 207, 239, 0.16)', border: '#00E5FF', glow: 'rgba(0, 207, 239, 0.55)', label: card?.title || 'QR Links' };
   }
   if (href?.includes('control') || href?.includes('ros')) {
     return { sysId: 'SYS_07', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.16)', border: '#fbbf24', glow: 'rgba(245, 158, 11, 0.55)', label: card?.title || 'ROS Controls' };
@@ -80,27 +137,38 @@ const getOrbTheme = (href, idx, card) => {
   return { sysId: `SYS_0${idx + 2}`, color: '#00ffff', bg: 'rgba(0, 255, 255, 0.16)', border: '#22d3ee', glow: 'rgba(0, 255, 255, 0.55)', label: card?.title || 'Module' };
 };
 
-export default function SliderAndCards({ 
-  onNavigate, 
-  showCardsInitially = false,
-  isAdminOpen = false,
-  onOpenAdmin,
-  onCloseAdmin 
-}) {
-  const [headerTitle, setHeaderTitle] = useState('Robomiracle Technologies Private Limited');
-  const [slides, setSlides] = useState([]);
-  const [cards, setCards] = useState([]);
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const [showSlider, setShowSlider] = useState(!showCardsInitially);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [devSettings, setDevSettings] = useState(devSettingsService.getSettings());
-  const [isLogsOpen, setIsLogsOpen] = useState(false);
-  const [fps, setFps] = useState(60);
-  const [espState, setEspState] = useState(esp32Service.getState());
+// Isolated 90 FPS Telemetry Component (zero re-render overhead on main view)
+const FpsTelemetry = React.memo(function FpsTelemetry() {
+  const [val, setVal] = useState(90);
+
+  useEffect(() => {
+    let frameCount = 0;
+    let lastTime = performance.now();
+    let animId = null;
+
+    const measureFps = () => {
+      frameCount++;
+      const now = performance.now();
+      if (now - lastTime >= 1000) {
+        setVal(Math.round((frameCount * 1000) / (now - lastTime)));
+        frameCount = 0;
+        lastTime = now;
+      }
+      animId = requestAnimationFrame(measureFps);
+    };
+
+    animId = requestAnimationFrame(measureFps);
+    return () => cancelAnimationFrame(animId);
+  }, []);
+
+  return <span>CAM/FPS: {val} FPS</span>;
+});
+
+// Isolated Live Clock Component (zero re-render overhead on main view)
+const LiveClockTelemetry = React.memo(function LiveClockTelemetry() {
   const [currentTimeStr, setCurrentTimeStr] = useState('');
   const [currentDateStr, setCurrentDateStr] = useState('');
 
-  // ── Real-Time Clock Synchronization (1s Interval) ──
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -121,6 +189,25 @@ export default function SliderAndCards({
     return () => clearInterval(interval);
   }, []);
 
+  return (
+    <div className="cyber-clock-box">
+      <div className="clock-time">{currentTimeStr || '12:00 PM'}</div>
+      <div className="clock-date">{currentDateStr || 'OCT 21, 2026'}</div>
+    </div>
+  );
+});
+
+export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, showCardsInitially = false }) {
+  const [slides, setSlides] = useState([]);
+  const [cards, setCards] = useState([]);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [showSlider, setShowSlider] = useState(true);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isLogsOpen, setIsLogsOpen] = useState(false);
+  const [headerTitle, setHeaderTitle] = useState('AURRA 4.0');
+  const [devSettings, setDevSettings] = useState(devSettingsService.getSettings());
+  const [espState, setEspState] = useState(esp32Service.getState());
+
   const tapCountRef = useRef(0);
   const tapTimerRef = useRef(null);
 
@@ -138,31 +225,23 @@ export default function SliderAndCards({
   }, []);
 
   useEffect(() => {
-    if (showCardsInitially) {
+    if (showCardsInitially || (typeof window !== 'undefined' && window.location.search.includes('view=cards'))) {
       setShowSlider(false);
     }
-  }, [showCardsInitially]);
 
-  // ── 90 FPS Telemetry Counter ──
-  useEffect(() => {
-    let frameCount = 0;
-    let lastTime = performance.now();
-    let animId = null;
+    const handleShowCards = () => setShowSlider(false);
+    const handleShowSlider = () => setShowSlider(true);
 
-    const measureFps = () => {
-      frameCount++;
-      const now = performance.now();
-      if (now - lastTime >= 1000) {
-        setFps(Math.round((frameCount * 1000) / (now - lastTime)));
-        frameCount = 0;
-        lastTime = now;
-      }
-      animId = requestAnimationFrame(measureFps);
+    window.addEventListener('aurra_show_cards', handleShowCards);
+    window.addEventListener('aurra_show_features', handleShowCards);
+    window.addEventListener('aurra_show_slider', handleShowSlider);
+
+    return () => {
+      window.removeEventListener('aurra_show_cards', handleShowCards);
+      window.removeEventListener('aurra_show_features', handleShowCards);
+      window.removeEventListener('aurra_show_slider', handleShowSlider);
     };
-
-    animId = requestAnimationFrame(measureFps);
-    return () => cancelAnimationFrame(animId);
-  }, []);
+  }, [showCardsInitially]);
 
   // ── Load Data from IndexedDB ──
   const loadKioskData = useCallback(async () => {
@@ -341,15 +420,12 @@ export default function SliderAndCards({
 
           <div className="hud-telem-pill telem-fps">
             <span className="telem-dot"></span>
-            <span>CAM/FPS: {fps} FPS</span>
+            <FpsTelemetry />
           </div>
         </div>
 
         {/* Right: Live Real-Time Clock */}
-        <div className="cyber-clock-box">
-          <div className="clock-time">{currentTimeStr || '12:00 PM'}</div>
-          <div className="clock-date">{currentDateStr || 'OCT 21, 2026'}</div>
-        </div>
+        <LiveClockTelemetry />
       </header>
 
       {/* Main Content Area */}
@@ -523,21 +599,18 @@ export default function SliderAndCards({
                 {cards.map((card, idx) => {
                   const theme = getOrbTheme(card.href, idx, card);
                   const total = cards.length || 1;
-                  // Calculate radial coordinates around center
-                  const angleDeg = (idx / total) * 360 - 90;
-                  const angleRad = (angleDeg * Math.PI) / 180;
-                  const radiusX = 230; // horizontal radius in px
-                  const radiusY = 195; // vertical radius in px
-                  const x = Math.round(radiusX * Math.cos(angleRad));
-                  const y = Math.round(radiusY * Math.sin(angleRad));
+                  const slot = getBubbleSlot(idx, total);
 
                   return (
                     <div
                       key={card.id || idx}
                       className="satellite-orb-node"
                       style={{
-                        '--orb-x': `${x}px`,
-                        '--orb-y': `${y}px`,
+                        '--orb-x': `${slot.x}px`,
+                        '--orb-y': `${slot.y}px`,
+                        '--orb-size': `${slot.size}px`,
+                        '--orb-font-size': `${slot.fontSize}px`,
+                        '--orb-label-max': `${slot.labelMax}px`,
                         '--orb-color': theme.color,
                         '--orb-glow': theme.glow,
                         '--orb-bg': theme.bg,
@@ -547,12 +620,14 @@ export default function SliderAndCards({
                       onClick={() => handleCardClick(card)}
                       title={`Open ${card.title}`}
                     >
-                      <div className="orb-glass-specular"></div>
-                      <div className="orb-icon-glyph">
-                        {getCardIcon(card.href, card.className)}
+                      <div className="orb-gpu-bobber">
+                        <div className="orb-glass-specular"></div>
+                        <div className="orb-icon-glyph">
+                          {getCardIcon(card.href, card.className, slot.iconSize)}
+                        </div>
+                        <div className="orb-label-text">{theme.label || card.title}</div>
+                        <div className="orb-sys-badge">{theme.sysId}</div>
                       </div>
-                      <div className="orb-label-text">{theme.label || card.title}</div>
-                      <div className="orb-sys-badge">{theme.sysId}</div>
                     </div>
                   );
                 })}

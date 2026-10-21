@@ -68,6 +68,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         super.onCreate(savedInstanceState);
         hideSystemUI();
         muteSystemChimes();
+        lockMaxRefreshRate();
 
         webView = new WebView(this) {
             @Override
@@ -87,6 +88,39 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         setupWebView();
         requestHardwarePermissions();
         loadAppIfReady();
+    }
+
+    private void lockMaxRefreshRate() {
+        try {
+            getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                android.view.Display display = getDisplay();
+                if (display != null) {
+                    android.view.Display.Mode[] modes = display.getSupportedModes();
+                    android.view.Display.Mode maxMode = null;
+                    for (android.view.Display.Mode mode : modes) {
+                        if (maxMode == null || mode.getRefreshRate() > maxMode.getRefreshRate()) {
+                            maxMode = mode;
+                        }
+                    }
+                    if (maxMode != null) {
+                        android.view.WindowManager.LayoutParams lp = getWindow().getAttributes();
+                        lp.preferredDisplayModeId = maxMode.getModeId();
+                        getWindow().setAttributes(lp);
+                        Log.i(TAG, "Locked display refresh rate to " + maxMode.getRefreshRate() + " Hz (modeId=" + maxMode.getModeId() + ")");
+                    }
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                android.view.WindowManager.LayoutParams lp = getWindow().getAttributes();
+                lp.preferredRefreshRate = 90.0f;
+                getWindow().setAttributes(lp);
+            }
+            try {
+                android.provider.Settings.System.putInt(getContentResolver(), "is_smart_fps", 0);
+            } catch (Throwable ignored) {}
+        } catch (Exception e) {
+            Log.w(TAG, "Could not set preferred refresh rate: " + e.getMessage());
+        }
     }
 
     private void setupWebView() {

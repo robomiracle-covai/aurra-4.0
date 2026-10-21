@@ -115,12 +115,16 @@ export default function PdfChatView({ onNavigate }) {
       voiceNavigationService.setDocumentContext({
         docId: activeDoc.id,
         title: activeDoc.title,
-        onAnswer: async ({ query, answer, citations, model, provider }) => {
+        onQuestion: (query) => {
           const userMsg = {
             role: 'user',
             text: query,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           };
+          setChatMessages((prev) => [...prev, userMsg]);
+          offlinePdfService.addChatMessage(activeDoc.id, userMsg);
+        },
+        onAnswer: async ({ query, answer, citations, model, provider }) => {
           const assistantMsg = {
             role: 'assistant',
             text: answer,
@@ -129,11 +133,27 @@ export default function PdfChatView({ onNavigate }) {
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           };
 
-          setChatMessages((prev) => [...prev, userMsg, assistantMsg]);
-          await offlinePdfService.addChatMessage(activeDoc.id, userMsg);
+          setChatMessages((prev) => {
+            // Avoid duplicate user message if already appended via onQuestion
+            const hasUserMsg = prev.length > 0 && prev[prev.length - 1].role === 'user' && prev[prev.length - 1].text === query;
+            if (hasUserMsg) {
+              return [...prev, assistantMsg];
+            }
+            const userMsg = {
+              role: 'user',
+              text: query,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            };
+            return [...prev, userMsg, assistantMsg];
+          });
           await offlinePdfService.addChatMessage(activeDoc.id, assistantMsg);
         },
       });
+
+      // Ensure voice listening is actively unpaused so user can speak immediately
+      if (!voiceNavigationService.isListening && !voiceNavigationService.userPaused) {
+        voiceNavigationService.startListening(true);
+      }
     } else {
       voiceNavigationService.clearDocumentContext();
     }

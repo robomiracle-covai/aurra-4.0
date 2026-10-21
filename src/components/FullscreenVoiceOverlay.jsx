@@ -89,83 +89,129 @@ export default function FullscreenVoiceOverlay({
 
       ctx.clearRect(0, 0, width, height);
 
-      // Smooth amplitude transition
-      let target = isSpeaking ? 42 : isListening ? 28 : 14;
+      // Active dynamic waves when hearing/speaking; very subtle micro-ripple in calm standby
+      let target = isSpeaking ? 48 : isListening ? 34 : 3.5;
       currentAmp += (target - currentAmp) * 0.08;
 
-      // 2x Faster Wave Animation Speed as requested
-      phaseRef.current += isSpeaking ? 0.12 : isListening ? 0.08 : 0.05;
+      // Phase speed: energetic when speaking/hearing, very slow gentle drift in calm standby
+      phaseRef.current += isSpeaking ? 0.12 : isListening ? 0.08 : 0.012;
       const phase = phaseRef.current;
 
       // Center bell curve width (spread of the waving ribbons)
-      const sigma = Math.min(width * 0.28, 360);
+      const sigma = Math.min(width * 0.30, 420);
 
-      // Ribbon Strands Definition
+      // Ribbon Strands Definition with Ultra-Delicate Razor-Thin Continuous and Dotted Filaments
       const strands = [
+        // --- Continuous Smooth Laser Filaments ---
         {
-          color: '#00f0ff',
-          glow: 'rgba(0, 240, 255, 0.85)',
-          blur: 14,
-          lineWidth: 2.8,
+          color: '#FFFFFF',
+          glow: 'rgba(255, 255, 255, 0.65)',
+          lineWidth: 0.8,
           freq: 0.016,
-          ampScale: 1.0,
+          ampScale: 1.15,
+          phaseOffset: 0.6,
+        },
+        {
+          color: '#00E5FF',
+          glow: 'rgba(0, 229, 255, 0.35)',
+          lineWidth: 0.75,
+          freq: 0.015,
+          ampScale: 1.1,
           phaseOffset: 0,
         },
         {
-          color: '#d946ef',
-          glow: 'rgba(217, 70, 239, 0.85)',
-          blur: 16,
-          lineWidth: 2.6,
-          freq: 0.019,
-          ampScale: 0.88,
+          color: '#00CFEF',
+          glow: 'rgba(0, 207, 239, 0.35)',
+          lineWidth: 0.7,
+          freq: 0.018,
+          ampScale: 0.95,
           phaseOffset: 1.8,
         },
         {
-          color: '#a855f7',
-          glow: 'rgba(168, 85, 247, 0.85)',
-          blur: 18,
-          lineWidth: 2.4,
-          freq: 0.013,
-          ampScale: 1.15,
+          color: '#00A8FF',
+          glow: 'rgba(0, 168, 255, 0.35)',
+          lineWidth: 0.65,
+          freq: 0.012,
+          ampScale: 1.25,
           phaseOffset: 3.4,
         },
         {
-          color: '#38bdf8',
-          glow: 'rgba(56, 189, 248, 0.9)',
-          blur: 12,
-          lineWidth: 1.8,
-          freq: 0.022,
-          ampScale: 0.72,
+          color: '#087FC1',
+          glow: 'rgba(8, 127, 193, 0.35)',
+          lineWidth: 0.55,
+          freq: 0.021,
+          ampScale: 0.85,
           phaseOffset: 4.9,
+        },
+
+        // --- Cyber Dotted Laser Filaments (Exactly 2 dotted waveforms) ---
+        {
+          color: '#FFFFFF',
+          glow: 'rgba(255, 255, 255, 0.75)',
+          lineWidth: 0.9,
+          freq: 0.013,
+          ampScale: 1.12,
+          phaseOffset: 1.25,
+          dash: [1, 9],
+          dashSpeed: 22,
+        },
+        {
+          color: '#00E5FF',
+          glow: 'rgba(0, 229, 255, 0.60)',
+          lineWidth: 0.85,
+          freq: 0.019,
+          ampScale: 0.88,
+          phaseOffset: 2.7,
+          dash: [1, 8],
+          dashSpeed: -18,
         },
       ];
 
-      // Draw horizontal baseline glow across entire width
+      // Draw horizontal baseline glow across entire width with White and Company Blue/Cyan Gradient
       ctx.save();
       const baseGrad = ctx.createLinearGradient(0, centerY, width, centerY);
-      baseGrad.addColorStop(0, 'rgba(0, 240, 255, 0.15)');
-      baseGrad.addColorStop(0.2, 'rgba(56, 189, 248, 0.8)');
-      baseGrad.addColorStop(0.5, 'rgba(217, 70, 239, 0.9)');
-      baseGrad.addColorStop(0.8, 'rgba(56, 189, 248, 0.8)');
-      baseGrad.addColorStop(1, 'rgba(0, 240, 255, 0.15)');
+      baseGrad.addColorStop(0, 'rgba(0, 123, 168, 0.05)');
+      baseGrad.addColorStop(0.2, 'rgba(8, 127, 193, 0.6)');
+      baseGrad.addColorStop(0.42, 'rgba(0, 229, 255, 0.85)');
+      baseGrad.addColorStop(0.5, '#FFFFFF');
+      baseGrad.addColorStop(0.58, 'rgba(0, 229, 255, 0.85)');
+      baseGrad.addColorStop(0.8, 'rgba(8, 127, 193, 0.6)');
+      baseGrad.addColorStop(1, 'rgba(0, 123, 168, 0.05)');
 
+      // Pass 1: Baseline Ambient Halo (Delicate half-radius halo)
+      ctx.beginPath();
+      ctx.moveTo(0, centerY);
+      ctx.lineTo(width, centerY);
+      ctx.strokeStyle = 'rgba(0, 207, 239, 0.20)';
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+
+      // Pass 2: Sharp Ultra-Delicate Laser Horizon Line
       ctx.beginPath();
       ctx.moveTo(0, centerY);
       ctx.lineTo(width, centerY);
       ctx.strokeStyle = baseGrad;
-      ctx.lineWidth = 1.6;
-      ctx.shadowColor = 'rgba(0, 240, 255, 0.6)';
-      ctx.shadowBlur = 8;
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+
+      // Pass 3: Dotted Baseline Horizon Tick Track
+      ctx.beginPath();
+      ctx.setLineDash([2, 12]);
+      ctx.lineDashOffset = -phase * 14;
+      ctx.moveTo(0, centerY);
+      ctx.lineTo(width, centerY);
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.35)';
+      ctx.lineWidth = 0.65;
       ctx.stroke();
       ctx.restore();
 
-      // Draw the undulating ribbon strands
+      // Draw the undulating ribbon strands with fast 2-pass GPU-friendly glow
       for (let s = 0; s < strands.length; s++) {
         const strand = strands[s];
         ctx.save();
         ctx.beginPath();
 
-        const step = 4; // Sample every 4px for smooth curves
+        const step = 4; // Sample every 4px for silky curves
         let isFirst = true;
 
         for (let x = 0; x <= width; x += step) {
@@ -175,8 +221,8 @@ export default function FullscreenVoiceOverlay({
 
           // Multi-frequency undulating wave
           const wave =
-            Math.sin(x * strand.freq + phase + strand.phaseOffset) * 0.75 +
-            Math.sin(x * (strand.freq * 1.65) - phase * 0.8 + strand.phaseOffset) * 0.25;
+            Math.sin(x * strand.freq + phase + strand.phaseOffset) * 0.78 +
+            Math.sin(x * (strand.freq * 1.65) - phase * 0.85 + strand.phaseOffset) * 0.22;
 
           const y = centerY + wave * currentAmp * strand.ampScale * envelope;
 
@@ -188,13 +234,26 @@ export default function FullscreenVoiceOverlay({
           }
         }
 
-        ctx.strokeStyle = strand.color;
-        ctx.lineWidth = strand.lineWidth;
-        ctx.shadowColor = strand.glow;
-        ctx.shadowBlur = strand.blur;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
+
+        if (strand.dash) {
+          ctx.setLineDash(strand.dash);
+          ctx.lineDashOffset = -(phase * (strand.dashSpeed || 15));
+        } else {
+          ctx.setLineDash([]);
+        }
+
+        // Pass 1: Delicate Neon Glow Aura
+        ctx.strokeStyle = strand.glow;
+        ctx.lineWidth = strand.lineWidth * 2.0;
         ctx.stroke();
+
+        // Pass 2: Crisp Delicate Core Strand
+        ctx.strokeStyle = strand.color;
+        ctx.lineWidth = strand.lineWidth;
+        ctx.stroke();
+
         ctx.restore();
       }
 
@@ -271,18 +330,23 @@ export default function FullscreenVoiceOverlay({
             onClick={onToggleListening}
             title={isListening ? 'Listening Active — Tap to Pause' : 'Mic Paused — Tap to Speak'}
           >
-            {/* Outer Cyan Ring */}
+            {/* Outer Cyan Dynamic Ring */}
             <div className="fs-concentric-ring ring-outer"></div>
-            {/* Middle Violet/Magenta Ring */}
+            {/* Cyber Dotted Orbit Ring */}
+            <div className="fs-concentric-ring ring-dotted"></div>
+            {/* Middle Pure White Dynamic Ring */}
             <div className="fs-concentric-ring ring-middle"></div>
+            {/* Dynamic Expanding Ripple Waves */}
+            <div className="fs-concentric-ring ring-ripple-1"></div>
+            <div className="fs-concentric-ring ring-ripple-2"></div>
             {/* Inner Glowing Gradient Core Orb */}
             <div className="fs-mic-core-orb">
               <div className="fs-core-glass-reflection"></div>
               <div className="fs-core-icon">
                 {isListening ? (
-                  <Mic size={44} color="#ffffff" />
+                  <Mic size={60} color="#ffffff" strokeWidth={2.4} />
                 ) : (
-                  <MicOff size={44} color="#ef4444" />
+                  <MicOff size={60} color="#ef4444" strokeWidth={2.4} />
                 )}
               </div>
               <div className="fs-core-pulse-aura"></div>
@@ -297,57 +361,92 @@ export default function FullscreenVoiceOverlay({
 
         {/* Below Horizon: Status Typography & Live Speech Transcript */}
         <div className="fs-status-content-area">
-          <div className="fs-listening-title">
-            {isThinking ? (
-              <span className="fs-thinking-text">
-                <Sparkles size={18} className="fs-sparkle-spin" /> Thinking...
-              </span>
-            ) : isSpeaking ? (
-              <span className="fs-speaking-text">Aurra Speaking...</span>
-            ) : isListening ? (
-              <span className="fs-listening-text">Listening...</span>
-            ) : (
-              <span className="fs-paused-text">Tap Mic to Speak</span>
-            )}
-          </div>
-
-          {/* Live Transcript / Response Feedback Bubble */}
-          {(latestReply || transcript) && (
-            <div className="fs-transcript-capsule">
-              {latestReply ? (
-                <div className="fs-reply-block">
-                  {latestReply.query && (
-                    <div className="fs-user-query-line">
-                      <span className="fs-query-tag">You:</span> "{latestReply.query}"
-                    </div>
-                  )}
-                  <div className="fs-aurra-reply-line">
-                    <span className="fs-reply-tag">Aurra:</span> {latestReply.reply}
-                  </div>
-                </div>
+          {/* Only show status title when no conversation dialogue is active */}
+          {(!latestReply && !transcript) && (
+            <div className="fs-listening-title">
+              {isThinking ? (
+                <span className="fs-thinking-text">
+                  <Sparkles size={18} className="fs-sparkle-spin" /> Thinking...
+                </span>
+              ) : isSpeaking ? (
+                <span className="fs-speaking-text">Aurra Speaking...</span>
+              ) : isListening ? (
+                <span className="fs-listening-text">Listening...</span>
               ) : (
-                <div className="fs-heard-line">
-                  <span className="fs-heard-quote">"{transcript}"</span>
-                </div>
+                <span className="fs-paused-text">Tap Mic to Speak</span>
               )}
             </div>
           )}
 
-          {/* Frosted Glass Waveform Equalizer Pill (from Screenshot) */}
-          <div className="fs-waveform-glass-capsule">
-            <div className={`fs-equalizer-bars ${isSpeaking ? 'active-speaking' : isListening ? 'active-listening' : 'idle-bars'}`}>
-              {eqBars.map((i) => (
-                <span
-                  key={i}
-                  className="fs-eq-bar"
-                  style={{
-                    '--bar-index': i,
-                    '--anim-delay': `${(i * 0.05).toFixed(2)}s`,
-                  }}
-                ></span>
-              ))}
+          {/* Conversation Dialogue Cards (Side-by-Side Dual Panels Matching Reference Screenshot) */}
+          {(latestReply || transcript) && (
+            <div className="fs-dual-dialog-container">
+              {/* Left Panel: User Question + Embedded Cyber Waveform */}
+              <div className="fs-dialog-panel fs-question-panel">
+                <div className="fs-panel-query-text">
+                  {latestReply?.query || transcript}
+                </div>
+
+                {/* Embedded Audio Waveform in Left Panel */}
+                <div className={`fs-card-waveform ${isSpeaking ? 'is-speaking' : isListening ? 'is-listening' : 'is-idle'}`}>
+                  {Array.from({ length: 32 }, (_, i) => {
+                    const distFromCenter = Math.abs(i - 15.5) / 15.5;
+                    const baseHeight = Math.max(3, Math.round((1 - distFromCenter * distFromCenter) * 22));
+                    return (
+                      <span
+                        key={i}
+                        className="fs-card-wave-bar"
+                        style={{
+                          '--bar-h': `${baseHeight}px`,
+                          '--anim-delay': `${(i % 10) * 0.08}s`,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+
+                {/* Edge Neon Accent */}
+                <div className="fs-panel-edge-glow"></div>
+              </div>
+
+              {/* Right Panel: Aurra Answer with Cyber Corner Accent */}
+              <div className="fs-dialog-panel fs-answer-panel">
+                {/* Sleek Top-Right Cyber Corner Notch/Graphic */}
+                <div className="fs-cyber-corner-accent">
+                  <svg width="44" height="26" viewBox="0 0 44 26" fill="none">
+                    <path d="M0 2 H34 L42 10 V26" stroke="#00E5FF" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="42" cy="18" r="1.5" fill="#00E5FF" />
+                    <line x1="22" y1="2" x2="34" y2="2" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" />
+                  </svg>
+                </div>
+
+                <div className="fs-panel-answer-text">
+                  {latestReply?.reply || (isThinking ? 'Aurra is processing your question...' : isSpeaking ? 'Aurra is speaking...' : 'Listening...')}
+                </div>
+
+                {/* Edge Neon Accent */}
+                <div className="fs-panel-edge-glow"></div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Frosted Glass Waveform Equalizer Pill (shown when dialogue is not active) */}
+          {(!latestReply && !transcript) && (
+            <div className="fs-waveform-glass-capsule">
+              <div className={`fs-equalizer-bars ${isSpeaking ? 'active-speaking' : isListening ? 'active-listening' : 'idle-bars'}`}>
+                {eqBars.map((i) => (
+                  <span
+                    key={i}
+                    className="fs-eq-bar"
+                    style={{
+                      '--bar-index': i,
+                      '--anim-delay': `${(i * 0.05).toFixed(2)}s`,
+                    }}
+                  ></span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Quick Interactive Prompt Suggestions & Type Command in One Single Line */}
           <div className="fs-suggestions-row">
@@ -359,9 +458,9 @@ export default function FullscreenVoiceOverlay({
             </button>
             <button
               className="fs-suggest-pill"
-              onClick={() => voiceNavigationService.processVoiceCommand('Show me around')}
+              onClick={() => voiceNavigationService.processVoiceCommand('What features do you have?')}
             >
-              "Show me around"
+              "What features do you have?"
             </button>
             <button
               className="fs-suggest-pill"

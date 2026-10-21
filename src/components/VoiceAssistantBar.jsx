@@ -148,9 +148,13 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
         <div className="voice-content-wrap">
           <div className="voice-status-line">
             <div className="status-line-left">
-              {documentContext && (
-                <span style={{ fontSize: '10px', background: 'rgba(255, 51, 102, 0.2)', color: '#ff3366', border: '1px solid rgba(255, 51, 102, 0.4)', padding: '2px 8px', borderRadius: '999px', fontWeight: 'bold', letterSpacing: '0.05em' }}>
-                  📄 DOC AI ACTIVE
+              {documentContext ? (
+                <span className="sys-doc-pill">
+                  SYS_08 • 📄 DOC AI ACTIVE
+                </span>
+              ) : (
+                <span className="sys-core-pill">
+                  SYS_01 • ASK AURRA
                 </span>
               )}
 
@@ -225,7 +229,7 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
                     : `Document AI active. Tap keyboard or mic icon to ask about "${documentContext.title || 'this PDF'}"...`
                 ) : (
                   isListening 
-                    ? 'Say "Who are you?", "Tour", "Facilities", "Register", or tap keyboard...' 
+                    ? 'Voice assistant & multi-intent receptionist — the core Aurra runs from.' 
                     : 'Microphone paused. Tap keyboard or mic icon to command Aurra.'
                 )}
               </span>
@@ -233,6 +237,25 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
           </div>
         </div>
       )}
+
+      {/* Real-Time Cyber Audio Equalizer Waveform */}
+      <div 
+        className={`voice-audio-equalizer ${isSpeaking ? 'speaking-bars' : isListening ? 'listening-bars' : 'idle-bars'}`}
+        title={isSpeaking ? 'Aurra Spoken Audio Waveform' : isListening ? 'Live Ambient Microphone Waveform' : 'Microphone Standby'}
+      >
+        <span className="eq-bar bar-1"></span>
+        <span className="eq-bar bar-2"></span>
+        <span className="eq-bar bar-3"></span>
+        <span className="eq-bar bar-4"></span>
+        <span className="eq-bar bar-5"></span>
+        <span className="eq-bar bar-6"></span>
+        <span className="eq-bar bar-7"></span>
+        <span className="eq-bar bar-8"></span>
+        <span className="eq-bar bar-9"></span>
+        <span className="eq-bar bar-10"></span>
+        <span className="eq-bar bar-11"></span>
+        <span className="eq-bar bar-12"></span>
+      </div>
 
       {/* Typing Keyboard Toggle Button */}
       <button

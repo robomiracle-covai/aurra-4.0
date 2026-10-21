@@ -20,11 +20,16 @@ import {
   CheckCircle2,
   ChevronRight,
   Wifi,
-  FlaskConical
+  FlaskConical,
+  Play,
+  Clock,
+  Bot,
+  Database
 } from 'lucide-react';
 import { offlineCardService, offlineSliderService, offlineBrandingService } from '../../db/offlineServices';
 import { logger } from '../../services/logger';
 import { devSettingsService } from '../../services/devSettingsService';
+import { voiceNavigationService } from '../../services/voiceNavigationService';
 import AdminAuthModal from '../../components/AdminAuthModal';
 import { LogViewerModal } from '../../components/LogViewerModal';
 import { esp32Service } from '../../services/esp32Service';
@@ -46,6 +51,35 @@ const getCardIcon = (href, className) => {
   return <Sparkles size={28} color="#00ffff" />;
 };
 
+// Orbital Sphere Aesthetic Theme Resolver
+const getOrbTheme = (href, idx) => {
+  if (href?.includes('face') || href?.includes('greet')) {
+    return { sysId: 'SYS_02', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.16)', border: '#c084fc', glow: 'rgba(168, 85, 247, 0.55)', label: 'Face Recognition' };
+  }
+  if (href?.includes('tour')) {
+    return { sysId: 'SYS_03', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.16)', border: '#22d3ee', glow: 'rgba(6, 182, 212, 0.55)', label: 'Guided Tour' };
+  }
+  if (href?.includes('facilities')) {
+    return { sysId: 'SYS_04', color: '#10b981', bg: 'rgba(16, 185, 129, 0.16)', border: '#34d399', glow: 'rgba(16, 185, 129, 0.55)', label: 'Facilities' };
+  }
+  if (href?.includes('form') || href?.includes('register')) {
+    return { sysId: 'SYS_05', color: '#00d2ff', bg: 'rgba(0, 210, 255, 0.16)', border: '#38bdf8', glow: 'rgba(0, 210, 255, 0.55)', label: 'Visitor Form' };
+  }
+  if (href?.includes('web') || href?.includes('qr')) {
+    return { sysId: 'SYS_06', color: '#d946ef', bg: 'rgba(217, 70, 239, 0.16)', border: '#e879f9', glow: 'rgba(217, 70, 239, 0.55)', label: 'QR Links' };
+  }
+  if (href?.includes('control') || href?.includes('ros')) {
+    return { sysId: 'SYS_07', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.16)', border: '#fbbf24', glow: 'rgba(245, 158, 11, 0.55)', label: 'ROS Controls' };
+  }
+  if (href?.includes('pdf') || href?.includes('document')) {
+    return { sysId: 'SYS_08', color: '#ff3366', bg: 'rgba(255, 51, 102, 0.16)', border: '#fb7185', glow: 'rgba(255, 51, 102, 0.55)', label: 'PDF AI' };
+  }
+  if (href?.includes('qa') || href?.includes('question')) {
+    return { sysId: 'SYS_02', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.16)', border: '#67e8f9', glow: 'rgba(56, 189, 248, 0.55)', label: 'Ask Aurra' };
+  }
+  return { sysId: `SYS_0${idx + 2}`, color: '#00ffff', bg: 'rgba(0, 255, 255, 0.16)', border: '#22d3ee', glow: 'rgba(0, 255, 255, 0.55)', label: 'Module' };
+};
+
 export default function SliderAndCards({ 
   onNavigate, 
   showCardsInitially = false,
@@ -63,6 +97,29 @@ export default function SliderAndCards({
   const [isLogsOpen, setIsLogsOpen] = useState(false);
   const [fps, setFps] = useState(60);
   const [espState, setEspState] = useState(esp32Service.getState());
+  const [currentTimeStr, setCurrentTimeStr] = useState('');
+  const [currentDateStr, setCurrentDateStr] = useState('');
+
+  // ── Real-Time Clock Synchronization (1s Interval) ──
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      let hours = now.getHours();
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      setCurrentTimeStr(`${hours}:${minutes} ${ampm}`);
+
+      const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+      const month = months[now.getMonth()];
+      const day = now.getDate();
+      const year = now.getFullYear();
+      setCurrentDateStr(`${month} ${day}, ${year}`);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const tapCountRef = useRef(0);
   const tapTimerRef = useRef(null);
@@ -225,39 +282,46 @@ export default function SliderAndCards({
 
   return (
     <div className="home-container">
-      {/* Top Cyber Header Bar - Center Holographic Capsule */}
+      {/* Top Cyber Telemetry Header Bar */}
       <header className="kiosk-top-bar">
-        <div
-          className="cyber-header-wrapper"
+        {/* Left: Cyber Brand Badge */}
+        <div 
+          className="cyber-brand-badge"
           onClick={handleHeadingTap}
-          title="Aurra Kiosk Heading (Tap 4 times to access Admin)"
+          title="Aurra 4.0 System (Tap 4 times to access Admin)"
         >
-          <h1 className="cyber-heading-text">{headerTitle}</h1>
+          <div className="brand-robot-icon">
+            <Bot size={22} color="#00ffff" />
+          </div>
+          <div className="brand-text-col">
+            <div className="brand-title">AURRA 4.0</div>
+            <div className="brand-sub">ROBOMIRACLE AI SYSTEM</div>
+          </div>
         </div>
 
-        {/* Live FPS Telemetry Pill & ESP32 Wi-Fi Pill (Corner) */}
-        {devSettings.showFpsBadge !== false && (
-          <div className="top-right-telemetry">
-            <div 
-              className={`hud-metric-pill esp-wifi-pill ${espState.online ? (espState.mode === 'ap' ? 'ap-mode' : 'sta-mode') : 'sim-mode'}`}
-              title={espState.online ? espState.connectionDetail : 'ESP32 Simulation Mode'}
-            >
-              <Wifi size={11} />
-              <span style={{ fontSize: '10px', fontWeight: 700 }}>
-                {espState.online 
-                  ? (espState.mode === 'ap' ? 'AP' : 'STA')
-                  : 'SIM'}
-              </span>
-              {espState.online && espState.latency && (
-                <span style={{ fontSize: '9px', opacity: 0.7 }}>{espState.latency}ms</span>
-              )}
-            </div>
-            <div className="hud-metric-pill" title="Live Screen Refresh Rate">
-              <span className="pill-dot"></span>
-              <strong>{fps} FPS</strong>
-            </div>
+        {/* Center: Live Telemetry Cluster */}
+        <div className="cyber-telemetry-cluster">
+          <div className={`hud-telem-pill ${espState.online ? 'telem-online' : 'telem-offline'}`}>
+            <span className="telem-dot"></span>
+            <span>SERIAL: {espState.online ? (espState.mode === 'ap' ? 'ONLINE (AP)' : 'ONLINE (STA)') : 'OFFLINE'}</span>
           </div>
-        )}
+
+          <div className="hud-telem-pill telem-db">
+            <span className="telem-dot"></span>
+            <span>DB: DEXIE LOCAL</span>
+          </div>
+
+          <div className="hud-telem-pill telem-fps">
+            <span className="telem-dot"></span>
+            <span>CAM/FPS: {fps} FPS</span>
+          </div>
+        </div>
+
+        {/* Right: Live Real-Time Clock */}
+        <div className="cyber-clock-box">
+          <div className="clock-time">{currentTimeStr || '12:00 PM'}</div>
+          <div className="clock-date">{currentDateStr || 'OCT 21, 2026'}</div>
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -356,41 +420,113 @@ export default function SliderAndCards({
             )}
           </div>
         ) : (
-          /* ACTION CARDS GRID VIEW */
-          <div className="cards-scroll-container">
-            <div className="cards-grid">
-              {cards.map((card) => {
-                const isVoiceEnabled = card.voiceAccessEnabled !== false;
+          /* AURRA 4.0 ORBITAL CONSTELLATION VIEW */
+          <div className="orbital-home-layout">
+            {/* Left: Hero System Highlight Command Deck */}
+            <div className="hero-system-column">
+              <div className="system-highlight-badge">
+                <span className="highlight-pill">SYSTEM HIGHLIGHT</span>
+                <span className="highlight-line"></span>
+              </div>
 
-                return (
-                  <div
-                    key={card.id}
-                    className="action-card-tile"
-                    onClick={() => handleCardClick(card)}
-                  >
-                    {/* Voice Access Status Badge on Card */}
-                    <div 
-                      className={`card-voice-pill ${isVoiceEnabled ? 'voice-on' : 'voice-off'}`}
-                      title={isVoiceEnabled ? 'Voice navigation enabled' : 'Voice navigation blocked by Admin'}
-                    >
-                      {isVoiceEnabled ? <Mic size={12} /> : <MicOff size={12} />}
-                      <span>{isVoiceEnabled ? 'VOICE ON' : 'VOICE OFF'}</span>
-                    </div>
+              <h1 className="hero-smart-title">
+                <span className="title-white">Aurra 4.0</span>
+                <span className="title-cyan">Smart System</span>
+              </h1>
 
-                    {/* Card Icon */}
-                    <div className="card-icon-pedestal">
-                      {getCardIcon(card.href, card.className)}
-                    </div>
+              <p className="hero-description-text">
+                On-device edge AI powered by Dexie IndexedDB & touchless voice autonomy. 
+                Ask Aurra sits at the core — tap any node around it or speak naturally to open that module.
+              </p>
 
-                    {/* Card Titles */}
-                    <h3 className="card-title-text">{card.title}</h3>
-                    <p className="card-subtitle-text">{card.subtitle}</p>
-
-                    {/* Glowing bottom projection bar */}
-                    <div className="card-neon-floor"></div>
+              <div className="hero-actions-row">
+                <button 
+                  className="talk-to-aurra-btn"
+                  onClick={() => {
+                    voiceNavigationService.speak('I am listening. Ask any question or command.');
+                    voiceNavigationService.startListening();
+                  }}
+                  title="Activate Hands-Free Voice Listening"
+                >
+                  <div className="play-icon-circle">
+                    <Play size={16} fill="#000" color="#000" />
                   </div>
-                );
-              })}
+                  <span>Talk to Aurra</span>
+                </button>
+
+                <button
+                  className="screensaver-switch-btn"
+                  onClick={() => setShowSlider(true)}
+                  title="Switch to Slideshow Screensaver"
+                >
+                  <span>Screensaver</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Right: The Planetary Orbital Constellation */}
+            <div className="constellation-column">
+              <div className="constellation-canvas">
+                {/* Visual Orbit Tracks */}
+                <div className="orbital-track-ring track-outer"></div>
+                <div className="orbital-track-ring track-inner"></div>
+
+                {/* Central Core Sphere: Ask Aurra (SYS_01) */}
+                <div 
+                  className="constellation-core-orb"
+                  onClick={() => {
+                    voiceNavigationService.speak('I am Aurra, how can I help you today?');
+                    voiceNavigationService.startListening();
+                  }}
+                  title="SYS_01: Ask Aurra Voice Core (Tap to Talk)"
+                >
+                  <div className="orb-glass-specular"></div>
+                  <div className="core-mic-halo">
+                    <Mic size={36} color="#00ffff" />
+                  </div>
+                  <div className="core-orb-title">Ask Aurra</div>
+                  <div className="core-orb-sys">SYS_01</div>
+                  <div className="core-breathing-aura"></div>
+                </div>
+
+                {/* Orbiting Satellite Glass Spheres */}
+                {cards.map((card, idx) => {
+                  const theme = getOrbTheme(card.href, idx);
+                  const total = cards.length || 1;
+                  // Calculate radial coordinates around center
+                  const angleDeg = (idx / total) * 360 - 90;
+                  const angleRad = (angleDeg * Math.PI) / 180;
+                  const radiusX = 230; // horizontal radius in px
+                  const radiusY = 195; // vertical radius in px
+                  const x = Math.round(radiusX * Math.cos(angleRad));
+                  const y = Math.round(radiusY * Math.sin(angleRad));
+
+                  return (
+                    <div
+                      key={card.id || idx}
+                      className="satellite-orb-node"
+                      style={{
+                        '--orb-x': `${x}px`,
+                        '--orb-y': `${y}px`,
+                        '--orb-color': theme.color,
+                        '--orb-glow': theme.glow,
+                        '--orb-bg': theme.bg,
+                        '--orb-border': theme.border,
+                        '--float-delay': `${(idx * 0.35).toFixed(2)}s`,
+                      }}
+                      onClick={() => handleCardClick(card)}
+                      title={`Open ${card.title}`}
+                    >
+                      <div className="orb-glass-specular"></div>
+                      <div className="orb-icon-glyph">
+                        {getCardIcon(card.href, card.className)}
+                      </div>
+                      <div className="orb-label-text">{theme.label || card.title}</div>
+                      <div className="orb-sys-badge">{theme.sysId}</div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

@@ -333,6 +333,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     setIsSavingHeader(true);
     try {
       await offlineBrandingService.saveHeader(headerName.trim());
+      window.dispatchEvent(new CustomEvent('aurra_branding_changed'));
       showStatus('Header branding saved successfully');
       logger.info('ADMIN', `Updated header branding: ${headerName.trim()}`);
     } finally {
@@ -345,6 +346,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     const updated = !card.isEnabled;
     await offlineCardService.toggleCardEnabled(card.id, updated);
     setCards((prev) => prev.map((c) => (c.id === card.id ? { ...c, isEnabled: updated } : c)));
+    window.dispatchEvent(new CustomEvent('aurra_cards_changed'));
     showStatus(`Card "${card.title}" visibility: ${updated ? 'SHOWN' : 'HIDDEN'}`);
   };
 
@@ -352,6 +354,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     const updated = card.voiceAccessEnabled === false ? true : false;
     await offlineCardService.toggleVoiceAccess(card.id, updated);
     setCards((prev) => prev.map((c) => (c.id === card.id ? { ...c, voiceAccessEnabled: updated } : c)));
+    window.dispatchEvent(new CustomEvent('aurra_cards_changed'));
     showStatus(`Voice access for "${card.title}": ${updated ? 'ALLOWED' : 'BLOCKED'}`);
   };
 
@@ -359,6 +362,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     if (window.confirm('Reset all action cards to default system layout?')) {
       const reset = await offlineCardService.restoreDefaultCards();
       setCards(reset);
+      window.dispatchEvent(new CustomEvent('aurra_cards_changed'));
       showStatus('Cards restored to factory defaults');
     }
   };
@@ -368,11 +372,13 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     const updated = !slide.isSelected;
     await offlineSliderService.toggleSlideSelected(slide.id, updated);
     setSlides((prev) => prev.map((s) => (s.id === slide.id ? { ...s, isSelected: updated } : s)));
+    window.dispatchEvent(new CustomEvent('aurra_slides_changed'));
   };
 
   const handleDeleteSlide = async (id) => {
     await offlineSliderService.deleteSlideImage(id);
     setSlides((prev) => prev.filter((s) => s.id !== id));
+    window.dispatchEvent(new CustomEvent('aurra_slides_changed'));
     showStatus('Slide removed');
   };
 
@@ -445,6 +451,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     if (slideFileInputRef.current) slideFileInputRef.current.value = '';
     const updated = await offlineSliderService.getSlideImages();
     setSlides(updated);
+    window.dispatchEvent(new CustomEvent('aurra_slides_changed'));
     showStatus(`New banner ${mediaType === 'video' ? 'video' : 'slide'} added successfully`);
   };
 
@@ -470,6 +477,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     await offlineSliderService.updateSlideImage(slide.id, { isMuted: updatedMuted });
     const updated = await offlineSliderService.getSlideImages();
     setSlides(updated);
+    window.dispatchEvent(new CustomEvent('aurra_slides_changed'));
     showStatus(`Slide audio set to ${updatedMuted ? 'Muted' : 'Unmuted (Sound On)'}`);
   };
 
@@ -477,6 +485,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
     if (window.confirm('Reset slides to system defaults?')) {
       const reset = await offlineSliderService.restoreDefaultSlides();
       setSlides(reset);
+      window.dispatchEvent(new CustomEvent('aurra_slides_changed'));
       showStatus('Slides restored to defaults');
     }
   };

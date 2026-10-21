@@ -991,6 +991,23 @@ class VoiceNavigationService {
         }
 
         if (matchedCard) {
+          const isEnabled = matchedCard.isEnabled !== false;
+          if (!isEnabled) {
+            const hiddenMsg = `${matchedCard.title} is currently disabled in system settings.`;
+            this.setFeedback(hiddenMsg);
+            this.setInteractiveReply({
+              query: rawUtterance,
+              reply: hiddenMsg,
+              source: 'navigation',
+              confidence: 0,
+              category: 'Access Denied',
+              timestamp: Date.now(),
+            });
+            logger.warn('VOICE', `Voice access BLOCKED for [${matchedCard.title}]. Card is hidden/disabled.`);
+            this.speak(hiddenMsg);
+            return;
+          }
+
           const isVoiceAllowed = matchedCard.voiceAccessEnabled !== false;
 
           if (!isVoiceAllowed) {

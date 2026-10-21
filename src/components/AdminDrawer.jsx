@@ -63,6 +63,7 @@ export default function AdminDrawer({ isOpen, onClose, onRefreshData }) {
     const updated = !card.isEnabled;
     await offlineCardService.toggleCardEnabled(card.id, updated);
     setCards((prev) => prev.map((c) => (c.id === card.id ? { ...c, isEnabled: updated } : c)));
+    window.dispatchEvent(new CustomEvent('aurra_cards_changed'));
     logger.info('ADMIN', `Card [${card.title}] display visibility set to: ${updated}`);
     showStatus(`Updated visibility for ${card.title}`);
     onRefreshData?.();
@@ -72,6 +73,7 @@ export default function AdminDrawer({ isOpen, onClose, onRefreshData }) {
     const updated = card.voiceAccessEnabled === false ? true : false;
     await offlineCardService.toggleVoiceAccess(card.id, updated);
     setCards((prev) => prev.map((c) => (c.id === card.id ? { ...c, voiceAccessEnabled: updated } : c)));
+    window.dispatchEvent(new CustomEvent('aurra_cards_changed'));
     logger.speech('ADMIN', `Card [${card.title}] VOICE ACCESS set to: ${updated ? 'ALLOWED' : 'BLOCKED'}`);
     showStatus(`Voice access for "${card.title}" set to ${updated ? 'ON' : 'OFF'}`);
     onRefreshData?.();
@@ -81,6 +83,7 @@ export default function AdminDrawer({ isOpen, onClose, onRefreshData }) {
     if (window.confirm('Reset all action cards to default system state?')) {
       const reset = await offlineCardService.restoreDefaultCards();
       setCards(reset);
+      window.dispatchEvent(new CustomEvent('aurra_cards_changed'));
       logger.info('ADMIN', 'Restored default action cards');
       showStatus('Cards restored to default');
       onRefreshData?.();
@@ -92,6 +95,7 @@ export default function AdminDrawer({ isOpen, onClose, onRefreshData }) {
     const updated = !slide.isSelected;
     await offlineSliderService.toggleSlideSelected(slide.id, updated);
     setSlides((prev) => prev.map((s) => (s.id === slide.id ? { ...s, isSelected: updated } : s)));
+    window.dispatchEvent(new CustomEvent('aurra_slides_changed'));
     logger.info('ADMIN', `Slide [${slide.title}] active state set to: ${updated}`);
     onRefreshData?.();
   };

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, HelpCircle, Keyboard, Send, X, CornerDownLeft, Pause, Play, Sparkles } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, HelpCircle, Keyboard, Send, X, CornerDownLeft, Pause, Play, Sparkles, Maximize2 } from 'lucide-react';
 import { voiceNavigationService } from '../services/voiceNavigationService';
 import { kioskConfigService } from '../services/kioskConfigService';
+import FullscreenVoiceOverlay from './FullscreenVoiceOverlay';
 import './VoiceAssistantBar.css';
 
 export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleView }) {
@@ -16,6 +17,7 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [typedInput, setTypedInput] = useState('');
   const [documentContext, setDocumentContext] = useState(null);
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -50,6 +52,12 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
       unsubscribe();
     };
   }, [onNavigate, onOpenAdmin, onToggleView]);
+
+  useEffect(() => {
+    const handleOpenFs = () => setIsFullscreenOpen(true);
+    window.addEventListener('aurra_open_fullscreen_voice', handleOpenFs);
+    return () => window.removeEventListener('aurra_open_fullscreen_voice', handleOpenFs);
+  }, []);
 
   useEffect(() => {
     if (isKeyboardOpen && inputRef.current) {
@@ -326,6 +334,16 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
         )}
       </button>
 
+      {/* Fullscreen Voice Immersion Toggle Button */}
+      <button
+        className="voice-fullscreen-btn"
+        onClick={() => setIsFullscreenOpen(true)}
+        title="Open Fullscreen Voice Assistant (Undulating Wave Horizon)"
+      >
+        <Maximize2 size={16} color="#00ffff" />
+        <span>Full Screen</span>
+      </button>
+
       {showHints && (
         <div className="voice-hints-popup" onClick={() => setShowHints(false)}>
           <div className="hints-header">
@@ -344,6 +362,22 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
           </ul>
         </div>
       )}
+
+      {/* Fullscreen Voice Immersion HUD Overlay */}
+      <FullscreenVoiceOverlay
+        isOpen={isFullscreenOpen}
+        onClose={() => setIsFullscreenOpen(false)}
+        isListening={isListening}
+        isThinking={isThinking}
+        isSpeaking={isSpeaking}
+        isAiMuted={isAiMuted}
+        transcript={transcript}
+        feedback={feedback}
+        latestReply={latestReply}
+        documentContext={documentContext}
+        onToggleListening={handleToggle}
+        onToggleAiMute={handleToggleAiMute}
+      />
     </div>
   );
 }

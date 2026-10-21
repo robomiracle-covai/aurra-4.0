@@ -52,32 +52,32 @@ const getCardIcon = (href, className) => {
 };
 
 // Orbital Sphere Aesthetic Theme Resolver
-const getOrbTheme = (href, idx) => {
+const getOrbTheme = (href, idx, card) => {
   if (href?.includes('face') || href?.includes('greet')) {
-    return { sysId: 'SYS_02', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.16)', border: '#c084fc', glow: 'rgba(168, 85, 247, 0.55)', label: 'Face Recognition' };
+    return { sysId: 'SYS_02', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.16)', border: '#c084fc', glow: 'rgba(168, 85, 247, 0.55)', label: card?.title || 'Face Recognition' };
   }
   if (href?.includes('tour')) {
-    return { sysId: 'SYS_03', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.16)', border: '#22d3ee', glow: 'rgba(6, 182, 212, 0.55)', label: 'Guided Tour' };
+    return { sysId: 'SYS_03', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.16)', border: '#22d3ee', glow: 'rgba(6, 182, 212, 0.55)', label: card?.title || 'Guided Tour' };
   }
   if (href?.includes('facilities')) {
-    return { sysId: 'SYS_04', color: '#10b981', bg: 'rgba(16, 185, 129, 0.16)', border: '#34d399', glow: 'rgba(16, 185, 129, 0.55)', label: 'Facilities' };
+    return { sysId: 'SYS_04', color: '#10b981', bg: 'rgba(16, 185, 129, 0.16)', border: '#34d399', glow: 'rgba(16, 185, 129, 0.55)', label: card?.title || 'Facilities' };
   }
   if (href?.includes('form') || href?.includes('register')) {
-    return { sysId: 'SYS_05', color: '#00d2ff', bg: 'rgba(0, 210, 255, 0.16)', border: '#38bdf8', glow: 'rgba(0, 210, 255, 0.55)', label: 'Visitor Form' };
+    return { sysId: 'SYS_05', color: '#00d2ff', bg: 'rgba(0, 210, 255, 0.16)', border: '#38bdf8', glow: 'rgba(0, 210, 255, 0.55)', label: card?.title || 'Visitor Form' };
   }
   if (href?.includes('web') || href?.includes('qr')) {
-    return { sysId: 'SYS_06', color: '#d946ef', bg: 'rgba(217, 70, 239, 0.16)', border: '#e879f9', glow: 'rgba(217, 70, 239, 0.55)', label: 'QR Links' };
+    return { sysId: 'SYS_06', color: '#d946ef', bg: 'rgba(217, 70, 239, 0.16)', border: '#e879f9', glow: 'rgba(217, 70, 239, 0.55)', label: card?.title || 'QR Links' };
   }
   if (href?.includes('control') || href?.includes('ros')) {
-    return { sysId: 'SYS_07', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.16)', border: '#fbbf24', glow: 'rgba(245, 158, 11, 0.55)', label: 'ROS Controls' };
+    return { sysId: 'SYS_07', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.16)', border: '#fbbf24', glow: 'rgba(245, 158, 11, 0.55)', label: card?.title || 'ROS Controls' };
   }
   if (href?.includes('pdf') || href?.includes('document')) {
-    return { sysId: 'SYS_08', color: '#ff3366', bg: 'rgba(255, 51, 102, 0.16)', border: '#fb7185', glow: 'rgba(255, 51, 102, 0.55)', label: 'PDF AI' };
+    return { sysId: 'SYS_08', color: '#ff3366', bg: 'rgba(255, 51, 102, 0.16)', border: '#fb7185', glow: 'rgba(255, 51, 102, 0.55)', label: card?.title || 'PDF AI' };
   }
   if (href?.includes('qa') || href?.includes('question')) {
-    return { sysId: 'SYS_02', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.16)', border: '#67e8f9', glow: 'rgba(56, 189, 248, 0.55)', label: 'Ask Aurra' };
+    return { sysId: 'SYS_02', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.16)', border: '#67e8f9', glow: 'rgba(56, 189, 248, 0.55)', label: card?.title || 'Ask Aurra' };
   }
-  return { sysId: `SYS_0${idx + 2}`, color: '#00ffff', bg: 'rgba(0, 255, 255, 0.16)', border: '#22d3ee', glow: 'rgba(0, 255, 255, 0.55)', label: 'Module' };
+  return { sysId: `SYS_0${idx + 2}`, color: '#00ffff', bg: 'rgba(0, 255, 255, 0.16)', border: '#22d3ee', glow: 'rgba(0, 255, 255, 0.55)', label: card?.title || 'Module' };
 };
 
 export default function SliderAndCards({ 
@@ -186,7 +186,35 @@ export default function SliderAndCards({
 
   useEffect(() => {
     loadKioskData();
+
+    const handleCardsChange = () => {
+      logger.info('HOME', 'Received aurra_cards_changed event, refreshing constellation...');
+      loadKioskData();
+    };
+    const handleSlidesChange = () => {
+      loadKioskData();
+    };
+    const handleBrandingChange = () => {
+      loadKioskData();
+    };
+
+    window.addEventListener('aurra_cards_changed', handleCardsChange);
+    window.addEventListener('aurra_slides_changed', handleSlidesChange);
+    window.addEventListener('aurra_branding_changed', handleBrandingChange);
+
+    return () => {
+      window.removeEventListener('aurra_cards_changed', handleCardsChange);
+      window.removeEventListener('aurra_slides_changed', handleSlidesChange);
+      window.removeEventListener('aurra_branding_changed', handleBrandingChange);
+    };
   }, [loadKioskData]);
+
+  // Re-fetch kiosk data when admin closes
+  useEffect(() => {
+    if (!isAdminOpen) {
+      loadKioskData();
+    }
+  }, [isAdminOpen, loadKioskData]);
 
   // ── Auto-cycle Banner Slideshow ──
   useEffect(() => {
@@ -445,6 +473,7 @@ export default function SliderAndCards({
                   onClick={() => {
                     voiceNavigationService.speak('I am listening. Ask any question or command.');
                     voiceNavigationService.startListening();
+                    window.dispatchEvent(new CustomEvent('aurra_open_fullscreen_voice'));
                   }}
                   title="Activate Hands-Free Voice Listening"
                 >
@@ -477,6 +506,7 @@ export default function SliderAndCards({
                   onClick={() => {
                     voiceNavigationService.speak('I am Aurra, how can I help you today?');
                     voiceNavigationService.startListening();
+                    window.dispatchEvent(new CustomEvent('aurra_open_fullscreen_voice'));
                   }}
                   title="SYS_01: Ask Aurra Voice Core (Tap to Talk)"
                 >
@@ -491,7 +521,7 @@ export default function SliderAndCards({
 
                 {/* Orbiting Satellite Glass Spheres */}
                 {cards.map((card, idx) => {
-                  const theme = getOrbTheme(card.href, idx);
+                  const theme = getOrbTheme(card.href, idx, card);
                   const total = cards.length || 1;
                   // Calculate radial coordinates around center
                   const angleDeg = (idx / total) * 360 - 90;

@@ -827,3 +827,104 @@
   color: #ffffff;
   background: rgba(255, 255, 255, 0.16);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   STORYBOARD MORPH TRANSITION: FULLSCREEN MIC -> BOTTOM VOICE BAR
+   (Reference Storyboard Frames 1, 2, 3 - 60/90 FPS Locked)
+   ═══════════════════════════════════════════════════════════════ */
+
+.fullscreen-voice-hud-root.morphing-to-bar {
+  background-color: transparent !important;
+  pointer-events: none !important;
+  transition: background-color 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fullscreen-voice-hud-root.morphing-to-bar .fs-ambient-backdrop,
+.fullscreen-voice-hud-root.morphing-to-bar .fs-top-telemetry-bar,
+.fullscreen-voice-hud-root.morphing-to-bar .fs-wave-horizon-wrapper,
+.fullscreen-voice-hud-root.morphing-to-bar .fs-status-content-area,
+.fullscreen-voice-hud-root.morphing-to-bar .fs-footer-telemetry,
+.fullscreen-voice-hud-root.morphing-to-bar .fs-concentric-ring {
+  opacity: 0 !important;
+  transition: opacity 0.22s ease-out;
+}
+
+/* Frame 2 & 3: Central Mic Circle stretches into capsule and glides down to dock into bottom voice bar */
+.fullscreen-voice-hud-root.morphing-to-bar .fs-mic-portal-container {
+  animation: morphMicPortalDown 0.72s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  will-change: transform, opacity;
+}
+
+@keyframes morphMicPortalDown {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+  24% {
+    /* Frame 2: Horizontal stretch into capsule / oval */
+    transform: translate3d(0, 6vh, 0) scale(1.75, 0.62);
+    opacity: 1;
+  }
+  64% {
+    /* Frame 3: Traveling down towards bottom bar */
+    transform: translate3d(0, 32vh, 0) scale(2.9, 0.36);
+    opacity: 0.95;
+  }
+  90% {
+    /* Reaching bottom bar docking coordinates */
+    transform: translate3d(0, 40vh, 0) scale(3.5, 0.28);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate3d(0, 42vh, 0) scale(3.6, 0.26);
+    opacity: 0;
+  }
+}
+
+.fullscreen-voice-hud-root.morphing-to-bar .fs-mic-core-orb {
+  animation: morphMicOrbCapsule 0.72s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: border-radius, background, border-color, box-shadow;
+}
+
+@keyframes morphMicOrbCapsule {
+  0% {
+    border-radius: 50%;
+    border-color: #00CFEF;
+  }
+  30% {
+    border-radius: 48px;
+    border-color: #00E5FF;
+  }
+  70% {
+    border-radius: 40px;
+    border-color: rgba(0, 255, 255, 0.5);
+    background: #090e17;
+  }
+  100% {
+    border-radius: 40px;
+    border-color: rgba(0, 255, 255, 0.4);
+    background: #090e17;
+  }
+}
+
+/* White mic icon slides gracefully to the left side of the morphing capsule */
+.fullscreen-voice-hud-root.morphing-to-bar .fs-core-icon {
+  animation: morphMicIconSlideLeft 0.72s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform;
+}
+
+@keyframes morphMicIconSlideLeft {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  30% {
+    transform: translate3d(-24px, 0, 0) scale(0.85);
+  }
+  70% {
+    transform: translate3d(-80px, 0, 0) scale(0.55);
+  }
+  100% {
+    transform: translate3d(-110px, 0, 0) scale(0.48);
+  }
+}
+

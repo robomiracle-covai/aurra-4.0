@@ -23,7 +23,38 @@ export default function FullscreenVoiceOverlay({
   const phaseRef = useRef(0);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [typedInput, setTypedInput] = useState('');
+  const [isRendered, setIsRendered] = useState(isOpen);
+  const [isMorphingOut, setIsMorphingOut] = useState(false);
   const inputRef = useRef(null);
+
+  // Synchronize rendered state with isOpen prop and trigger morphing
+  useEffect(() => {
+    if (isOpen) {
+      setIsRendered(true);
+      setIsMorphingOut(false);
+    } else if (isRendered && !isMorphingOut) {
+      setIsMorphingOut(true);
+      window.dispatchEvent(new CustomEvent('aurra_morph_cards_in'));
+      const timer = setTimeout(() => {
+        setIsRendered(false);
+        setIsMorphingOut(false);
+      }, 720);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, isRendered, isMorphingOut]);
+
+  // Smooth close morph trigger for user-initiated actions (Minimize, ESC)
+  const triggerCloseWithMorph = () => {
+    if (isMorphingOut) return;
+    setIsMorphingOut(true);
+    window.dispatchEvent(new CustomEvent('aurra_show_cards'));
+    window.dispatchEvent(new CustomEvent('aurra_morph_cards_in'));
+    setTimeout(() => {
+      setIsRendered(false);
+      setIsMorphingOut(false);
+      onClose?.();
+    }, 720);
+  };
 
   // Focus input when keyboard opens
   useEffect(() => {
@@ -32,21 +63,21 @@ export default function FullscreenVoiceOverlay({
     }
   }, [isKeyboardOpen]);
 
-  // Handle ESC key to close fullscreen
+  // Handle ESC key to close fullscreen with morph
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen && !isRendered) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         if (isKeyboardOpen) {
           setIsKeyboardOpen(false);
         } else {
-          onClose?.();
+          triggerCloseWithMorph();
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isKeyboardOpen, onClose]);
+  }, [isOpen, isRendered, isKeyboardOpen, triggerCloseWithMorph]);
 
   // ── Ultra-Smooth Continuous Waving Laser Horizon Animation ──
   useEffect(() => {
@@ -267,9 +298,9 @@ export default function FullscreenVoiceOverlay({
       cancelAnimationFrame(animFrameRef.current);
       window.removeEventListener('resize', updateCanvasSize);
     };
-  }, [isOpen, isSpeaking, isListening]);
+  }, [isOpen, isRendered, isSpeaking, isListening]);
 
-  if (!isOpen) return null;
+  if (!isRendered) return null;
 
   const handleSendTyped = (e) => {
     e?.preventDefault();
@@ -284,7 +315,7 @@ export default function FullscreenVoiceOverlay({
   const eqBars = Array.from({ length: 28 }, (_, i) => i);
 
   return createPortal(
-    <div className="fullscreen-voice-hud-root">
+    <div className={`fullscreen-voice-hud-root ${isMorphingOut ? 'morphing-to-bar' : ''}`}>
       {/* Deep Space Radial Ambient Backdrop */}
       <div className="fs-ambient-backdrop">
         <div className="fs-radial-glow"></div>
@@ -312,7 +343,7 @@ export default function FullscreenVoiceOverlay({
 
           <button
             className="fs-header-btn fs-minimize-btn"
-            onClick={onClose}
+            onClick={triggerCloseWithMorph}
             title="Exit Fullscreen Mode (ESC)"
           >
             <Minimize2 size={18} color="#00ffff" />
@@ -326,7 +357,7 @@ export default function FullscreenVoiceOverlay({
         {/* Upper Zone: Concentric Glowing Mic Circles & Waving Laser Horizon */}
         <div className="fs-upper-stage">
           <div 
-            className={`fs-mic-portal-container ${isSpeaking ? 'is-speaking' : isListening ? 'is-listening' : 'is-idle'}`}
+            className={`fs-mic-portal-container ${isSpeaking ? 'is-speaking' : isListening ? 'is-listening' : 'is-idle'} ${isMorphingOut ? 'morphing-to-bar' : ''}`}
             onClick={onToggleListening}
             title={isListening ? 'Listening Active — Tap to Pause' : 'Mic Paused — Tap to Speak'}
           >

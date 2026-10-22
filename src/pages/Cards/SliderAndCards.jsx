@@ -207,6 +207,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
   const [headerTitle, setHeaderTitle] = useState('AURRA 4.0');
   const [devSettings, setDevSettings] = useState(devSettingsService.getSettings());
   const [espState, setEspState] = useState(esp32Service.getState());
+  const [isMorphingIn, setIsMorphingIn] = useState(false);
 
   const tapCountRef = useRef(0);
   const tapTimerRef = useRef(null);
@@ -229,16 +230,30 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
       setShowSlider(false);
     }
 
-    const handleShowCards = () => setShowSlider(false);
-    const handleShowSlider = () => setShowSlider(true);
+    const handleShowCards = () => {
+      setShowSlider(false);
+      setIsMorphingIn(true);
+      setTimeout(() => setIsMorphingIn(false), 1200);
+    };
+    const handleMorphCardsIn = () => {
+      setShowSlider(false);
+      setIsMorphingIn(true);
+      setTimeout(() => setIsMorphingIn(false), 1200);
+    };
+    const handleShowSlider = () => {
+      setShowSlider(true);
+      setIsMorphingIn(false);
+    };
 
     window.addEventListener('aurra_show_cards', handleShowCards);
     window.addEventListener('aurra_show_features', handleShowCards);
+    window.addEventListener('aurra_morph_cards_in', handleMorphCardsIn);
     window.addEventListener('aurra_show_slider', handleShowSlider);
 
     return () => {
       window.removeEventListener('aurra_show_cards', handleShowCards);
       window.removeEventListener('aurra_show_features', handleShowCards);
+      window.removeEventListener('aurra_morph_cards_in', handleMorphCardsIn);
       window.removeEventListener('aurra_show_slider', handleShowSlider);
     };
   }, [showCardsInitially]);
@@ -525,7 +540,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
           </div>
         ) : (
           /* AURRA 4.0 ORBITAL CONSTELLATION VIEW */
-          <div className="orbital-home-layout">
+          <div className={`orbital-home-layout ${isMorphingIn ? 'is-morphing-in' : ''}`}>
             {/* Left: Hero System Highlight Command Deck */}
             <div className="hero-system-column">
               <div className="system-highlight-badge">
@@ -606,6 +621,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                       key={card.id || idx}
                       className="satellite-orb-node"
                       style={{
+                        '--node-idx': idx,
                         '--orb-x': `${slot.x}px`,
                         '--orb-y': `${slot.y}px`,
                         '--orb-size': `${slot.size}px`,

@@ -18,6 +18,7 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
   const [typedInput, setTypedInput] = useState('');
   const [documentContext, setDocumentContext] = useState(null);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
+  const [isCatchingMorph, setIsCatchingMorph] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -56,11 +57,20 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
   useEffect(() => {
     const handleOpenFs = () => setIsFullscreenOpen(true);
     const handleCloseFs = () => setIsFullscreenOpen(false);
+    const handleMorphCatch = () => {
+      setTimeout(() => {
+        setIsCatchingMorph(true);
+        setTimeout(() => setIsCatchingMorph(false), 550);
+      }, 400);
+    };
+
     window.addEventListener('aurra_open_fullscreen_voice', handleOpenFs);
     window.addEventListener('aurra_close_fullscreen_voice', handleCloseFs);
+    window.addEventListener('aurra_morph_cards_in', handleMorphCatch);
     return () => {
       window.removeEventListener('aurra_open_fullscreen_voice', handleOpenFs);
       window.removeEventListener('aurra_close_fullscreen_voice', handleCloseFs);
+      window.removeEventListener('aurra_morph_cards_in', handleMorphCatch);
     };
   }, []);
 
@@ -111,7 +121,7 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
   };
 
   return (
-    <div className={`voice-assistant-bar ${isKeyboardOpen ? 'keyboard-mode' : ''} ${latestReply ? 'has-reply' : ''}`}>
+    <div className={`voice-assistant-bar ${isKeyboardOpen ? 'keyboard-mode' : ''} ${latestReply ? 'has-reply' : ''} ${isCatchingMorph ? 'morph-catch' : ''}`}>
       {/* Mic Action Toggle Button */}
       <button
         className={`voice-mic-btn ${isListening ? 'listening' : 'muted'}`}

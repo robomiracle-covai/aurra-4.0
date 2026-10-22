@@ -750,3 +750,96 @@
   justify-content: center;
   z-index: 50;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   STORYBOARD MORPH: CARDS FROM LEFT CORNER (FRAMES 4, 5, 6, 7)
+   60 to 90 FPS Hardware Composited Only (translate3d + scale + opacity)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Left Hero Command Column gliding in */
+.orbital-home-layout.is-morphing-in .hero-system-column {
+  animation: heroColumnGlideIn 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.12s;
+  will-change: transform, opacity;
+}
+
+@keyframes heroColumnGlideIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(-55px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Orbital Track Rings expanding outward into place */
+.orbital-home-layout.is-morphing-in .orbital-track-ring {
+  animation: orbitalTracksExpandIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.16s;
+  will-change: transform, opacity;
+}
+
+@keyframes orbitalTracksExpandIn {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.35);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Frame 4 & 5: Big center card ("Ask Aurra") emerges from left corner to focal center */
+.orbital-home-layout.is-morphing-in .constellation-core-orb {
+  animation: coreOrbFromLeftCorner 0.76s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.14s;
+  will-change: transform, opacity;
+}
+
+@keyframes coreOrbFromLeftCorner {
+  0% {
+    opacity: 0;
+    transform: translate3d(calc(-50% - 360px), calc(-50% + 160px), 0) scale(0.22);
+  }
+  42% {
+    opacity: 1;
+    transform: translate3d(calc(-50% - 80px), calc(-50% + 35px), 0) scale(0.82);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(1);
+  }
+}
+
+/* Frame 4, 5, 6 & 7: Remaining satellite cards emerge from left corner one by one and bloom outward to surround the big center card */
+.orbital-home-layout.is-morphing-in .satellite-orb-node {
+  animation: satelliteOrbFromLeftCorner 0.78s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(0.18s + var(--node-idx, 0) * 0.075s);
+  will-change: transform, opacity;
+}
+
+@keyframes satelliteOrbFromLeftCorner {
+  0% {
+    opacity: 0;
+    transform: translate3d(calc(-50% - 360px), calc(-50% + 160px), 0) scale(0.12);
+  }
+  38% {
+    opacity: 0.85;
+    /* Trailing behind the big core sphere */
+    transform: translate3d(calc(-50% - 70px + var(--orb-x) * 0.22), calc(-50% + 30px + var(--orb-y) * 0.22), 0) scale(0.58);
+  }
+  72% {
+    opacity: 1;
+    /* Expanding outwards around the core */
+    transform: translate3d(calc(-50% + var(--orb-x) * 1.05), calc(-50% + var(--orb-y) * 1.05), 0) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    /* Locking symmetrically into final orbital slot */
+    transform: translate3d(calc(-50% + var(--orb-x)), calc(-50% + var(--orb-y)), 0) scale(1);
+  }
+}
+

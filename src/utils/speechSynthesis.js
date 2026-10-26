@@ -127,6 +127,9 @@ const pickWebVoice = (voices = [], gender = 'female', selectedVoiceURI = '') => 
   return voices[0] || null;
 };
 
+let isWebSpeechActive = false;
+let webSpeechTimeout = null;
+
 export const isAnySpeaking = () => {
   const launcher = getAndroidLauncher();
   if (launcher && typeof launcher.isSpeaking === 'function') {
@@ -139,16 +142,15 @@ export const isAnySpeaking = () => {
   if (typeof window !== 'undefined' && window.isNativeSpeaking) {
     return true;
   }
-  if (!launcher && !isAndroidApp()) {
-    const synth = getSpeechSynthesis();
-    if (synth && (synth.speaking || synth.pending)) {
-      return true;
-    }
-  }
-  return false;
+  return isWebSpeechActive;
 };
 
 export const cancelSpeech = () => {
+  isWebSpeechActive = false;
+  if (webSpeechTimeout) {
+    clearTimeout(webSpeechTimeout);
+    webSpeechTimeout = null;
+  }
   stopSpeakingAnimatronics();
   if (typeof window !== 'undefined') {
     window.isNativeSpeaking = false;
@@ -164,7 +166,13 @@ export const cancelSpeech = () => {
     return;
   }
   const synth = getSpeechSynthesis();
-  if (synth) synth.cancel();
+  if (synth) {
+    try {
+      synth.cancel();
+    } catch {
+      /* ignore */
+    }
+  }
 };
 
 const speakViaNative = (launcher, text, selectedVoiceURI, onStart, onEnd) => {
@@ -291,16 +299,27 @@ export const speakWithVoice = async (text, options = {}) => {
   cancelSpeech();
 
   const handleStart = () => {
+    isWebSpeechActive = true;
     startSpeakingAnimatronics();
     onStart?.();
   };
 
   const handleEnd = () => {
+    isWebSpeechActive = false;
+    if (webSpeechTimeout) {
+      clearTimeout(webSpeechTimeout);
+      webSpeechTimeout = null;
+    }
     stopSpeakingAnimatronics();
     onEnd?.();
   };
 
   const handleError = (err) => {
+    isWebSpeechActive = false;
+    if (webSpeechTimeout) {
+      clearTimeout(webSpeechTimeout);
+      webSpeechTimeout = null;
+    }
     stopSpeakingAnimatronics();
     onError?.(err);
   };
@@ -350,6 +369,19 @@ export const speakWithVoice = async (text, options = {}) => {
     }
 
     console.log('[Aurra Speech] Speaking text:', text);
+    isWebSpeechActive = true;
+    const wordsCount = String(text).trim().split(/\s+/).length;
+    const maxWatchdogMs = Math.max(4000, wordsCount * 650 + 2500);
+    if (webSpeechTimeout) clearTimeout(webSpeechTimeout);
+    webSpeechTimeout = setTimeout(() => {
+      if (isWebSpeechActive) {
+        console.warn('[Web Speech] Watchdog timeout — clearing isWebSpeechActive');
+        isWebSpeechActive = false;
+        try { synth.cancel(); } catch {}
+        handleEnd();
+      }
+    }, maxWatchdogMs);
+
     setTimeout(() => {
       try {
         if (synth.paused) synth.resume();

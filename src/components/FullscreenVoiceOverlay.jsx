@@ -415,6 +415,9 @@ export default function FullscreenVoiceOverlay({
       setIsRendered(true);
       setIsMorphingOut(false);
       setIsMorphingIn(true);
+      if (!isListening && !isSpeaking && !isThinking) {
+        voiceNavigationService.startListening(true);
+      }
     } else if (isRendered && !isMorphingOut) {
       setIsMorphingOut(true);
       window.dispatchEvent(new CustomEvent('aurra_morph_cards_in'));
@@ -887,25 +890,25 @@ export default function FullscreenVoiceOverlay({
           <div className="fs-suggestions-row">
             <button
               className="fs-suggest-pill"
-              onClick={() => voiceNavigationService.processVoiceCommand('What is Aurra?')}
+              onClick={() => voiceNavigationService.processVoiceCommand('What is Aurra?', { inputType: 'touch' })}
             >
               "What is Aurra?"
             </button>
             <button
               className="fs-suggest-pill"
-              onClick={() => voiceNavigationService.processVoiceCommand('What features do you have?')}
+              onClick={() => voiceNavigationService.processVoiceCommand('What features do you have?', { inputType: 'touch' })}
             >
               "What features do you have?"
             </button>
             <button
               className="fs-suggest-pill"
-              onClick={() => voiceNavigationService.processVoiceCommand('Visitor form')}
+              onClick={() => voiceNavigationService.processVoiceCommand('Visitor form', { inputType: 'touch' })}
             >
               "Visitor form"
             </button>
             <button
               className="fs-suggest-pill"
-              onClick={() => voiceNavigationService.processVoiceCommand('Public facilities')}
+              onClick={() => voiceNavigationService.processVoiceCommand('Public facilities', { inputType: 'touch' })}
             >
               "Public facilities"
             </button>

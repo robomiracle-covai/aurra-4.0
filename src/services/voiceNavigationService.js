@@ -224,7 +224,13 @@ class VoiceNavigationService {
     this.isProcessing = false;
     this.lastSpokenText = String(text || '');
     this.notify({ isSpeaking: true, isThinking: false });
-    if (this.recognition && this.isListening) {
+    if (this.isAndroid && typeof window !== 'undefined' && window.AndroidLauncher?.stopSpeechRecognizer) {
+      try {
+        window.AndroidLauncher.stopSpeechRecognizer();
+      } catch {
+        /* ignore */
+      }
+    } else if (this.recognition && this.isListening) {
       try {
         this.recognition.abort();
       } catch {
@@ -288,9 +294,10 @@ class VoiceNavigationService {
     });
   }
 
-  cancelSpeech() {
+  cancelSpeech(resumeMic = false) {
     this.isSpeakingTts = false;
     this.isThinking = false;
+    this.isProcessing = false;
     this.lastSpeechEndTime = Date.now();
     cancelSpeech();
     this.currentTranscript = '';
@@ -300,7 +307,9 @@ class VoiceNavigationService {
       this.speechDebounceTimer = null;
     }
     this.notify({ isSpeaking: false, isThinking: false, transcript: '' });
-    this.startListening(true);
+    if (resumeMic) {
+      this.startListening(true);
+    }
   }
 
   setInteractiveReply(replyObj) {
@@ -375,6 +384,68 @@ class VoiceNavigationService {
       return true;
     }
 
+    // 1. Android Native Bridge Speech Recognition (avoid WebView webkitSpeechRecognition not-allowed/network failure)
+    const hasAndroidBridge = typeof window !== 'undefined' && Boolean(window.AndroidLauncher);
+    if (hasAndroidBridge) {
+      this.isAndroid = true;
+      this.isInitialized = true;
+      logger.info('VOICE', 'Initialized voice service via Android Native Bridge');
+
+      window.onAndroidSpeechReady = () => {
+        logger.speech('VOICE', 'Android SpeechRecognizer ready');
+        this.isListening = true;
+        this.notify({ isListening: true, status: 'listening' });
+      };
+
+      window.onAndroidSpeechStart = () => {
+        logger.speech('VOICE', 'Android SpeechRecognizer capturing speech');
+        this.isListening = true;
+        this.notify({ isListening: true, status: 'listening' });
+      };
+
+      window.onAndroidSpeechPartial = (partial) => {
+        if (!partial || this.isSpeakingTts || isAnySpeaking() || this.isProcessing) return;
+        this.currentTranscript = partial;
+        this.notify({ transcript: partial });
+      };
+
+      window.onAndroidSpeechResult = (text) => {
+        logger.speech('VOICE', `Android Speech result received: "${text}"`);
+        this.isListening = false;
+        this.notify({ isListening: false });
+        if (!text || !text.trim()) return;
+        const clean = text.trim();
+        this.currentTranscript = clean;
+        this.notify({ transcript: clean });
+        this.processVoiceCommand(clean, { inputType: 'voice' });
+      };
+
+      window.onAndroidSpeechError = (errorCode) => {
+        logger.warn('VOICE', `Android SpeechRecognizer error code: ${errorCode}`);
+        this.isListening = false;
+        this.notify({ isListening: false });
+        // Auto-recover after normal timeouts (error 7: NO_MATCH, error 6: SPEECH_TIMEOUT)
+        if (!this.manualStop && !this.userPaused && !this.isSpeakingTts && !this.isProcessing && (errorCode === 7 || errorCode === 6)) {
+          setTimeout(() => {
+            if (!this.manualStop && !this.userPaused && !this.isSpeakingTts && !this.isProcessing) {
+              this.startListening(false);
+            }
+          }, 800);
+        }
+      };
+
+      window.onAndroidSpeechCancel = () => {
+        this.isListening = false;
+        this.notify({ isListening: false });
+      };
+
+      if (autoStart && !this.userPaused) {
+        this.startListening(true);
+      }
+      return true;
+    }
+
+    // 2. Standard Web Speech API (Desktop Chrome / Edge / Vivaldi)
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) {
       logger.warn('VOICE', 'Speech Recognition API is not supported in this browser/WebView');
@@ -477,14 +548,14 @@ class VoiceNavigationService {
         }
         if (event.error === 'not-allowed') {
           this.isListening = false;
-          this.notify({ isListening: false, error: 'Microphone permission denied' });
+          this.notify({ isListening: false, error: 'Microphone permission denied. Tap mic to allow.' });
         } else if (event.error === 'network') {
-          // Android WebView transient network glitch: schedule auto-recovery
+          // Transient network glitch: retry once after 1.5s
           setTimeout(() => {
             if (!this.manualStop && !this.userPaused && !this.isListening && !this.isSpeakingTts && !this.isProcessing) {
-              this.startListening(true);
+              this.startListening(false);
             }
-          }, 800);
+          }, 1500);
         }
       };
 
@@ -508,7 +579,7 @@ class VoiceNavigationService {
           return;
         }
 
-        // Auto-restart with debounce to avoid Android WebView InvalidStateError
+        // Auto-restart with debounce to avoid InvalidStateError
         this.isListening = false;
         setTimeout(() => {
           const isBusy = this.isProcessing || this.isSpeakingTts || isAnySpeaking();
@@ -518,7 +589,7 @@ class VoiceNavigationService {
               this.isListening = true;
               this.notify({ isListening: true, status: 'listening' });
             } catch {
-              // Retry once after 500ms if Android threw already-started or busy error
+              // Retry once after 500ms if threw already-started or busy error
               setTimeout(() => {
                 const retryBusy = this.isProcessing || this.isSpeakingTts || isAnySpeaking();
                 if (!this.manualStop && !this.userPaused && !retryBusy) {
@@ -882,6 +953,15 @@ class VoiceNavigationService {
     // ACQUIRE MUTEX LOCK
     this.isProcessing = true;
     this.notify({ isThinking: true });
+
+    // Safety watchdog: ensure isProcessing NEVER remains stuck true
+    const processingWatchdog = setTimeout(() => {
+      if (this.isProcessing) {
+        logger.warn('VOICE', 'Processing command watchdog timeout (15s) - resetting mutex');
+        this.isProcessing = false;
+        this.notify({ isThinking: false });
+      }
+    }, 15000);
 
     try {
       // 4A. Active PDF Document AI Context Interceptor (When user is viewing a PDF document)
@@ -1336,6 +1416,7 @@ class VoiceNavigationService {
     } catch (err) {
       logger.error('VOICE', `Voice command evaluation error: ${err.message}`);
     } finally {
+      clearTimeout(processingWatchdog);
       this.isProcessing = false;
       this.notify({ isThinking: false });
     }
@@ -1350,12 +1431,37 @@ class VoiceNavigationService {
     if (force) {
       this.userPaused = false;
       this.manualStop = false;
+      this.isProcessing = false;
     } else if (this.userPaused) {
       // User explicitly paused AI listening; suppress auto-starting on navigation
       return;
     }
 
     this.manualStop = false;
+
+    // 1. Android Native SpeechRecognizer Bridge
+    if (this.isAndroid || (typeof window !== 'undefined' && Boolean(window.AndroidLauncher))) {
+      this.isAndroid = true;
+      if (this.isSpeakingTts || isAnySpeaking()) {
+        logger.info('VOICE', 'Android speech recognizer delayed: TTS is currently speaking');
+        return;
+      }
+      try {
+        if (window.AndroidLauncher?.startSpeechRecognizer) {
+          window.AndroidLauncher.startSpeechRecognizer();
+          this.isListening = true;
+          this.notify({ isListening: true, status: 'listening' });
+          logger.speech('VOICE', 'Android Native SpeechRecognizer started');
+        } else if (window.AndroidLauncher?.startAndroidVoiceRecognition) {
+          window.AndroidLauncher.startAndroidVoiceRecognition();
+        }
+      } catch (err) {
+        logger.error('VOICE', `Android startSpeechRecognizer error: ${err.message}`);
+      }
+      return;
+    }
+
+    // 2. Browser Web Speech API (Desktop Chrome / Edge / Vivaldi)
     if (!this.recognition) {
       this.init({
         onNavigate: this.navigationHandler,
@@ -1363,18 +1469,34 @@ class VoiceNavigationService {
         onToggleView: this.viewToggleHandler,
       });
     }
+
     if (this.recognition && !this.isListening) {
-      try {
-        this.recognition.start();
+      if (force && typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+          stream.getTracks().forEach((track) => track.stop());
+          this.doStartRecognition();
+        }).catch((err) => {
+          logger.warn('VOICE', `getUserMedia prompt error: ${err.message}`);
+          this.doStartRecognition();
+        });
+        return;
+      }
+      this.doStartRecognition();
+    }
+  }
+
+  doStartRecognition() {
+    if (!this.recognition || this.isListening) return;
+    try {
+      this.recognition.start();
+      this.isListening = true;
+      this.notify({ isListening: true, status: 'listening' });
+    } catch (err) {
+      if (err.message && err.message.includes('already started')) {
         this.isListening = true;
-        this.notify({ isListening: true });
-      } catch (err) {
-        if (err.message && err.message.includes('already started')) {
-          this.isListening = true;
-          this.notify({ isListening: true });
-        } else {
-          logger.warn('VOICE', `Recognition start issue: ${err.message}`);
-        }
+        this.notify({ isListening: true, status: 'listening' });
+      } else {
+        logger.warn('VOICE', `Recognition start issue: ${err.message}`);
       }
     }
   }
@@ -1384,6 +1506,15 @@ class VoiceNavigationService {
       this.userPaused = true;
       this.manualStop = true;
     }
+
+    if (this.isAndroid || (typeof window !== 'undefined' && Boolean(window.AndroidLauncher))) {
+      try {
+        window.AndroidLauncher?.stopSpeechRecognizer?.();
+      } catch {
+        /* ignore */
+      }
+    }
+
     if (this.recognition && this.isListening) {
       try {
         this.recognition.stop();
@@ -1400,6 +1531,7 @@ class VoiceNavigationService {
     if (this.isListening) {
       this.stopListening(true);
     } else {
+      this.cancelSpeech();
       this.startListening(true);
     }
   }

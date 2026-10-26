@@ -13,7 +13,9 @@ import android.net.Uri;
 import android.net.wifi.WifiNetworkSpecifier;
 import android.os.Build;
 import android.os.Bundle;
+import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
@@ -463,6 +465,141 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 null));
     }
 
+    private SpeechRecognizer speechRecognizer = null;
+    private Intent speechRecognizerIntent = null;
+    private volatile boolean isListeningSpeech = false;
+
+    private void initNativeSpeechRecognizer() {
+        runOnUiThread(() -> {
+            try {
+                if (SpeechRecognizer.isRecognitionAvailable(this)) {
+                    if (speechRecognizer != null) {
+                        try {
+                            speechRecognizer.destroy();
+                        } catch (Exception ignored) {}
+                    }
+                    speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+                    speechRecognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                    speechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                    speechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+                    speechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+                    speechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+
+                    speechRecognizer.setRecognitionListener(new RecognitionListener() {
+                        @Override
+                        public void onReadyForSpeech(Bundle params) {
+                            Log.d(TAG, "SpeechRecognizer: onReadyForSpeech");
+                            if (webView != null) {
+                                webView.post(() -> webView.evaluateJavascript("if(window.onAndroidSpeechReady){window.onAndroidSpeechReady();}", null));
+                            }
+                        }
+
+                        @Override
+                        public void onBeginningOfSpeech() {
+                            Log.d(TAG, "SpeechRecognizer: onBeginningOfSpeech");
+                            if (webView != null) {
+                                webView.post(() -> webView.evaluateJavascript("if(window.onAndroidSpeechStart){window.onAndroidSpeechStart();}", null));
+                            }
+                        }
+
+                        @Override
+                        public void onRmsChanged(float rmsdB) {}
+
+                        @Override
+                        public void onBufferReceived(byte[] buffer) {}
+
+                        @Override
+                        public void onEndOfSpeech() {
+                            Log.d(TAG, "SpeechRecognizer: onEndOfSpeech");
+                        }
+
+                        @Override
+                        public void onError(int error) {
+                            Log.w(TAG, "SpeechRecognizer error: " + error);
+                            isListeningSpeech = false;
+                            if (webView != null) {
+                                webView.post(() -> webView.evaluateJavascript("if(window.onAndroidSpeechError){window.onAndroidSpeechError(" + error + ");}", null));
+                            }
+                        }
+
+                        @Override
+                        public void onResults(Bundle results) {
+                            isListeningSpeech = false;
+                            ArrayList<String> matches = results != null ? results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) : null;
+                            if (matches != null && !matches.isEmpty()) {
+                                String text = matches.get(0).replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ").replace("\r", " ");
+                                Log.i(TAG, "SpeechRecognizer result: " + text);
+                                if (webView != null) {
+                                    webView.post(() -> webView.evaluateJavascript("if(window.onAndroidSpeechResult){window.onAndroidSpeechResult('" + text + "');}", null));
+                                }
+                            } else {
+                                if (webView != null) {
+                                    webView.post(() -> webView.evaluateJavascript("if(window.onAndroidSpeechCancel){window.onAndroidSpeechCancel();}", null));
+                                }
+                            }
+                        }
+
+                        @Override
+                        public void onPartialResults(Bundle partialResults) {
+                            ArrayList<String> matches = partialResults != null ? partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) : null;
+                            if (matches != null && !matches.isEmpty()) {
+                                String partial = matches.get(0).replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ").replace("\r", " ");
+                                if (webView != null) {
+                                    webView.post(() -> webView.evaluateJavascript("if(window.onAndroidSpeechPartial){window.onAndroidSpeechPartial('" + partial + "');}", null));
+                                }
+                            }
+                        }
+
+                        @Override
+                        public void onEvent(int eventType, Bundle params) {}
+                    });
+                    Log.i(TAG, "SpeechRecognizer initialized");
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "initNativeSpeechRecognizer failed: " + e.getMessage());
+            }
+        });
+    }
+
+    public void startNativeSpeechRecognizer() {
+        runOnUiThread(() -> {
+            try {
+                if (!hasHardwarePermissions()) {
+                    requestHardwarePermissions();
+                    return;
+                }
+                if (speechRecognizer == null) {
+                    initNativeSpeechRecognizer();
+                }
+                if (speechRecognizer != null) {
+                    isListeningSpeech = true;
+                    speechRecognizer.startListening(speechRecognizerIntent);
+                    Log.i(TAG, "Native SpeechRecognizer started listening");
+                    if (webView != null) {
+                        webView.post(() -> webView.evaluateJavascript("if(window.onAndroidSpeechReady){window.onAndroidSpeechReady();}", null));
+                    }
+                    return;
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "startNativeSpeechRecognizer exception, fallback to dialog: " + e.getMessage());
+            }
+            startAndroidVoiceRecognition();
+        });
+    }
+
+    public void stopNativeSpeechRecognizer() {
+        runOnUiThread(() -> {
+            try {
+                isListeningSpeech = false;
+                if (speechRecognizer != null) {
+                    speechRecognizer.stopListening();
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "stopNativeSpeechRecognizer error: " + e.getMessage());
+            }
+        });
+    }
+
     public void startAndroidVoiceRecognition() {
         runOnUiThread(() -> {
             try {
@@ -699,6 +836,12 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
     @Override
     protected void onDestroy() {
+        if (speechRecognizer != null) {
+            try {
+                speechRecognizer.destroy();
+            } catch (Exception ignored) {}
+            speechRecognizer = null;
+        }
         if (tts != null) {
             tts.stop();
             tts.shutdown();

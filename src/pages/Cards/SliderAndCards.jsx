@@ -1232,9 +1232,8 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                 <button 
                   className="talk-to-aurra-btn"
                   onClick={() => {
-                    voiceNavigationService.speak('I am listening. Ask any question or command.');
-                    voiceNavigationService.startListening();
                     window.dispatchEvent(new CustomEvent('aurra_open_fullscreen_voice'));
+                    voiceNavigationService.speak('I am listening. Ask any question or command.');
                   }}
                   title="Activate Hands-Free Voice Listening"
                 >
@@ -1266,9 +1265,8 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                   ref={coreOrbRef}
                   className="constellation-core-orb"
                   onClick={() => {
-                    voiceNavigationService.speak('I am Aurra, how can I help you today?');
-                    voiceNavigationService.startListening();
                     window.dispatchEvent(new CustomEvent('aurra_open_fullscreen_voice'));
+                    voiceNavigationService.speak('I am Aurra, how can I help you today?');
                   }}
                   title="SYS_01: Ask Aurra Voice Core (Tap to Talk)"
                 >

@@ -63,6 +63,16 @@ public class LauncherBridge {
     }
 
     @JavascriptInterface
+    public void startSpeechRecognizer() {
+        mainHandler.post(() -> activity.startNativeSpeechRecognizer());
+    }
+
+    @JavascriptInterface
+    public void stopSpeechRecognizer() {
+        mainHandler.post(() -> activity.stopNativeSpeechRecognizer());
+    }
+
+    @JavascriptInterface
     public boolean isTtsReady() {
         return activity.isTtsEngineReady();
     }

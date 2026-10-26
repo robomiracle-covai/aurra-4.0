@@ -374,123 +374,48 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
       const coreEl = coreOrbRef.current;
       const satellites = satelliteNodesRef.current.filter(Boolean);
       const trackRings = orbTrackRingsRef.current.filter(Boolean);
-      const targetCount = cardsRef.current?.length || 1;
 
-      // If DOM nodes haven't mounted yet, retry on next frame
-      if (!coreEl || satellites.length < targetCount) {
-        requestAnimationFrame(() => runMorphInGSAP());
-        return;
-      }
+      // If elements not in DOM yet, do nothing (CSS keeps them cleanly visible)
+      if (!coreEl && satellites.length === 0) return;
 
       const tl = gsap.timeline();
       morphInTlRef.current = tl;
 
-      // Reset constellation column position, top bar, and all nodes cleanly
-      gsap.set(['.hero-system-column', '.constellation-column', '.constellation-core-orb', '.orbital-track-ring', '.satellite-orb-node'], { clearProps: 'all' });
-      if (kioskTopBarRef.current) gsap.to(kioskTopBarRef.current, { y: 0, opacity: 1, duration: 0.45, ease: 'power3.out', clearProps: 'transform,opacity' });
-
-      // Set initial starting states
-      if (heroEl) gsap.set(heroEl, { x: -280, opacity: 0 });
-      if (coreEl) gsap.set(coreEl, { scale: 0.88, opacity: 1 });
-      trackRings.forEach((el) => gsap.set(el, { scale: 0.7, opacity: 0 }));
-
-      // Phase 1: Hero system column glides in smoothly from the left
+      // Hero system column glides in from left
       if (heroEl) {
-        tl.to(heroEl, {
-          x: 0,
-          opacity: 1,
-          duration: 0.65,
-          ease: 'power3.out',
-          clearProps: 'transform,opacity',
-        }, 0.05);
+        tl.fromTo(heroEl,
+          { x: -50, opacity: 0 },
+          { x: 0, opacity: 1, duration: 0.45, ease: 'power2.out', clearProps: 'transform,opacity' },
+          0
+        );
       }
 
-      // Phase 2: Central Core Ask Aurra sphere stabilizes and pulses at center
+      // Central core Ask Aurra sphere stabilizes and pulses
       if (coreEl) {
-        tl.to(coreEl, {
-          scale: 1,
-          opacity: 1,
-          duration: 0.5,
-          ease: 'back.out(1.4)',
-          clearProps: 'transform,opacity',
-        }, 0.04);
+        tl.fromTo(coreEl,
+          { scale: 0.85, opacity: 0 },
+          { scale: 1, opacity: 1, duration: 0.45, ease: 'back.out(1.4)', clearProps: 'transform,opacity' },
+          0.04
+        );
       }
 
-      // Phase 3: Orbital track rings expand into place around the core
+      // Orbital track rings expand into place
       trackRings.forEach((el, i) => {
-        tl.to(el, {
-          scale: 1,
-          opacity: 1,
-          duration: 0.6,
-          ease: 'power2.out',
-          clearProps: 'transform,opacity',
-        }, 0.1 + i * 0.08);
+        tl.fromTo(el,
+          { scale: 0.75, opacity: 0 },
+          { scale: 1, opacity: 1, duration: 0.4, ease: 'power2.out', clearProps: 'transform,opacity' },
+          0.06 + i * 0.05
+        );
       });
 
-      // Phase 4: Rotary Mobile Dialer Circulation - Satellite orbs emerge from the right-down corner
-      // of the core orb and circulate around the orbital dial like a vintage rotary phone into their respective slots
-      satellites.forEach((el, i) => {
-        const slot = getBubbleSlot(i, satellites.length);
-        const rawX = el.style.getPropertyValue('--orb-x');
-        const rawY = el.style.getPropertyValue('--orb-y');
-        const finalX = rawX ? parseFloat(rawX) : (slot.x || 0);
-        const finalY = rawY ? parseFloat(rawY) : (slot.y || 0);
-
-        const finalR = Math.hypot(finalX, finalY);
-        let finalAngle = Math.atan2(finalY, finalX);
-        if (finalAngle < 0) finalAngle += 2 * Math.PI;
-
-        // Emergence point: Right-Down corner (45° in polar screen coordinates) as in Storyboard Frame 1
-        const emergenceAngle = 0.25 * Math.PI; // ~45 degrees (right-down / bottom-right corner)
-        const startAngle = emergenceAngle + (i * 0.08);
-        let targetAngle = finalAngle;
-        while (targetAngle < startAngle + 0.35) {
-          targetAngle += 2 * Math.PI;
-        }
-
-        const startR = 32; // Nestled snugly inside the 154px core orb at the right-down corner
-
-        // Hide and position at right-down corner of core orb initially
-        gsap.set(el, {
-          xPercent: -50,
-          yPercent: -50,
-          x: Math.cos(startAngle) * startR,
-          y: Math.sin(startAngle) * startR,
-          scale: 0.2,
-          opacity: 0,
-        });
-
-        const dialProxy = { progress: 0 };
-
-        // Rotary circulation around dial into slots
-        tl.to(dialProxy, {
-          progress: 1,
-          duration: 1.5,
-          ease: 'power2.out',
-          onUpdate: () => {
-            const p = dialProxy.progress;
-            const curAngle = startAngle + (targetAngle - startAngle) * p;
-            const curR = startR + (finalR - startR) * Math.min(1, p * 1.15);
-            const curScale = 0.2 + 0.8 * Math.min(1, p * 1.25);
-            const curOpacity = Math.min(1, p * 3.5);
-
-            gsap.set(el, {
-              xPercent: -50,
-              yPercent: -50,
-              x: Math.cos(curAngle) * curR,
-              y: Math.sin(curAngle) * curR,
-              scale: curScale,
-              opacity: curOpacity,
-            });
-          },
-          onComplete: () => {
-            // Restore native CSS layout with zero offset jump so ambient bobber floats seamlessly
-            gsap.set(el, {
-              clearProps: 'transform,opacity',
-            });
-          },
-        }, 0.1 + i * 0.12);
-      });
+      // Satellite cards bloom outward cleanly at their orbital slots
+      if (satellites.length > 0) {
+        tl.fromTo(satellites,
+          { scale: 0.5, opacity: 0 },
+          { scale: 1, opacity: 1, duration: 0.45, stagger: 0.06, ease: 'back.out(1.2)', clearProps: 'transform,opacity' },
+          0.08
+        );
+      }
     };
 
     if (showCardsInitially || (typeof window !== 'undefined' && window.location.search.includes('view=cards'))) {
@@ -662,81 +587,13 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
     }
   }, [cards]);
 
-  // ── Seamless In-Place Cinematic Continuous Morph ──
+  // ── Seamless In-Place Mode Switch ──
   const handleStartExplain = useCallback(() => {
     if (isExplainMode) return;
     setShowSlider(false);
-
-    const heroEl = heroColRef.current;
-    const coreEl = coreOrbRef.current;
-    const trackRings = orbTrackRingsRef.current.filter(Boolean);
-    const satellites = satelliteNodesRef.current.filter(Boolean);
-    const topBarEl = kioskTopBarRef.current;
-
-    // If elements not mounted, switch directly
-    if (!heroEl && !coreEl && satellites.length === 0) {
-      setIsExplainMode(true);
-      setExplainIndex(0);
-      setIsAutoPlaying(true);
-      return;
-    }
-
-    const tl = gsap.timeline({
-      onComplete: () => {
-        setIsExplainMode(true);
-        setExplainIndex(0);
-        setIsAutoPlaying(true);
-      }
-    });
-
-    // 1. Kiosk Top Bar smoothly glides upward off-screen
-    if (topBarEl) {
-      tl.to(topBarEl, {
-        y: -60,
-        opacity: 0,
-        duration: 0.35,
-        ease: 'power2.inOut',
-      }, 0);
-    }
-
-    // 2. All text in hero-system-column glides smoothly to the left
-    if (heroEl) {
-      tl.to(heroEl, {
-        x: -250,
-        opacity: 0,
-        duration: 0.4,
-        ease: 'power2.in',
-      }, 0);
-    }
-
-    // 3. Central Core Ask Aurra & Track rings smoothly shrink & fade into background
-    if (coreEl) {
-      tl.to(coreEl, {
-        scale: 0.3,
-        opacity: 0,
-        duration: 0.35,
-        ease: 'power2.in',
-      }, 0.02);
-    }
-
-    trackRings.forEach((ring) => {
-      tl.to(ring, {
-        scale: 0.4,
-        opacity: 0,
-        duration: 0.35,
-        ease: 'power2.in',
-      }, 0.02);
-    });
-
-    // 4. Satellite bubbles fade out smoothly in place (NO translating constellation column!)
-    satellites.forEach((el, i) => {
-      tl.to(el, {
-        scale: 0.6,
-        opacity: 0,
-        duration: 0.35,
-        ease: 'power2.in',
-      }, 0.02 + i * 0.03);
-    });
+    setIsExplainMode(true);
+    setExplainIndex(0);
+    setIsAutoPlaying(true);
   }, [isExplainMode]);
 
   handleStartExplainRef.current = handleStartExplain;
@@ -744,53 +601,10 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
   const handleExitExplain = useCallback(() => {
     voiceNavigationService.cancelSpeech();
     if (explainTimerRef.current) clearTimeout(explainTimerRef.current);
-
-    const cardEl = explainCardRef.current;
-    const topRowEl = topNodesRowRef.current;
-    const topBarEl = kioskTopBarRef.current;
-
-    const tl = gsap.timeline({
-      onComplete: () => {
-        setIsExplainMode(false);
-        // Clear all inline transforms and props from previous animations immediately
-        requestAnimationFrame(() => {
-          gsap.set(['.hero-system-column', '.constellation-column', '.constellation-core-orb', '.orbital-track-ring', '.satellite-orb-node'], { clearProps: 'all' });
-          window.dispatchEvent(new CustomEvent('aurra_morph_cards_in'));
-        });
-      }
-    });
-
-    // 1. Center showcase card glides down
-    if (cardEl) {
-      tl.to(cardEl, {
-        scale: 0.9,
-        y: 20,
-        opacity: 0,
-        duration: 0.25,
-        ease: 'power2.in',
-      }, 0);
-    }
-
-    // 2. Top nodes row smoothly glides up
-    if (topRowEl) {
-      tl.to(topRowEl, {
-        y: -20,
-        opacity: 0,
-        duration: 0.2,
-        ease: 'power2.in',
-      }, 0.02);
-    }
-
-    // 3. Kiosk Top Bar smoothly glides back down from above
-    if (topBarEl) {
-      tl.to(topBarEl, {
-        y: 0,
-        opacity: 1,
-        duration: 0.4,
-        ease: 'power3.out',
-        clearProps: 'transform,opacity',
-      }, 0.05);
-    }
+    setIsExplainMode(false);
+    setShowSlider(false);
+    // Smoothly animate constellation cards in
+    window.dispatchEvent(new CustomEvent('aurra_morph_cards_in'));
   }, []);
 
   // Auto-advance & Voice Narration for Explain Features Mode
@@ -899,7 +713,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
       {/* Top Cyber Telemetry Header Bar */}
       <header 
         ref={kioskTopBarRef} 
-        className={`kiosk-top-bar ${isExplainMode ? 'kiosk-top-bar-hidden' : ''}`}
+        className="kiosk-top-bar"
       >
         {/* Left: Cyber Brand Badge */}
         <div 
@@ -1294,6 +1108,8 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                         '--node-idx': idx,
                         '--orb-x': `${slot.x}px`,
                         '--orb-y': `${slot.y}px`,
+                        top: `calc(50% + ${slot.y}px)`,
+                        left: `calc(50% + ${slot.x}px)`,
                         '--orb-size': `${slot.size}px`,
                         '--orb-font-size': `${slot.fontSize}px`,
                         '--orb-label-max': `${slot.labelMax}px`,

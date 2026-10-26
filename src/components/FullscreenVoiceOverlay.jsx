@@ -701,7 +701,7 @@ export default function FullscreenVoiceOverlay({
     const cmd = typedInput.trim();
     if (!cmd) return;
     setIsKeyboardOpen(false);
-    voiceNavigationService.processVoiceCommand(cmd);
+    voiceNavigationService.processVoiceCommand(cmd, { inputType: 'text' });
     setTypedInput('');
   };
 

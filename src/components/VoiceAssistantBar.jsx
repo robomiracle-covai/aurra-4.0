@@ -97,6 +97,16 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
     };
   }, []);
 
+  // Watchdog: Clear stuck transcript if no reply or speaking state occurs within 8s
+  useEffect(() => {
+    if (transcript && !latestReply && !isSpeaking && !isThinking) {
+      const timer = setTimeout(() => {
+        setTranscript('');
+      }, 7000);
+      return () => clearTimeout(timer);
+    }
+  }, [transcript, latestReply, isSpeaking, isThinking]);
+
   useEffect(() => {
     if (isKeyboardOpen && inputRef.current) {
       inputRef.current.focus();

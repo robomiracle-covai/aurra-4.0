@@ -122,12 +122,28 @@ class RagSearchService {
     if (!query || typeof query !== 'string') return false;
     const q = query.toLowerCase().trim();
 
-    // Guard: exclude identity and specifications questions from web search
+    // Guard: Exclude identity, company, political leadership, specifications, and facility questions from web search
+    // These are authoritative ground truth embedded directly in Aurra's knowledge base and system prompt.
     if (/\b(who are you|what is your name|who created you|who developed you|who made you|who built you|battery|display|motor|caster|speaker|spec sheet|specifications|hello|hi|hey)\b/i.test(q)) {
       return false;
     }
 
-    return /\b(who is|what is|current|chief minister|prime minister|president|capital|where is|today|latest|news|minister|governor|leader|score|match|winner|stock|price|she|he|did|do|does|was)\b/i.test(q);
+    // Exclude RoboMiracle company details, sales, staff, location
+    if (/\b(robomiracle|sales|manager|founder|ceo|contact|address|phone|email|rs puram|coimbatore|team)\b/i.test(q)) {
+      return false;
+    }
+
+    // Exclude Indian political leadership and state Chief Ministers (strictly governed by designated system prompt)
+    if (/\b(chief minister|prime minister|president|governor|modi|stalin|vijay|tamil nadu|tamilnadu|andhra|karnataka|kerala|maharashtra|uttar pradesh|delhi|bengal|bihar|gujarat)\b/i.test(q)) {
+      return false;
+    }
+
+    // Exclude facility rooms, tour, kiosk features
+    if (/\b(facility|campus|room|hall|tour|guide|form|admission|cockpit|settings)\b/i.test(q)) {
+      return false;
+    }
+
+    return /\b(who is|what is|current|capital|where is|today|latest|news|leader|score|match|winner|stock|price|she|he|did|do|does|was)\b/i.test(q);
   }
 
   /**
@@ -215,7 +231,7 @@ class RagSearchService {
 
     try {
       const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 4000);
+      const tid = setTimeout(() => controller.abort(), 1200);
 
       const res = await fetch('https://google.serper.dev/search', {
         method: 'POST',
@@ -286,7 +302,7 @@ class RagSearchService {
     try {
       const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}&format=json&no_html=1&skip_disambig=1`;
       const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 3000);
+      const tid = setTimeout(() => controller.abort(), 800);
       const res = await fetch(ddgUrl, { signal: controller.signal });
       clearTimeout(tid);
 
@@ -310,7 +326,7 @@ class RagSearchService {
       if (wikiTopic.length > 2) {
         const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiTopic)}`;
         const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 3000);
+        const tid = setTimeout(() => controller.abort(), 800);
         const wikiRes = await fetch(wikiUrl, { signal: controller.signal });
         clearTimeout(tid);
 
@@ -333,26 +349,36 @@ class RagSearchService {
   /**
    * Master Context Orchestrator:
    * Evaluates query type (Weather vs Fact Search) and retrieves best real-time context.
+   * Hard bounded to 1.2s max so LLM inference never stalls.
    */
   async fetchLiveContext(query, conversationHistory = []) {
     if (!this.config.enabled) return null;
+    if (!this.isWeatherQuery(query) && !this.isRealTimeFactQuery(query)) return null;
 
-    // 1. Weather Query
-    if (this.isWeatherQuery(query)) {
-      const weather = await this.fetchLiveWeatherContext(query);
-      if (weather) return weather;
+    try {
+      const searchPromise = (async () => {
+        // 1. Weather Query
+        if (this.isWeatherQuery(query)) {
+          const weather = await this.fetchLiveWeatherContext(query);
+          if (weather) return weather;
+        }
+
+        // 2. Real-Time Fact Query
+        if (this.isRealTimeFactQuery(query)) {
+          const serper = await this.fetchGoogleSerperContext(query, conversationHistory);
+          if (serper) return serper;
+
+          const free = await this.fetchFreeWebContext(query);
+          if (free) return free;
+        }
+        return null;
+      })();
+
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1200));
+      return await Promise.race([searchPromise, timeoutPromise]);
+    } catch {
+      return null;
     }
-
-    // 2. Real-Time Fact Query
-    if (this.isRealTimeFactQuery(query)) {
-      const serper = await this.fetchGoogleSerperContext(query, conversationHistory);
-      if (serper) return serper;
-
-      const free = await this.fetchFreeWebContext(query);
-      if (free) return free;
-    }
-
-    return null;
   }
 }
 

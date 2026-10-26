@@ -117,7 +117,13 @@ export const DEFAULT_QA_QUESTIONS = [
     question: "Who is the Chief Minister of Tamil Nadu?",
     answer: "The Chief Minister of Tamil Nadu is C. Joseph Vijay.",
     category: "General",
-    keywords: ["chief minister of tamil nadu", "cm of tamil nadu", "tamil nadu cm", "tamil nadu chief minister", "cm of tn", "tn cm"],
+    keywords: [
+      "chief minister of tamil nadu", "cm of tamil nadu", "tamil nadu cm", "tamil nadu chief minister",
+      "cm of tn", "tn cm", "chief minister of tamilnadu", "chief minister f tamilnadu", "chief minister tamil nadu",
+      "tamilnadu cm", "tamilnadu chief minister", "who is the chief minister of tamil nadu", "who is the chief minister of tamilnadu",
+      "who is chief minister of tamil nadu", "who is chief minister of tamilnadu", "who is the chief minister f tamilnadu",
+      "who is the cm of tamil nadu", "who is the cm of tamilnadu", "c joseph vijay", "joseph vijay"
+    ],
     actionRoute: null,
   },
   {
@@ -150,6 +156,14 @@ export const DEFAULT_QA_QUESTIONS = [
     answer: "RoboMiracle Technologies is located in RS Puram, Coimbatore, Tamil Nadu, India.",
     category: "Company",
     keywords: ["where is robomiracle", "location", "address", "where are you located", "coimbatore"],
+    actionRoute: null,
+  },
+  {
+    id: 16,
+    question: "Who is the sales manager in RoboMiracle?",
+    answer: "For sales inquiries and robot bookings at RoboMiracle Technologies, you can contact our sales team directly at sales@robomiracle.com or call +91 63804 73177.",
+    category: "Company",
+    keywords: ["sales manager", "sales manager in robomiracle", "sales team", "sales contact", "who is sales manager", "purchase aurra", "contact sales"],
     actionRoute: null,
   },
 ];

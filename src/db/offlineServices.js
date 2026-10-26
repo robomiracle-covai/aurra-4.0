@@ -74,16 +74,21 @@ export const offlineCardService = {
     } else {
       // Auto-seed any newly registered default cards if missing from existing Dexie DB
       for (const defCard of DEFAULT_REGISTRATION_CARDS) {
-        const existing = cards.find((c) => c.href === defCard.href);
-        if (!existing) {
-          await db.cards.add(defCard);
-        } else if (defCard.href === '/testing-interaction' && (!existing.voiceKeywords || existing.voiceKeywords.length < defCard.voiceKeywords.length)) {
-          await db.cards.update(existing.id, { voiceKeywords: defCard.voiceKeywords });
-        }
+        try {
+          const existing = cards.find((c) => c.href === defCard.href);
+          if (!existing) {
+            const { id, ...cardWithoutId } = defCard;
+            await db.cards.add(cardWithoutId);
+          } else if (defCard.href === '/testing-interaction' && (!existing.voiceKeywords || existing.voiceKeywords.length < defCard.voiceKeywords.length)) {
+            await db.cards.update(existing.id, { voiceKeywords: defCard.voiceKeywords });
+          }
+        } catch {}
       }
-      cards = await db.cards.toArray();
+      try {
+        cards = await db.cards.toArray();
+      } catch {}
     }
-    return cards;
+    return cards && cards.length > 0 ? cards : DEFAULT_REGISTRATION_CARDS;
   },
 
   saveCard: async (cardData) => {
@@ -221,22 +226,40 @@ const tokenize = (text) => {
  */
 export const offlineQaService = {
   getQuestions: async () => {
-    let questions = await db.qaQuestions.toArray();
-    if (!questions || questions.length === 0) {
-      await db.qaQuestions.bulkAdd(DEFAULT_QA_QUESTIONS);
+    let questions = [];
+    try {
       questions = await db.qaQuestions.toArray();
+    } catch {
+      questions = [];
+    }
+
+    if (!questions || questions.length === 0) {
+      try {
+        const cleaned = DEFAULT_QA_QUESTIONS.map(({ id, ...rest }) => rest);
+        await db.qaQuestions.bulkAdd(cleaned);
+        questions = await db.qaQuestions.toArray();
+      } catch {
+        return DEFAULT_QA_QUESTIONS;
+      }
     } else {
       for (const defQ of DEFAULT_QA_QUESTIONS) {
-        const existing = questions.find((q) => q.question.toLowerCase() === defQ.question.toLowerCase());
-        if (!existing) {
-          await db.qaQuestions.add(defQ);
-        } else if (defQ.keywords && defQ.keywords.length > (existing.keywords?.length || 0)) {
-          await db.qaQuestions.update(existing.id, { keywords: defQ.keywords });
+        try {
+          const existing = questions.find((q) => (q.question || '').toLowerCase() === (defQ.question || '').toLowerCase());
+          if (!existing) {
+            const { id, ...dataWithoutId } = defQ;
+            await db.qaQuestions.add(dataWithoutId);
+          } else if (defQ.keywords && defQ.keywords.length > (existing.keywords?.length || 0)) {
+            await db.qaQuestions.update(existing.id, { keywords: defQ.keywords });
+          }
+        } catch {
+          // Ignore individual constraint errors during auto-seed
         }
       }
-      questions = await db.qaQuestions.toArray();
+      try {
+        questions = await db.qaQuestions.toArray();
+      } catch {}
     }
-    return questions;
+    return questions && questions.length > 0 ? questions : DEFAULT_QA_QUESTIONS;
   },
 
   addQuestion: async ({ question, answer, category = 'General', keywords = [], actionRoute = null }) => {

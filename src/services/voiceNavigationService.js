@@ -737,6 +737,173 @@ class VoiceNavigationService {
       return;
     }
 
+    // 1D. Instant Indian Political Leadership Intent (0ms Zero Latency)
+    const cleanNoPunctLeading = utterance.replace(/[?.!,]/g, '').trim();
+    const isPmQuery =
+      cleanNoPunctLeading === 'modi' ||
+      cleanNoPunctLeading === 'narendra modi' ||
+      cleanNoPunctLeading === 'who is modi' ||
+      cleanNoPunctLeading === 'who is narendra modi' ||
+      cleanNoPunctLeading === 'about modi' ||
+      cleanNoPunctLeading === 'prime minister' ||
+      cleanNoPunctLeading === 'who is the prime minister' ||
+      cleanNoPunctLeading === 'who is prime minister' ||
+      cleanNoPunctLeading === 'who is our prime minister' ||
+      cleanNoPunctLeading === 'current prime minister' ||
+      cleanNoPunctLeading === 'pm of india' ||
+      cleanNoPunctLeading.includes('prime minister of india') ||
+      cleanNoPunctLeading.includes('prime minister') ||
+      cleanNoPunctLeading.includes('pm of india') ||
+      cleanNoPunctLeading.includes('who is modi') ||
+      cleanNoPunctLeading.includes('narendra modi') ||
+      cleanNoPunctLeading.includes('current prime minister');
+
+    if (isPmQuery) {
+      this.cancelSpeech(false);
+      const pmMsg = "The current Prime Minister of India is Narendra Modi.";
+      this.setFeedback(pmMsg);
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: pmMsg,
+        source: 'political-leadership',
+        confidence: 100,
+        category: 'Indian Leadership',
+        timestamp: Date.now(),
+      });
+      this.speak(pmMsg);
+      return;
+    }
+
+    // Chief Ministers Table for all 28 Indian States (Authoritative Designated Reference)
+    const STATE_CM_MAP = {
+      'tamil nadu': 'C. Joseph Vijay',
+      'tamilnadu': 'C. Joseph Vijay',
+      'tamil': 'C. Joseph Vijay',
+      'tn': 'C. Joseph Vijay',
+      'andhra pradesh': 'N. Chandrababu Naidu',
+      'andhra': 'N. Chandrababu Naidu',
+      'arunachal pradesh': 'Pema Khandu',
+      'arunachal': 'Pema Khandu',
+      'assam': 'Himanta Biswa Sarma',
+      'bihar': 'Samrat Choudhary',
+      'chhattisgarh': 'Vishnu Deo Sai',
+      'goa': 'Pramod Sawant',
+      'gujarat': 'Bhupendra Patel',
+      'haryana': 'Nayab Singh Saini',
+      'himachal pradesh': 'Sukhvinder Singh Sukhu',
+      'himachal': 'Sukhvinder Singh Sukhu',
+      'jharkhand': 'Hemant Soren',
+      'karnataka': 'D. K. Shivakumar',
+      'kerala': 'V. D. Satheesan',
+      'madhya pradesh': 'Mohan Yadav',
+      'maharashtra': 'Devendra Fadnavis',
+      'manipur': 'Yumnam Khemchand Singh',
+      'meghalaya': 'Conrad K. Sangma',
+      'mizoram': 'Lalduhoma',
+      'nagaland': 'Neiphiu Rio',
+      'odisha': 'Mohan Charan Majhi',
+      'punjab': 'Bhagwant Mann',
+      'rajasthan': 'Bhajan Lal Sharma',
+      'sikkim': 'Prem Singh Tamang',
+      'telangana': 'A. Revanth Reddy',
+      'tripura': 'Manik Saha',
+      'uttar pradesh': 'Yogi Adityanath',
+      'up': 'Yogi Adityanath',
+      'uttarakhand': 'Pushkar Singh Dhami',
+      'west bengal': 'Suvendu Adhikari',
+      'bengal': 'Suvendu Adhikari',
+    };
+
+    const isCmQuery =
+      cleanNoPunctLeading.includes('chief minister') ||
+      cleanNoPunctLeading.includes('cm of') ||
+      cleanNoPunctLeading.includes('cm f') ||
+      /\b(who is the cm|who is cm|current cm)\b/i.test(cleanNoPunctLeading);
+
+    if (isCmQuery) {
+      // Find which state was requested
+      let matchedState = null;
+      let matchedCm = null;
+
+      for (const [st, cm] of Object.entries(STATE_CM_MAP)) {
+        if (cleanNoPunctLeading.includes(st)) {
+          matchedState = st;
+          matchedCm = cm;
+          break;
+        }
+      }
+
+      // Default to Tamil Nadu if no specific state was mentioned or if asked generally in TN context
+      if (!matchedState && (cleanNoPunctLeading.includes('our state') || cleanNoPunctLeading.includes('here') || cleanNoPunctLeading === 'who is the chief minister')) {
+        matchedState = 'Tamil Nadu';
+        matchedCm = 'C. Joseph Vijay';
+      }
+
+      if (matchedCm) {
+        this.cancelSpeech(false);
+        const displayName = matchedState === 'tn' || matchedState === 'tamilnadu' ? 'Tamil Nadu' : matchedState.charAt(0).toUpperCase() + matchedState.slice(1);
+        const cmMsg = `The Chief Minister of ${displayName} is ${matchedCm}.`;
+        this.setFeedback(cmMsg);
+        this.setInteractiveReply({
+          query: rawUtterance,
+          reply: cmMsg,
+          source: 'political-leadership',
+          confidence: 100,
+          category: 'Indian Leadership',
+          timestamp: Date.now(),
+        });
+        this.speak(cmMsg);
+        return;
+      }
+    }
+
+    // 1E. Instant RoboMiracle Company & Sales Inquiries Intent (0ms Zero Latency)
+    const isSalesQuery =
+      cleanNoPunctLeading.includes('sales manager') ||
+      cleanNoPunctLeading.includes('sales team') ||
+      cleanNoPunctLeading.includes('sales head') ||
+      cleanNoPunctLeading.includes('contact sales') ||
+      cleanNoPunctLeading.includes('purchase aurra') ||
+      cleanNoPunctLeading.includes('buy aurra');
+
+    if (isSalesQuery) {
+      this.cancelSpeech(false);
+      const salesMsg = "For sales inquiries and orders at RoboMiracle Technologies, you can reach our sales team at sales@robomiracle.com or call +91 63804 73177.";
+      this.setFeedback(salesMsg);
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: salesMsg,
+        source: 'company-info',
+        confidence: 100,
+        category: 'RoboMiracle Sales',
+        timestamp: Date.now(),
+      });
+      this.speak(salesMsg);
+      return;
+    }
+
+    const isCompanyLocationQuery =
+      cleanNoPunctLeading.includes('where is robomiracle') ||
+      cleanNoPunctLeading.includes('location of robomiracle') ||
+      cleanNoPunctLeading.includes('where are you located') ||
+      cleanNoPunctLeading.includes('address of robomiracle');
+
+    if (isCompanyLocationQuery) {
+      this.cancelSpeech(false);
+      const locMsg = "RoboMiracle Technologies is located in RS Puram, Coimbatore, Tamil Nadu, India.";
+      this.setFeedback(locMsg);
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: locMsg,
+        source: 'company-info',
+        confidence: 100,
+        category: 'RoboMiracle Location',
+        timestamp: Date.now(),
+      });
+      this.speak(locMsg);
+      return;
+    }
+
     const isAdminIntent =
       utterance === 'admin' ||
       utterance === 'settings' ||
@@ -1024,11 +1191,11 @@ class VoiceNavigationService {
     // Safety watchdog: ensure isProcessing NEVER remains stuck true
     const processingWatchdog = setTimeout(() => {
       if (this.isProcessing) {
-        logger.warn('VOICE', 'Processing command watchdog timeout (15s) - resetting mutex');
+        logger.warn('VOICE', 'Processing command watchdog timeout (7s) - resetting mutex and clearing thinking HUD');
         this.isProcessing = false;
-        this.notify({ isThinking: false });
+        this.notify({ isThinking: false, transcript: '' });
       }
-    }, 15000);
+    }, 7000);
 
     try {
       // 4A. Active PDF Document AI Context Interceptor (When user is viewing a PDF document)
@@ -1337,7 +1504,13 @@ class VoiceNavigationService {
 
 
       // 6. Conversational / Q&A Intent: Tier 1 - Universal Offline Q&A Matching (< 3ms IndexedDB)
-      const qaResult = await offlineQaService.findBestAnswer(rawUtterance);
+      let qaResult = null;
+      try {
+        qaResult = await offlineQaService.findBestAnswer(rawUtterance);
+      } catch (qaErr) {
+        logger.warn('VOICE', `Offline QA lookup non-fatal error: ${qaErr.message}`);
+      }
+
       if (qaResult && qaResult.match && (qaResult.confidence >= 50 || !llmService.isConfigured())) {
         const item = qaResult.match;
         const latency = Math.round(performance.now() - queryStartTime);
@@ -1425,17 +1598,18 @@ class VoiceNavigationService {
             }
           }));
           return;
-        } else if (llmResult.reason === 'OFFLINE' && llmResult.text) {
-          this.setFeedback(llmResult.text);
+        } else if (llmResult.text) {
+          const fallbackAiReply = llmResult.text;
+          this.setFeedback(fallbackAiReply);
           this.setInteractiveReply({
             query: rawUtterance,
-            reply: llmResult.text,
+            reply: fallbackAiReply,
             source: 'groq-llm',
-            confidence: 80,
-            category: 'Offline Fallback',
+            confidence: 75,
+            category: 'AI Assistant',
             timestamp: Date.now(),
           });
-          this.speak(llmResult.text);
+          this.speak(fallbackAiReply);
           return;
         }
       }

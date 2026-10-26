@@ -170,6 +170,7 @@ CONVERSATIONAL RULES:
 const STORAGE_KEY = 'aurra_llm_config_v4';
 
 export const DEFAULT_GROQ_API_KEY = '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';
+export const DEFAULT_BACKUP_LLM_KEY = '160def7c98d44d4d80f21170c807fd7f.a_xwhlvPEyPS9z0EyFXcvTUN';
 export const DEFAULT_GEMINI_API_KEY = 'AQ.Ab8RN6IVrEIKjCLjNw6QjOtaIlmnH4RsvHtMn_6Ay6Tp39LxNw';
 
 export const getDefaultLlmConfig = () => ({
@@ -177,6 +178,7 @@ export const getDefaultLlmConfig = () => ({
   provider: 'groq', // 'groq' | 'gemini'
   apiUrl: 'https://api.groq.com/openai/v1',
   apiKey: import.meta.env.VITE_LLM_API_KEY || DEFAULT_GROQ_API_KEY,
+  backupApiKey: DEFAULT_BACKUP_LLM_KEY,
   model: 'qwen/qwen3.8-27b',
   geminiApiKey: DEFAULT_GEMINI_API_KEY,
   geminiModel: 'gemini-1.5-flash',
@@ -184,7 +186,7 @@ export const getDefaultLlmConfig = () => ({
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   temperature: 0.6,
   maxTokens: 300,
-  timeoutMs: 8000,
+  timeoutMs: 12000,
 });
 
 class LlmService {
@@ -202,8 +204,12 @@ class LlmService {
       if (raw) {
         const parsed = JSON.parse(raw);
         const merged = { ...defaults, ...parsed };
+        merged.enabled = true;
         if (!merged.apiKey || !merged.apiKey.trim()) {
           merged.apiKey = defaults.apiKey;
+        }
+        if (!merged.backupApiKey || !merged.backupApiKey.trim()) {
+          merged.backupApiKey = DEFAULT_BACKUP_LLM_KEY;
         }
         if (!merged.geminiApiKey || !merged.geminiApiKey.trim()) {
           merged.geminiApiKey = defaults.geminiApiKey;
@@ -220,15 +226,22 @@ class LlmService {
         if (!merged.maxTokens || merged.maxTokens < 200) {
           merged.maxTokens = 300;
         }
-        // Upgrade system prompt if it lacks Coimbatore / Chief Ministers / Narendra Modi / AURRA knowledge
+        if (!merged.timeoutMs || merged.timeoutMs < 10000) {
+          merged.timeoutMs = 12000;
+        }
+        // Upgrade system prompt if it lacks Coimbatore / Chief Ministers / C. Joseph Vijay / Narendra Modi
         if (
           !merged.systemPrompt ||
           merged.systemPrompt.length < 500 ||
           !merged.systemPrompt.includes('Coimbatore') ||
-          !merged.systemPrompt.includes('CHIEF MINISTERS OF ALL INDIAN STATES') ||
-          !merged.systemPrompt.includes('Narendra Modi')
+          !merged.systemPrompt.includes('C. Joseph Vijay') ||
+          !merged.systemPrompt.includes('Narendra Modi') ||
+          !merged.systemPrompt.includes('CURRENT INDIAN POLITICAL LEADERSHIP')
         ) {
           merged.systemPrompt = defaults.systemPrompt;
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          } catch {}
         } else if (!merged.systemPrompt.includes('CAMPUS ROOM DIRECTORY') && !merged.systemPrompt.includes('G-01')) {
           merged.systemPrompt = mergeKnowledgeIntoPrompt(merged.systemPrompt, getDefaultKnowledgeBlock());
         }
@@ -259,9 +272,8 @@ class LlmService {
   }
 
   isConfigured() {
-    if (!this.config.enabled) return false;
     if (this.config.provider === 'gemini') {
-      return Boolean((this.config.geminiApiKey || '').trim());
+      return Boolean((this.config.geminiApiKey || DEFAULT_GEMINI_API_KEY).trim());
     }
     const key = (this.config.apiKey || DEFAULT_GROQ_API_KEY).trim();
     return Boolean(key);
@@ -342,7 +354,7 @@ class LlmService {
       };
     }
 
-    // 2. Real-Time RAG Context Retrieval (Live Weather / Serper Google Search)
+    // 2. Real-Time RAG Context Retrieval (strictly non-blocking & guarded)
     let liveRAG = null;
     try {
       liveRAG = await ragSearchService.fetchLiveContext(userQuery, conversationHistory);
@@ -352,9 +364,6 @@ class LlmService {
     } catch (ragErr) {
       logger.warn('RAG', `Context retrieval error: ${ragErr.message}`);
     }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.config.timeoutMs || 8000);
 
     const timeInfo = ragSearchService.getLocalTimeAndDate();
     let dynamicSystemPrompt = this.config.systemPrompt || DEFAULT_SYSTEM_PROMPT;
@@ -413,6 +422,9 @@ class LlmService {
         }
       };
 
+      const geminiController = new AbortController();
+      const geminiTimeoutId = setTimeout(() => geminiController.abort(), this.config.timeoutMs || 12000);
+
       try {
         logger.speech('LLM', `Calling Google Gemini (${cleanModel}) for: "${userQuery}"`);
 
@@ -420,10 +432,10 @@ class LlmService {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(geminiBody),
-          signal: controller.signal,
+          signal: geminiController.signal,
         });
 
-        clearTimeout(timeoutId);
+        clearTimeout(geminiTimeoutId);
 
         const data = await response.json();
         if (!response.ok || data.error) {
@@ -492,6 +504,9 @@ class LlmService {
       max_tokens: this.config.maxTokens || 300,
     };
 
+    const groqController = new AbortController();
+    const groqTimeoutId = setTimeout(() => groqController.abort(), this.config.timeoutMs || 12000);
+
     try {
       logger.speech('LLM', `Calling Groq LLM (${body.model}) for: "${userQuery}"`);
 
@@ -502,10 +517,10 @@ class LlmService {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(body),
-        signal: controller.signal,
+        signal: groqController.signal,
       });
 
-      clearTimeout(timeoutId);
+      clearTimeout(groqTimeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -533,19 +548,26 @@ class LlmService {
         ragDetails: liveRAG,
       };
     } catch (err) {
-      clearTimeout(timeoutId);
+      clearTimeout(groqTimeoutId);
       const latency = Date.now() - startTime;
       const isAbort = err.name === 'AbortError';
 
       if (isAbort) {
-        logger.warn('LLM', `Groq LLM timed out after ${this.config.timeoutMs}ms`);
+        logger.warn('LLM', `Groq LLM timed out after ${this.config.timeoutMs || 12000}ms`);
+        console.warn(`[AURRA LLM TIMEOUT] Call exceeded ${this.config.timeoutMs || 12000}ms limit for: "${userQuery}"`);
       } else {
         logger.error('LLM', `Groq LLM call failed: ${err.message}`);
+        console.error(`[AURRA LLM ERROR] Groq API error: ${err.message}`);
       }
+
+      const fallbackText = isAbort
+        ? "I am experiencing a brief cloud latency delay. How else can I assist you with RoboMiracle facilities or robot features?"
+        : "I am having trouble reaching the AI cloud service right now. Please feel free to ask about our facilities, services, or tours.";
 
       return {
         success: false,
         reason: isAbort ? 'TIMEOUT' : 'ERROR',
+        text: fallbackText,
         error: err.message,
         latencyMs: latency,
       };
@@ -770,3 +792,7 @@ ${docContext || 'No document excerpts available.'}`;
 }
 
 export const llmService = new LlmService();
+
+if (typeof window !== 'undefined') {
+  window.llmService = llmService;
+}

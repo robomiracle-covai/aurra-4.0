@@ -859,7 +859,7 @@ export default function FullscreenVoiceOverlay({
                 </div>
 
                 <div className="fs-panel-answer-text">
-                  {latestReply?.reply || (isThinking ? 'Aurra is processing your question...' : isSpeaking ? 'Aurra is speaking...' : 'Listening...')}
+                  {latestReply?.reply || (isThinking ? 'Aurra is processing your question...' : isSpeaking ? 'Aurra is speaking...' : transcript ? 'Aurra is thinking...' : 'Listening...')}
                 </div>
 
                 {/* Edge Neon Accent */}

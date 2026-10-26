@@ -659,6 +659,51 @@ class VoiceNavigationService {
       return;
     }
 
+    // 1B. Instant Conversational Greeting Intent (Zero Latency < 1ms)
+    const isGreeting =
+      utterance === 'hello' ||
+      utterance === 'hi' ||
+      utterance === 'hey' ||
+      utterance === 'hello aurra' ||
+      utterance === 'hi aurra' ||
+      utterance === 'hey aurra' ||
+      utterance === 'namaste' ||
+      utterance === 'vanakkam' ||
+      utterance === 'good morning' ||
+      utterance === 'good afternoon' ||
+      utterance === 'good evening' ||
+      utterance === 'hello there' ||
+      utterance === 'hi there';
+
+    if (isGreeting) {
+      this.cancelSpeech(false);
+      let greeting = "Hello! I am Aurra, your humanoid AI receptionist developed by RoboMiracle Technologies in Coimbatore. How can I assist you today?";
+      const hr = new Date().getHours();
+      if (utterance.includes('morning') || (hr >= 4 && hr < 12 && (utterance === 'hello' || utterance === 'hi' || utterance === 'hey'))) {
+        greeting = "Good morning! I am Aurra, your humanoid AI assistant from RoboMiracle Technologies. How can I assist you today?";
+      } else if (utterance.includes('afternoon') || (hr >= 12 && hr < 17 && (utterance === 'hello' || utterance === 'hi' || utterance === 'hey'))) {
+        greeting = "Good afternoon! Welcome to RoboMiracle Technologies. I am Aurra, how may I assist you today?";
+      } else if (utterance.includes('evening') || (hr >= 17 && (utterance === 'hello' || utterance === 'hi' || utterance === 'hey'))) {
+        greeting = "Good evening! Welcome to RoboMiracle Technologies. I am Aurra, how can I assist you today?";
+      } else if (utterance.includes('vanakkam')) {
+        greeting = "Vanakkam! Welcome to RoboMiracle Technologies. I am Aurra, how may I help you today?";
+      } else if (utterance.includes('namaste')) {
+        greeting = "Namaste! Welcome to RoboMiracle Technologies. I am Aurra, how may I help you today?";
+      }
+
+      this.setFeedback(greeting);
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: greeting,
+        source: 'instant-greeting',
+        confidence: 100,
+        category: 'Greeting',
+        timestamp: Date.now(),
+      });
+      this.speak(greeting);
+      return;
+    }
+
     const isAdminIntent =
       utterance === 'admin' ||
       utterance === 'settings' ||
@@ -896,19 +941,16 @@ class VoiceNavigationService {
       return;
     }
 
-    // 2. Strict Concurrency Mutex & Hardware Busy Guard:
-    const isBusy = this.isProcessing || this.isSpeakingTts || isAnySpeaking();
-    if (isBusy && inputType === 'voice') {
-      logger.speech('VOICE', `Rejected utterance while busy (processing=${this.isProcessing}, speaking=${this.isSpeakingTts}): "${rawUtterance}"`);
-      return;
+    // 2. User Barge-In & State Sync:
+    // If user speaks into mic or inputs a command, user intent ALWAYS takes priority over background TTS
+    if (this.isSpeakingTts || isAnySpeaking()) {
+      logger.speech('VOICE', `User barge-in: clearing active speech for "${rawUtterance}"`);
+      this.cancelSpeech(false);
     }
 
-    if (inputType === 'text' && isBusy) {
-      this.cancelSpeech();
-    }
-
-    // 3. Post-speech acoustic settling delay (750ms) - only applies to voice
-    if (inputType === 'voice' && this.lastSpeechEndTime && (Date.now() - this.lastSpeechEndTime < 750)) {
+    // 3. Post-speech acoustic settling delay (350ms only for long speech to avoid speaker echo)
+    const wordCount = rawUtterance.trim().split(/\s+/).length;
+    if (inputType === 'voice' && wordCount > 2 && this.lastSpeechEndTime && (Date.now() - this.lastSpeechEndTime < 350)) {
       logger.speech('VOICE', `Dropped utterance during acoustic settling: "${rawUtterance}"`);
       return;
     }
@@ -919,13 +961,11 @@ class VoiceNavigationService {
       return;
     }
 
-    // 5. Deduplicate identical/similar utterances within 3.5 seconds
+    // 5. Deduplicate exact stutter utterances within 1.2 seconds
     const timeSinceLast = Date.now() - this.lastProcessedTime;
-    if (timeSinceLast < 3500) {
-      if (this.lastProcessedUtterance === utterance || utterance.includes(this.lastProcessedUtterance) || this.lastProcessedUtterance.includes(utterance)) {
-        logger.speech('VOICE', `Dropped duplicate utterance: "${rawUtterance}"`);
-        return;
-      }
+    if (timeSinceLast < 1200 && this.lastProcessedUtterance === utterance) {
+      logger.speech('VOICE', `Dropped duplicate stutter utterance: "${rawUtterance}"`);
+      return;
     }
 
     this.lastProcessedUtterance = utterance;

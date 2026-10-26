@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { gsap } from 'gsap';
 import { Mic, MicOff, Volume2, VolumeX, Minimize2, Keyboard, Send, X, Sparkles, HelpCircle } from 'lucide-react';
 import { voiceNavigationService } from '../services/voiceNavigationService';
 import './FullscreenVoiceOverlay.css';
@@ -24,36 +25,426 @@ export default function FullscreenVoiceOverlay({
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [typedInput, setTypedInput] = useState('');
   const [isRendered, setIsRendered] = useState(isOpen);
+  const [isMorphingIn, setIsMorphingIn] = useState(false);
   const [isMorphingOut, setIsMorphingOut] = useState(false);
   const inputRef = useRef(null);
 
-  // Synchronize rendered state with isOpen prop and trigger morphing
+  // GSAP DOM refs for morph targets
+  const rootRef = useRef(null);
+  const backdropRef = useRef(null);
+  const telemetryBarRef = useRef(null);
+  const micPortalRef = useRef(null);
+  const micCoreOrbRef = useRef(null);
+  const micIconRef = useRef(null);
+  const outerRingRef = useRef(null);
+  const waveWrapperRef = useRef(null);
+  const statusAreaRef = useRef(null);
+  const morphTlRef = useRef(null);
+
+  // Helper to accurately measure bottom Voice Assistant Bar and Left Mic Button geometry
+  const getMetrics = () => {
+    const voiceBarEl = document.querySelector('.voice-assistant-bar');
+    const barRect = voiceBarEl ? voiceBarEl.getBoundingClientRect() : null;
+
+    const barWidth = barRect && barRect.width > 0 ? Math.round(barRect.width) : Math.min(window.innerWidth * 0.96, 850);
+    const barHeight = barRect && barRect.height > 0 ? Math.round(barRect.height) : 56;
+    const barTargetCX = barRect && barRect.width > 0 ? Math.round(barRect.left + barRect.width / 2) : Math.round(window.innerWidth / 2);
+    const barTargetCY = barRect && barRect.height > 0 ? Math.round(barRect.top + barRect.height / 2) : Math.round(window.innerHeight - 38);
+
+    const micBtnEl = document.querySelector('.voice-mic-btn');
+    const micRect = micBtnEl ? micBtnEl.getBoundingClientRect() : null;
+    const barLeft = barTargetCX - barWidth / 2;
+    const micTargetCX = micRect && micRect.width > 0 ? Math.round(micRect.left + micRect.width / 2) : Math.round(barLeft + 18 + 24);
+    const micTargetCY = micRect && micRect.height > 0 ? Math.round(micRect.top + micRect.height / 2) : barTargetCY;
+    const micTargetSize = micRect && micRect.width > 0 ? micRect.width : 48;
+
+    const portalEl = micPortalRef.current;
+    const portalRect = portalEl ? portalEl.getBoundingClientRect() : null;
+    const portalStartCX = portalRect && portalRect.width > 0 ? portalRect.left + portalRect.width / 2 : window.innerWidth / 2;
+    const portalStartCY = portalRect && portalRect.height > 0 ? portalRect.top + portalRect.height / 2 : window.innerHeight * 0.35;
+
+    const outerRingEl = outerRingRef.current;
+    const ringRect = outerRingEl ? outerRingEl.getBoundingClientRect() : null;
+    const ringStartCX = ringRect && ringRect.width > 0 ? ringRect.left + ringRect.width / 2 : window.innerWidth / 2;
+    const ringStartCY = ringRect && ringRect.height > 0 ? ringRect.top + ringRect.height / 2 : portalStartCY;
+
+    const ringDeltaX = Math.round(barTargetCX - ringStartCX);
+    const ringDeltaY = Math.round(barTargetCY - ringStartCY);
+
+    const micDeltaX = Math.round(micTargetCX - portalStartCX);
+    const micDeltaY = Math.round(micTargetCY - portalStartCY);
+
+    const coreEl = micCoreOrbRef.current;
+    const coreOrbSize = coreEl && coreEl.getBoundingClientRect().width > 0 ? coreEl.getBoundingClientRect().width : 132;
+    const landScale = Math.max(0.25, Math.min(0.42, micTargetSize / coreOrbSize));
+
+    return {
+      barWidth,
+      barHeight,
+      ringDeltaX,
+      ringDeltaY,
+      micDeltaX,
+      micDeltaY,
+      landScale,
+    };
+  };
+
+  // ── MORPH IN: Voice Bar (curved rectangle) &rarr; Fullscreen Portal (round circle) ──
+  const runMorphInTimeline = (onDone) => {
+    if (morphTlRef.current) morphTlRef.current.kill();
+    const tl = gsap.timeline({ onComplete: () => onDone?.() });
+    morphTlRef.current = tl;
+
+    const portalEl = micPortalRef.current;
+    const coreEl = micCoreOrbRef.current;
+    const outerRingEl = outerRingRef.current;
+
+    const {
+      barWidth,
+      barHeight,
+      ringDeltaX,
+      ringDeltaY,
+      micDeltaX,
+      micDeltaY,
+      landScale,
+    } = getMetrics();
+
+    const peripherals = [backdropRef.current, telemetryBarRef.current, waveWrapperRef.current, statusAreaRef.current].filter(Boolean);
+    gsap.set(peripherals, { opacity: 0 });
+
+    const decorRings = portalEl ? portalEl.querySelectorAll('.ring-dotted, .ring-middle, .ring-ripple-1, .ring-ripple-2') : [];
+    gsap.set(decorRings, { opacity: 0 });
+
+    // Initial state: starts at bottom voice assistant bar capsule position
+    if (outerRingEl) {
+      outerRingEl.style.animation = 'none';
+      outerRingEl.style.transition = 'none';
+      gsap.set(outerRingEl, {
+        xPercent: -50,
+        yPercent: -50,
+        x: ringDeltaX,
+        y: ringDeltaY,
+        width: barWidth,
+        height: barHeight,
+        borderRadius: '9999px',
+        backgroundColor: '#090e17',
+        borderColor: 'rgba(0, 255, 255, 0.45)',
+        boxShadow: '0 0 24px rgba(0, 255, 255, 0.25), inset 0 0 10px rgba(0, 255, 255, 0.08)',
+        opacity: 1,
+        zIndex: 10,
+      });
+    }
+
+    // Mic starts as the listening button at bottom-left inside that bar (UPPER LAYER)
+    if (portalEl) {
+      portalEl.style.transition = 'none';
+      gsap.set(portalEl, {
+        x: micDeltaX,
+        y: micDeltaY,
+        scale: landScale,
+        opacity: 1,
+        zIndex: 10000,
+        position: 'relative',
+      });
+    }
+
+    if (coreEl) {
+      coreEl.style.transition = 'none';
+      const gl = coreEl.querySelector('.fs-core-glass-reflection');
+      const au = coreEl.querySelector('.fs-core-pulse-aura');
+      if (gl) gsap.set(gl, { opacity: 0 });
+      if (au) gsap.set(au, { opacity: 0 });
+
+      gsap.set(coreEl, {
+        borderRadius: '50%',
+        backgroundColor: '#002b36',
+        borderColor: '#00ffff',
+        borderWidth: '2px',
+        boxShadow: '0 0 16px rgba(0, 255, 255, 0.65)',
+        zIndex: 10001,
+        position: 'relative',
+      });
+    }
+
+    if (rootRef.current) {
+      gsap.set(rootRef.current, { backgroundColor: 'rgba(2, 8, 23, 0)' });
+    }
+
+    // Phase 1 (0.02–0.4s): Outer ring expands upwards rapidly from curved rectangle into round circle (9999px)
+    if (outerRingEl) {
+      tl.to(
+        outerRingEl,
+        {
+          x: 0,
+          y: 0,
+          width: 220,
+          height: 220,
+          borderRadius: '9999px',
+          backgroundColor: 'rgba(9, 14, 23, 0)',
+          borderColor: 'rgba(0, 210, 255, 0.30)',
+          boxShadow: '0 0 16px rgba(0, 210, 255, 0.16)',
+          opacity: 0.48,
+          duration: 0.38,
+          ease: 'power3.inOut',
+        },
+        0.02
+      );
+    }
+
+    // Phase 2 (0.02–0.4s): Mic Portal glides up to center, scaling from button size to full orb
+    if (portalEl) {
+      tl.to(
+        portalEl,
+        {
+          x: 0,
+          y: 0,
+          scale: 1,
+          duration: 0.38,
+          ease: 'power3.inOut',
+        },
+        0.02
+      );
+    }
+
+    // Phase 3 (0.02–0.4s): Core orb transmits into glowing cosmic gradient orb
+    if (coreEl) {
+      tl.to(
+        coreEl,
+        {
+          borderRadius: '50%',
+          backgroundColor: '#020817',
+          borderColor: '#00CFEF',
+          borderWidth: '3px',
+          boxShadow: '0 0 32px rgba(0, 207, 239, 0.75), 0 0 65px rgba(0, 168, 255, 0.45), inset 0 0 25px rgba(0, 123, 168, 0.5)',
+          duration: 0.38,
+          ease: 'power3.inOut',
+        },
+        0.02
+      );
+
+      const gl = coreEl.querySelector('.fs-core-glass-reflection');
+      const au = coreEl.querySelector('.fs-core-pulse-aura');
+      if (gl) tl.to(gl, { opacity: 1, duration: 0.18, ease: 'power2.in' }, 0.2);
+      if (au) tl.to(au, { opacity: 0.65, duration: 0.18, ease: 'power2.in' }, 0.2);
+    }
+
+    // Phase 4 (0–0.28s): Background fades to deep space `#020817`
+    if (rootRef.current) {
+      tl.to(
+        rootRef.current,
+        { backgroundColor: '#020817', duration: 0.28, ease: 'power2.inOut' },
+        0
+      );
+    }
+
+    // Phase 5 (0.18–0.38s): Peripherals & decorative concentric rings fade in briskly
+    if (peripherals.length) {
+      tl.to(
+        peripherals,
+        { opacity: 1, duration: 0.2, ease: 'power2.out' },
+        0.18
+      );
+    }
+
+    if (decorRings.length) {
+      tl.to(
+        decorRings,
+        { opacity: 1, duration: 0.18, ease: 'power2.out' },
+        0.2
+      );
+    }
+
+    // Phase 6: Clean up temporary inline styles on finish
+    tl.call(() => {
+      if (outerRingEl) {
+        outerRingEl.style.animation = '';
+        outerRingEl.style.transition = '';
+      }
+      if (portalEl) {
+        portalEl.style.transition = '';
+      }
+      if (coreEl) {
+        coreEl.style.transition = '';
+      }
+    }, null, 0.4);
+
+    return tl;
+  };
+
+  // ── MORPH OUT: Fullscreen Portal (round circle) &rarr; Voice Bar (curved rectangle) ──
+  const runMorphOutTimeline = (onDone) => {
+    if (morphTlRef.current) morphTlRef.current.kill();
+    const tl = gsap.timeline({ onComplete: () => onDone?.() });
+    morphTlRef.current = tl;
+
+    const portalEl = micPortalRef.current;
+    const coreEl = micCoreOrbRef.current;
+    const iconEl = micIconRef.current;
+    const outerRingEl = outerRingRef.current;
+
+    const {
+      barWidth,
+      barHeight,
+      ringDeltaX,
+      ringDeltaY,
+      micDeltaX,
+      micDeltaY,
+      landScale,
+    } = getMetrics();
+
+    // ─ Phase 1 (0–0.22s): Quick fade out of peripheral UI & decorative rings ─
+    tl.to(
+      [backdropRef.current, telemetryBarRef.current, waveWrapperRef.current, statusAreaRef.current].filter(Boolean),
+      { opacity: 0, duration: 0.22, ease: 'power2.out' },
+      0
+    );
+
+    const decorRings = portalEl ? portalEl.querySelectorAll('.ring-dotted, .ring-middle, .ring-ripple-1, .ring-ripple-2') : [];
+    if (decorRings.length) {
+      tl.to(decorRings, { opacity: 0, duration: 0.18, ease: 'power2.out' }, 0);
+    }
+
+    // ─ Phase 2 (0.05–0.75s): fs-mic-core-orb transmits into exact voice-mic-btn.listening appearance ─
+    if (coreEl) {
+      coreEl.style.transition = 'none';
+      gsap.set(coreEl, { zIndex: 10001, position: 'relative' });
+
+      const gl = coreEl.querySelector('.fs-core-glass-reflection');
+      const au = coreEl.querySelector('.fs-core-pulse-aura');
+      if (gl) tl.to(gl, { opacity: 0, duration: 0.2, ease: 'power2.out' }, 0.05);
+      if (au) tl.to(au, { opacity: 0, duration: 0.2, ease: 'power2.out' }, 0.05);
+
+      tl.to(
+        coreEl,
+        {
+          borderRadius: '50%',
+          backgroundColor: '#002b36',
+          borderColor: '#00ffff',
+          borderWidth: '2px',
+          boxShadow: '0 0 16px rgba(0, 255, 255, 0.65)',
+          duration: 0.75,
+          ease: 'power3.inOut',
+        },
+        0.05
+      );
+    }
+
+    if (iconEl) {
+      tl.to(iconEl, { opacity: 1, duration: 0.2, ease: 'power2.out' }, 0.05);
+    }
+
+    // ─ Phase 3 (0.05–0.8s): Outer Ring converts into bottom Voice Assistant Bar Capsule (LOWER LAYER z-index: 10) ─
+    // Direct width, height & borderRadius morph prevents ANY distortion of borders or pill corners!
+    if (outerRingEl) {
+      outerRingEl.style.animation = 'none';
+      outerRingEl.style.transition = 'none';
+      gsap.set(outerRingEl, {
+        xPercent: -50,
+        yPercent: -50,
+        x: 0,
+        y: 0,
+        width: 220,
+        height: 220,
+        borderRadius: '9999px',
+        zIndex: 10,
+      });
+
+      tl.to(
+        outerRingEl,
+        {
+          x: ringDeltaX,
+          y: ringDeltaY,
+          width: barWidth,
+          height: barHeight,
+          borderRadius: '9999px',
+          backgroundColor: '#090e17',
+          borderColor: 'rgba(0, 255, 255, 0.45)',
+          boxShadow: '0 0 24px rgba(0, 255, 255, 0.25), inset 0 0 10px rgba(0, 255, 255, 0.08)',
+          opacity: 1,
+          duration: 0.75,
+          ease: 'power3.inOut',
+        },
+        0.05
+      );
+    }
+
+    // ─ Phase 4 (0.05–0.8s): Mic Portal flies into left mic button slot ON STRICT UPPER LAYER (z-index: 10000) ─
+    if (portalEl) {
+      portalEl.style.transition = 'none';
+      gsap.set(portalEl, { zIndex: 10000, position: 'relative' });
+
+      tl.to(
+        portalEl,
+        {
+          x: micDeltaX,
+          y: micDeltaY,
+          scale: landScale,
+          duration: 0.75,
+          ease: 'power3.inOut',
+        },
+        0.05
+      );
+    }
+
+    // ─ Phase 5 (0.74s): Dock trigger for voice assistant bar ripple ─
+    tl.call(() => {
+      window.dispatchEvent(new CustomEvent('aurra_voice_bar_dock'));
+    }, null, 0.74);
+
+    // Fade morph proxies seamlessly as the real bar catches
+    if (outerRingEl) {
+      tl.to(outerRingEl, { opacity: 0, duration: 0.12, ease: 'power2.in' }, 0.76);
+    }
+    if (portalEl) {
+      tl.to(portalEl, { opacity: 0, duration: 0.12, ease: 'power2.in' }, 0.76);
+    }
+
+    // ─ Phase 6 (0.45–0.8s): Background fades to transparent ─
+    tl.to(
+      rootRef.current,
+      { backgroundColor: 'rgba(2,8,23,0)', duration: 0.45, ease: 'power1.in' },
+      0.45
+    );
+
+    return tl;
+  };
+
+  // Synchronize rendered state with isOpen prop and trigger two-way morphing
   useEffect(() => {
     if (isOpen) {
       setIsRendered(true);
       setIsMorphingOut(false);
+      setIsMorphingIn(true);
     } else if (isRendered && !isMorphingOut) {
       setIsMorphingOut(true);
       window.dispatchEvent(new CustomEvent('aurra_morph_cards_in'));
-      const timer = setTimeout(() => {
+      runMorphOutTimeline(() => {
         setIsRendered(false);
         setIsMorphingOut(false);
-      }, 720);
-      return () => clearTimeout(timer);
+      });
     }
-  }, [isOpen, isRendered, isMorphingOut]);
+  }, [isOpen]);
 
-  // Smooth close morph trigger for user-initiated actions (Minimize, ESC)
+  // Synchronously initialize morph-in proxy positions before browser paints Frame 1
+  useLayoutEffect(() => {
+    if (isRendered && isMorphingIn) {
+      runMorphInTimeline(() => {
+        setIsMorphingIn(false);
+      });
+    }
+  }, [isRendered, isMorphingIn]);
+
+  // Smooth close morph trigger for user-initiated actions (Minimize / Features / ESC)
   const triggerCloseWithMorph = () => {
     if (isMorphingOut) return;
     setIsMorphingOut(true);
     window.dispatchEvent(new CustomEvent('aurra_show_cards'));
     window.dispatchEvent(new CustomEvent('aurra_morph_cards_in'));
-    setTimeout(() => {
+    runMorphOutTimeline(() => {
       setIsRendered(false);
       setIsMorphingOut(false);
       onClose?.();
-    }, 720);
+    });
   };
 
   // Focus input when keyboard opens
@@ -315,15 +706,15 @@ export default function FullscreenVoiceOverlay({
   const eqBars = Array.from({ length: 28 }, (_, i) => i);
 
   return createPortal(
-    <div className={`fullscreen-voice-hud-root ${isMorphingOut ? 'morphing-to-bar' : ''}`}>
+    <div ref={rootRef} className={`fullscreen-voice-hud-root ${isMorphingIn ? 'morphing-in' : ''} ${isMorphingOut ? 'morphing-out' : ''}`}>
       {/* Deep Space Radial Ambient Backdrop */}
-      <div className="fs-ambient-backdrop">
+      <div ref={backdropRef} className="fs-ambient-backdrop">
         <div className="fs-radial-glow"></div>
         <div className="fs-dust-grid"></div>
       </div>
 
       {/* Top Cyber Telemetry Header */}
-      <header className="fs-top-telemetry-bar">
+      <header ref={telemetryBarRef} className="fs-top-telemetry-bar">
         <div className="fs-system-badge">
           <span className="fs-badge-dot"></span>
           <span className="fs-badge-text">
@@ -332,6 +723,15 @@ export default function FullscreenVoiceOverlay({
         </div>
 
         <div className="fs-top-controls">
+          <button
+            className="fs-header-btn fs-features-btn"
+            onClick={triggerCloseWithMorph}
+            title="View Features & Action Cards"
+          >
+            <Sparkles size={16} color="#00ffff" />
+            <span>Features</span>
+          </button>
+
           <button
             className={`fs-header-btn ${isAiMuted ? 'muted' : 'active'}`}
             onClick={onToggleAiMute}
@@ -356,42 +756,46 @@ export default function FullscreenVoiceOverlay({
       <main className="fs-center-stage">
         {/* Upper Zone: Concentric Glowing Mic Circles & Waving Laser Horizon */}
         <div className="fs-upper-stage">
-          <div 
-            className={`fs-mic-portal-container ${isSpeaking ? 'is-speaking' : isListening ? 'is-listening' : 'is-idle'} ${isMorphingOut ? 'morphing-to-bar' : ''}`}
-            onClick={onToggleListening}
-            title={isListening ? 'Listening Active — Tap to Pause' : 'Mic Paused — Tap to Speak'}
-          >
-            {/* Outer Cyan Dynamic Ring */}
-            <div className="fs-concentric-ring ring-outer"></div>
-            {/* Cyber Dotted Orbit Ring */}
-            <div className="fs-concentric-ring ring-dotted"></div>
-            {/* Middle Pure White Dynamic Ring */}
-            <div className="fs-concentric-ring ring-middle"></div>
-            {/* Dynamic Expanding Ripple Waves */}
-            <div className="fs-concentric-ring ring-ripple-1"></div>
-            <div className="fs-concentric-ring ring-ripple-2"></div>
-            {/* Inner Glowing Gradient Core Orb */}
-            <div className="fs-mic-core-orb">
-              <div className="fs-core-glass-reflection"></div>
-              <div className="fs-core-icon">
-                {isListening ? (
-                  <Mic size={60} color="#ffffff" strokeWidth={2.4} />
-                ) : (
-                  <MicOff size={60} color="#ef4444" strokeWidth={2.4} />
-                )}
+          <div className="fs-portal-wrapper">
+            {/* Outer Cyan Dynamic Ring (Morphs directly into the bottom voice assistant bar pill) */}
+            <div ref={outerRingRef} className="fs-concentric-ring ring-outer"></div>
+
+            <div 
+              ref={micPortalRef}
+              className={`fs-mic-portal-container ${isSpeaking ? 'is-speaking' : isListening ? 'is-listening' : 'is-idle'}`}
+              onClick={onToggleListening}
+              title={isListening ? 'Listening Active — Tap to Pause' : 'Mic Paused — Tap to Speak'}
+            >
+              {/* Cyber Dotted Orbit Ring */}
+              <div className="fs-concentric-ring ring-dotted"></div>
+              {/* Middle Pure White Dynamic Ring */}
+              <div className="fs-concentric-ring ring-middle"></div>
+              {/* Dynamic Expanding Ripple Waves */}
+              <div className="fs-concentric-ring ring-ripple-1"></div>
+              <div className="fs-concentric-ring ring-ripple-2"></div>
+              {/* Inner Glowing Gradient Core Orb */}
+              <div ref={micCoreOrbRef} className="fs-mic-core-orb">
+                <div className="fs-core-glass-reflection"></div>
+                <div ref={micIconRef} className="fs-core-icon">
+                  {isListening ? (
+                    <Mic size={60} color="#ffffff" strokeWidth={2.4} />
+                  ) : (
+                    <MicOff size={60} color="#ef4444" strokeWidth={2.4} />
+                  )}
+                </div>
+                <div className="fs-core-pulse-aura"></div>
               </div>
-              <div className="fs-core-pulse-aura"></div>
             </div>
           </div>
 
           {/* Continuous Undulating Waving Laser Horizon Line Canvas */}
-          <div className="fs-wave-horizon-wrapper">
+          <div ref={waveWrapperRef} className="fs-wave-horizon-wrapper">
             <canvas ref={canvasRef} className="fs-wave-horizon-canvas"></canvas>
           </div>
         </div>
 
         {/* Below Horizon: Status Typography & Live Speech Transcript */}
-        <div className="fs-status-content-area">
+        <div ref={statusAreaRef} className="fs-status-content-area">
           {/* Only show status title when no conversation dialogue is active */}
           {(!latestReply && !transcript) && (
             <div className="fs-listening-title">

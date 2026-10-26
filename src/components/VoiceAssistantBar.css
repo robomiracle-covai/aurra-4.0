@@ -18,8 +18,16 @@
   will-change: transform, box-shadow;
 }
 
+.voice-assistant-bar.is-fullscreen-open {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
 .voice-assistant-bar.morph-catch {
-  animation: voiceBarCatchDock 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  animation: voiceBarCatchDock 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes voiceBarCatchDock {

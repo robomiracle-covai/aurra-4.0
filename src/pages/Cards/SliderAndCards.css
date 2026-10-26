@@ -44,6 +44,19 @@
   z-index: 50;
   width: 100%;
   box-sizing: border-box;
+  will-change: transform, opacity;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+}
+
+.kiosk-top-bar.kiosk-top-bar-hidden {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateY(-100%);
 }
 
 /* Left Brand Badge */
@@ -257,6 +270,42 @@
   box-shadow: 0 0 14px rgba(56, 189, 248, 0.6);
 }
 
+.cyber-top-right-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cyber-top-features-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: rgba(0, 207, 239, 0.12);
+  border: 1px solid rgba(0, 207, 239, 0.4);
+  color: #00ffff;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 14px rgba(0, 207, 239, 0.18);
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.cyber-top-features-btn:hover {
+  background: rgba(0, 207, 239, 0.25);
+  border-color: #00ffff;
+  box-shadow: 0 0 18px rgba(0, 207, 239, 0.45);
+  transform: translateY(-1px);
+}
+
+.cyber-top-features-btn:active {
+  transform: scale(0.96);
+}
+
 /* Main Body View */
 .kiosk-main-content {
   flex: 1;
@@ -430,6 +479,8 @@
   flex-direction: column;
   justify-content: center;
   z-index: 20;
+  will-change: transform, opacity;
+  position: relative;
 }
 
 .system-highlight-badge {
@@ -758,8 +809,8 @@
 
 /* Left Hero Command Column gliding in */
 .orbital-home-layout.is-morphing-in .hero-system-column {
-  animation: heroColumnGlideIn 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: 0.12s;
+  animation: heroColumnGlideIn 1.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.24s;
   will-change: transform, opacity;
 }
 
@@ -776,8 +827,8 @@
 
 /* Orbital Track Rings expanding outward into place */
 .orbital-home-layout.is-morphing-in .orbital-track-ring {
-  animation: orbitalTracksExpandIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: 0.16s;
+  animation: orbitalTracksExpandIn 1.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.32s;
   will-change: transform, opacity;
 }
 
@@ -794,8 +845,8 @@
 
 /* Frame 4 & 5: Big center card ("Ask Aurra") emerges from left corner to focal center */
 .orbital-home-layout.is-morphing-in .constellation-core-orb {
-  animation: coreOrbFromLeftCorner 0.76s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: 0.14s;
+  animation: coreOrbFromLeftCorner 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.28s;
   will-change: transform, opacity;
 }
 
@@ -816,8 +867,8 @@
 
 /* Frame 4, 5, 6 & 7: Remaining satellite cards emerge from left corner one by one and bloom outward to surround the big center card */
 .orbital-home-layout.is-morphing-in .satellite-orb-node {
-  animation: satelliteOrbFromLeftCorner 0.78s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(0.18s + var(--node-idx, 0) * 0.075s);
+  animation: satelliteOrbFromLeftCorner 1.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(0.36s + var(--node-idx, 0) * 0.15s);
   will-change: transform, opacity;
 }
 
@@ -842,4 +893,395 @@
     transform: translate3d(calc(-50% + var(--orb-x)), calc(-50% + var(--orb-y)), 0) scale(1);
   }
 }
+
+/* ========================================================
+   EXPLAIN FEATURES SHOWCASE MODE (STORYBOARD SPEC)
+   ======================================================== */
+.cyber-top-explain-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: rgba(168, 85, 247, 0.14);
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  color: #c084fc;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.2);
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.cyber-top-explain-btn:hover,
+.cyber-top-explain-btn.active-tour {
+  background: rgba(168, 85, 247, 0.3);
+  border-color: #d8b4fe;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Explain Mode Layout adjustments on parent */
+.home-container.in-explain-mode .bottom-global-voice-spacer {
+  height: 55px;
+}
+
+.home-container.in-explain-mode .kiosk-main-content {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 8px 16px !important;
+  overflow: hidden !important;
+  height: 100% !important;
+}
+
+.explain-mode-layout {
+  width: 100%;
+  max-width: 820px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 10;
+  gap: 14px;
+  margin: 0 auto;
+}
+
+/* 1. Top row of circular nodes (O O O O O O) */
+.explain-top-nodes-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 18px !important;
+  width: 100% !important;
+  max-width: 800px !important;
+  margin: 0 auto !important;
+  padding: 4px 8px !important;
+  flex-wrap: nowrap !important;
+}
+
+.explain-top-node {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.2) 0%, rgba(13, 25, 46, 0.95) 70%);
+  border: 1.5px solid var(--node-color, #00ffff);
+  box-shadow: 0 0 12px var(--node-glow, rgba(0, 255, 255, 0.3));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.explain-top-node:hover {
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: 0 0 20px var(--node-color, #00ffff);
+}
+
+.explain-top-node.active-node {
+  transform: translateY(-3px) scale(1.12);
+  border-color: #ffffff;
+  box-shadow: 0 0 24px var(--node-color, #00ffff), inset 0 0 10px var(--node-color, #00ffff);
+  background: radial-gradient(circle at 35% 25%, var(--node-color, #00ffff) 0%, #031428 100%);
+}
+
+.explain-active-ring {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
+  border-radius: 50%;
+  border: 2px dashed var(--node-color, #00ffff);
+  animation: rotateActiveRing 8s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes rotateActiveRing {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.explain-top-node-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.explain-top-node-pill {
+  font-size: 7.5px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
+  margin-top: 1px;
+}
+
+/* 2. Large Rounded Rectangle Showcase Card */
+.explain-showcase-container {
+  width: 100%;
+  max-width: 820px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0 auto;
+  flex-shrink: 0;
+}
+
+.explain-showcase-card {
+  width: 100%;
+  max-width: 820px;
+  background: linear-gradient(135deg, rgba(8, 16, 32, 0.96) 0%, rgba(13, 27, 52, 0.96) 100%);
+  border: 2px solid var(--card-color, #00ffff);
+  box-shadow: 0 0 40px var(--card-glow, rgba(0, 255, 255, 0.35)), inset 0 0 30px rgba(0, 255, 255, 0.05);
+  border-radius: 22px;
+  padding: 18px 24px 14px 24px;
+  box-sizing: border-box;
+  position: relative;
+  backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.explain-card-specular {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, transparent 100%);
+  border-radius: 22px 22px 0 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.explain-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.explain-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.explain-icon-box {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  background: rgba(0, 255, 255, 0.12);
+  border: 1.5px solid var(--card-color, #00ffff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 16px var(--card-color, #00ffff);
+  flex-shrink: 0;
+}
+
+.explain-sys-badge {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--card-color, #00ffff);
+  background: rgba(0, 255, 255, 0.1);
+  border: 1px solid var(--card-color, #00ffff);
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-bottom: 3px;
+}
+
+.explain-card-title {
+  font-size: 20px;
+  font-weight: 900;
+  color: #ffffff !important;
+  margin: 0 0 2px 0;
+  letter-spacing: -0.3px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  line-height: 1.2;
+}
+
+.explain-card-sub {
+  font-size: 12px;
+  color: #94a3b8 !important;
+  font-weight: 500;
+}
+
+.explain-step-counter {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.explain-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.explain-speech-quote {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: #f1f5f9 !important;
+  font-weight: 500;
+  background: rgba(2, 6, 23, 0.7);
+  padding: 10px 14px;
+  border-radius: 10px;
+  border-left: 3px solid var(--card-color, #00ffff);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.quote-mark {
+  color: var(--card-color, #00ffff);
+  font-weight: 900;
+  font-size: 16px;
+}
+
+.explain-bullets-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.explain-bullet-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.bullet-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--card-color, #00ffff);
+  box-shadow: 0 0 6px var(--card-color, #00ffff);
+}
+
+.explain-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 12px;
+  width: 100%;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.explain-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.explain-nav-btn {
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f1f5f9;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  touch-action: manipulation;
+}
+
+.explain-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: #00ffff;
+  color: #00ffff;
+}
+
+.explain-nav-btn.play-pause {
+  background: rgba(0, 255, 255, 0.12);
+  border-color: rgba(0, 255, 255, 0.4);
+  color: #00ffff;
+}
+
+.explain-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.explain-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #00d2ff 0%, #0088ff 100%);
+  border: none;
+  color: #000;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(0, 210, 255, 0.4);
+  transition: transform 0.2s;
+  touch-action: manipulation;
+}
+
+.explain-open-btn:active {
+  transform: scale(0.96);
+}
+
+.explain-exit-btn {
+  padding: 7px 14px;
+  border-radius: 18px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  touch-action: manipulation;
+}
+
+.explain-exit-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ffffff;
+}
+
+
 

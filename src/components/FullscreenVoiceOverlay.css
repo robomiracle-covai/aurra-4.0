@@ -14,7 +14,6 @@
   overflow: hidden;
   user-select: none;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  animation: fsFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes fsFadeIn {
@@ -143,6 +142,20 @@
   box-shadow: 0 0 14px rgba(0, 255, 255, 0.15);
 }
 
+.fs-features-btn {
+  border-color: rgba(0, 207, 239, 0.45);
+  background: rgba(0, 207, 239, 0.12);
+  color: #00ffff;
+  box-shadow: 0 0 14px rgba(0, 207, 239, 0.2);
+}
+
+.fs-features-btn:hover {
+  background: rgba(0, 207, 239, 0.22);
+  border-color: #00ffff;
+  box-shadow: 0 0 18px rgba(0, 207, 239, 0.45);
+  transform: translateY(-1px);
+}
+
 /* Main Center Stage - Anchored gracefully towards the bottom */
 .fs-center-stage {
   position: relative;
@@ -155,7 +168,7 @@
   width: 100%;
   padding-top: 10px;
   padding-bottom: 20px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* Upper Zone: Concentric Glowing Mic Circles & Horizon Wave */
@@ -165,6 +178,7 @@
   align-items: center;
   width: 100%;
   margin-bottom: 0px;
+  overflow: visible;
 }
 
 /* Concentric Glowing Mic Orb Container (Enlarged for prominent visual impact) */
@@ -178,6 +192,7 @@
   cursor: pointer;
   margin-bottom: 4px;
   transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), margin 0.35s ease;
+  z-index: 1000; /* Stays strictly on the upper layer above the morphing outer ring and bar */
 }
 
 .fs-mic-portal-container:hover {
@@ -191,22 +206,37 @@
   margin-bottom: -18px;
 }
 
-/* Outer Concentric Cyan Ring (Very gentle, slow micro-movement in calm standby) */
+.fs-portal-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  overflow: visible;
+}
+
+/* Outer Concentric Cyan Ring (Very gentle, slow micro-movement in calm standby; morphs into bottom voice bar) */
 .fs-concentric-ring.ring-outer {
   position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   width: 220px;
   height: 220px;
-  border-radius: 50%;
+  border-radius: 9999px;
   border: 1.5px solid rgba(0, 210, 255, 0.30);
   box-shadow: 0 0 16px rgba(0, 210, 255, 0.16);
   opacity: 0.48;
   pointer-events: none;
   animation: fsRingCalmOuter 5.0s ease-in-out infinite alternate;
+  transform-origin: center center;
+  box-sizing: border-box;
+  z-index: 10;
 }
 
 @keyframes fsRingCalmOuter {
-  0% { transform: scale(0.985); opacity: 0.42; }
-  100% { transform: scale(1.015); opacity: 0.56; }
+  0% { transform: translate(-50%, -50%) scale(0.985); opacity: 0.42; }
+  100% { transform: translate(-50%, -50%) scale(1.015); opacity: 0.56; }
 }
 
 /* Cyber Dotted Orbit Ring (Dotted line circling mic portal) */
@@ -347,6 +377,44 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  z-index: 1001; /* Strictly on top layer above outer ring */
+}
+
+/* Ensure no CSS transition conflicts with GSAP during morph in / morph out */
+.fullscreen-voice-hud-root.morphing-in,
+.fullscreen-voice-hud-root.morphing-in .fs-center-stage,
+.fullscreen-voice-hud-root.morphing-in .fs-upper-stage,
+.fullscreen-voice-hud-root.morphing-in .fs-portal-wrapper,
+.fullscreen-voice-hud-root.morphing-out,
+.fullscreen-voice-hud-root.morphing-out .fs-center-stage,
+.fullscreen-voice-hud-root.morphing-out .fs-upper-stage,
+.fullscreen-voice-hud-root.morphing-out .fs-portal-wrapper {
+  overflow: visible !important;
+}
+
+.fullscreen-voice-hud-root.morphing-in .fs-mic-portal-container,
+.fullscreen-voice-hud-root.morphing-in .fs-mic-core-orb,
+.fullscreen-voice-hud-root.morphing-out .fs-mic-portal-container,
+.fullscreen-voice-hud-root.morphing-out .fs-mic-core-orb {
+  transition: none !important;
+  z-index: 10000 !important;
+}
+
+.fullscreen-voice-hud-root.morphing-in .fs-concentric-ring.ring-outer,
+.fullscreen-voice-hud-root.morphing-out .fs-concentric-ring.ring-outer {
+  z-index: 10 !important;
+}
+
+/* Zero-flash initial paint state when morphing in */
+.fullscreen-voice-hud-root.morphing-in {
+  background-color: transparent;
+}
+
+.fullscreen-voice-hud-root.morphing-in .fs-top-telemetry-bar,
+.fullscreen-voice-hud-root.morphing-in .fs-wave-horizon-wrapper,
+.fullscreen-voice-hud-root.morphing-in .fs-status-content-area,
+.fullscreen-voice-hud-root.morphing-in .fs-ambient-backdrop {
+  opacity: 0;
 }
 
 .fs-core-glass-reflection {
@@ -836,7 +904,7 @@
 .fullscreen-voice-hud-root.morphing-to-bar {
   background-color: transparent !important;
   pointer-events: none !important;
-  transition: background-color 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 1.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .fullscreen-voice-hud-root.morphing-to-bar .fs-ambient-backdrop,
@@ -846,12 +914,12 @@
 .fullscreen-voice-hud-root.morphing-to-bar .fs-footer-telemetry,
 .fullscreen-voice-hud-root.morphing-to-bar .fs-concentric-ring {
   opacity: 0 !important;
-  transition: opacity 0.22s ease-out;
+  transition: opacity 0.45s ease-out;
 }
 
 /* Frame 2 & 3: Central Mic Circle stretches into capsule and glides down to dock into bottom voice bar */
 .fullscreen-voice-hud-root.morphing-to-bar .fs-mic-portal-container {
-  animation: morphMicPortalDown 0.72s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  animation: morphMicPortalDown 1.45s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
   will-change: transform, opacity;
 }
 
@@ -882,7 +950,7 @@
 }
 
 .fullscreen-voice-hud-root.morphing-to-bar .fs-mic-core-orb {
-  animation: morphMicOrbCapsule 0.72s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: morphMicOrbCapsule 1.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: border-radius, background, border-color, box-shadow;
 }
 
@@ -909,7 +977,7 @@
 
 /* White mic icon slides gracefully to the left side of the morphing capsule */
 .fullscreen-voice-hud-root.morphing-to-bar .fs-core-icon {
-  animation: morphMicIconSlideLeft 0.72s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: morphMicIconSlideLeft 1.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform;
 }
 

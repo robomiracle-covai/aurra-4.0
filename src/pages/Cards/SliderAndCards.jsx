@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { gsap } from 'gsap';
 import { 
   Shield, 
   Terminal, 
@@ -24,7 +25,9 @@ import {
   Play,
   Clock,
   Bot,
-  Database
+  Database,
+  Volume2,
+  Pause
 } from 'lucide-react';
 import { offlineCardService, offlineSliderService, offlineBrandingService } from '../../db/offlineServices';
 import { logger } from '../../services/logger';
@@ -82,29 +85,69 @@ const CLUSTER_CONFIGS = {
   ],
   // If 8 cards:
   8: [
-    { x: 0, y: -136, size: 116, iconSize: 26, fontSize: 11, labelMax: 92 },
-    { x: 114, y: -90, size: 124, iconSize: 28, fontSize: 11.5, labelMax: 98 },
-    { x: 142, y: 32, size: 114, iconSize: 24, fontSize: 10.5, labelMax: 88 },
-    { x: 62, y: 130, size: 104, iconSize: 22, fontSize: 10, labelMax: 84 },
-    { x: -62, y: 130, size: 100, iconSize: 22, fontSize: 10, labelMax: 82 },
-    { x: -140, y: 32, size: 118, iconSize: 26, fontSize: 11, labelMax: 90 },
-    { x: -114, y: -90, size: 112, iconSize: 24, fontSize: 10.5, labelMax: 86 },
-    { x: 218, y: -12, size: 102, iconSize: 22, fontSize: 10, labelMax: 80 },
+    { x: 0, y: -140, size: 106, iconSize: 24, fontSize: 10.5, labelMax: 86 },
+    { x: 112, y: -96, size: 108, iconSize: 24, fontSize: 10.5, labelMax: 88 },
+    { x: 154, y: 18, size: 106, iconSize: 24, fontSize: 10.5, labelMax: 86 },
+    { x: 92, y: 126, size: 102, iconSize: 22, fontSize: 10, labelMax: 84 },
+    { x: -44, y: 148, size: 100, iconSize: 22, fontSize: 10, labelMax: 82 },
+    { x: -142, y: 78, size: 104, iconSize: 22, fontSize: 10, labelMax: 84 },
+    { x: -158, y: -42, size: 106, iconSize: 24, fontSize: 10.5, labelMax: 86 },
+    { x: -82, y: -130, size: 102, iconSize: 22, fontSize: 10, labelMax: 84 },
+  ],
+  // If 9 or 10 cards: Curated 2-tier alternating inner/outer planetary constellation
+  10: [
+    { x: 0, y: -140, size: 102, iconSize: 24, fontSize: 10, labelMax: 80 },     // 0: Top (Inner)
+    { x: 122, y: -164, size: 96, iconSize: 22, fontSize: 9.5, labelMax: 76 },  // 1: Top-Right (Outer)
+    { x: 142, y: -42, size: 102, iconSize: 24, fontSize: 10, labelMax: 80 },   // 2: Right-Top (Inner)
+    { x: 196, y: 64, size: 96, iconSize: 22, fontSize: 9.5, labelMax: 76 },    // 3: Right-Bottom (Outer)
+    { x: 82, y: 118, size: 102, iconSize: 24, fontSize: 10, labelMax: 80 },    // 4: Bottom-Right (Inner)
+    { x: 0, y: 212, size: 96, iconSize: 22, fontSize: 9.5, labelMax: 76 },      // 5: Bottom (Outer)
+    { x: -82, y: 118, size: 102, iconSize: 24, fontSize: 10, labelMax: 80 },   // 6: Bottom-Left (Inner)
+    { x: -196, y: 64, size: 96, iconSize: 22, fontSize: 9.5, labelMax: 76 },   // 7: Left-Bottom (Outer)
+    { x: -142, y: -42, size: 102, iconSize: 24, fontSize: 10, labelMax: 80 },  // 8: Left-Top (Inner)
+    { x: -122, y: -164, size: 96, iconSize: 22, fontSize: 9.5, labelMax: 76 }, // 9: Top-Left (Outer)
   ],
 };
 
 const getBubbleSlot = (idx, total) => {
-  const config = CLUSTER_CONFIGS[total] || CLUSTER_CONFIGS[6];
-  if (config && config[idx]) return config[idx];
+  // If exact configuration exists, use curated slot
+  if (CLUSTER_CONFIGS[total] && CLUSTER_CONFIGS[total][idx]) {
+    return CLUSTER_CONFIGS[total][idx];
+  }
+
+  // If <= 7 cards and no exact config, calculate single-tier circle
+  if (total <= 7) {
+    const angleDeg = (idx / total) * 360 - 90;
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const r = 142;
+    return {
+      x: Math.round(r * Math.cos(angleRad)),
+      y: Math.round(r * Math.sin(angleRad)),
+      size: 112,
+      iconSize: 24,
+      fontSize: 10.5,
+      labelMax: 88,
+    };
+  }
+
+  // For 8+ cards: Dynamic 2-tier alternating concentric orbits (Inner Track & Outer Track)
+  // This guarantees ZERO overlapping bubbles regardless of how many action cards exist!
+  const isInner = idx % 2 === 0;
+  const r = isInner ? 138 : 208;
+  const size = isInner ? 102 : 96;
+  const iconSize = isInner ? 24 : 22;
+  const fontSize = isInner ? 10 : 9.5;
+  const labelMax = isInner ? 80 : 76;
   const angleDeg = (idx / total) * 360 - 90;
   const angleRad = (angleDeg * Math.PI) / 180;
+
   return {
-    x: Math.round(140 * Math.cos(angleRad)),
-    y: Math.round(140 * Math.sin(angleRad)),
-    size: 112,
-    iconSize: 24,
-    fontSize: 10.5,
-    labelMax: 88,
+    x: Math.round(r * Math.cos(angleRad)),
+    y: Math.round(r * Math.sin(angleRad)),
+    size,
+    iconSize,
+    fontSize,
+    labelMax,
   };
 };
 
@@ -135,6 +178,82 @@ const getOrbTheme = (href, idx, card) => {
     return { sysId: 'SYS_02', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.16)', border: '#67e8f9', glow: 'rgba(56, 189, 248, 0.55)', label: card?.title || 'Ask Aurra' };
   }
   return { sysId: `SYS_0${idx + 2}`, color: '#00ffff', bg: 'rgba(0, 255, 255, 0.16)', border: '#22d3ee', glow: 'rgba(0, 255, 255, 0.55)', label: card?.title || 'Module' };
+};
+
+// Rich Storyboard Feature Explanations & Speech Scripts
+const FEATURE_EXPLANATIONS = {
+  form: {
+    title: 'Touchless Visitor Registration',
+    badge: 'SYS_05',
+    color: '#00d2ff',
+    speech: 'Welcome to Visitor Registration. Guests can check in touchlessly, submit their visit details, and receive instant digital verification.',
+    bullets: ['Touchless QR & On-screen Form', 'Instant Local Storage', 'Admin Verified Check-in'],
+  },
+  qa: {
+    title: 'Ask Aurra AI Intelligence',
+    badge: 'SYS_02',
+    color: '#38bdf8',
+    speech: 'I am Ask Aurra, your interactive voice intelligence. Speak naturally to ask any question about the facility, team, or schedule.',
+    bullets: ['Edge AI Voice Recognition', 'Instant Institutional Knowledge', 'Multi-turn Intelligent Dialogue'],
+  },
+  tour: {
+    title: 'Autonomous Guided Robot Tour',
+    badge: 'SYS_03',
+    color: '#06b6d4',
+    speech: 'Show me around initiates our autonomous Guided Tour. Follow our mobile robot as it escorts visitors through key facility checkpoints.',
+    bullets: ['Multi-Stop Waypoint Navigation', 'Live Voice Narrated Waypoints', 'Hands-Free Visitor Escort'],
+  },
+  facilities: {
+    title: 'Public Facilities & Directory',
+    badge: 'SYS_04',
+    color: '#10b981',
+    speech: 'Public Facilities provides a complete interactive directory of conference halls, labs, rest zones, and office locations.',
+    bullets: ['Interactive Floor Directory', 'Live Status & Availability', 'Step-by-step Room Guidance'],
+  },
+  face: {
+    title: 'Facial Vision & Smart Greetings',
+    badge: 'SYS_02',
+    color: '#00A8FF',
+    speech: 'Face Greetings uses camera vision to detect approaching visitors, recognize registered faces, and deliver personalized audio greetings.',
+    bullets: ['High-speed Local Face Matching', 'Emotion & Expression Reflex', 'Automated Visitor Welcoming'],
+  },
+  control: {
+    title: 'Robot Teleoperation & Hardware Cockpit',
+    badge: 'SYS_07',
+    color: '#f59e0b',
+    speech: 'Robot Control Cockpit gives direct access to our ROS 2 motors, multi-axis servos, camera pan-tilt, and telemetry.',
+    bullets: ['ROS 2 Teleoperation Grid', 'Head Pan-Tilt & Arm Articulation', 'Real-time ESP32 Serial Telemetry'],
+  },
+  pdf: {
+    title: 'Interactive PDF Document AI',
+    badge: 'SYS_08',
+    color: '#ff3366',
+    speech: 'PDF AI allows visitors and staff to converse with complex documents, research whitepapers, and brochures through AI.',
+    bullets: ['On-device Document Ingestion', 'Semantic PDF Search', 'Instant Citation Q&A'],
+  },
+  testing: {
+    title: 'Testing & Diagnostic Interactive Lab',
+    badge: 'SYS_09',
+    color: '#f59e0b',
+    speech: 'Interactive Testing mode lets engineers test 3D face tracking, light reflex simulations, voice channels, and peripheral diagnostics.',
+    bullets: ['3D Eye Reflex Simulation', 'Pupil Dilation Dynamics', 'Real-time Diagnostic Metrics'],
+  },
+};
+
+const getFeatureExplanation = (card) => {
+  if (!card) return null;
+  const href = (card.href || '').toLowerCase();
+  const title = (card.title || '').toLowerCase();
+  for (const [key, val] of Object.entries(FEATURE_EXPLANATIONS)) {
+    if (href.includes(key) || title.includes(key)) return val;
+  }
+  return {
+    title: card.title,
+    badge: 'FEATURE',
+    color: '#00ffff',
+    speech: `This is ${card.title}. ${card.subtitle || 'Tap to launch this module.'}`,
+    bullets: [card.subtitle || 'Interactive Smart Module', 'One-tap Direct Launch', 'Voice Enabled'],
+  };
 };
 
 // Isolated 90 FPS Telemetry Component (zero re-render overhead on main view)
@@ -207,10 +326,32 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
   const [headerTitle, setHeaderTitle] = useState('AURRA 4.0');
   const [devSettings, setDevSettings] = useState(devSettingsService.getSettings());
   const [espState, setEspState] = useState(esp32Service.getState());
-  const [isMorphingIn, setIsMorphingIn] = useState(false);
+
+  // Explain Features Mode state (Storyboard Spec)
+  const [isExplainMode, setIsExplainMode] = useState(false);
+  const [explainIndex, setExplainIndex] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const explainTimerRef = useRef(null);
+  const explainCardRef = useRef(null);
+  const topNodesRowRef = useRef(null);
+  const handleStartExplainRef = useRef(null);
+  const kioskTopBarRef = useRef(null);
 
   const tapCountRef = useRef(0);
   const tapTimerRef = useRef(null);
+
+  // GSAP refs for morph-in animation targets
+  const orbitalLayoutRef = useRef(null);
+  const coreOrbRef = useRef(null);
+  const heroColRef = useRef(null);
+  const satelliteNodesRef = useRef([]);
+  const orbTrackRingsRef = useRef([]);
+  const morphInTlRef = useRef(null);
+  const cardsRef = useRef(cards);
+
+  useEffect(() => {
+    cardsRef.current = cards;
+  }, [cards]);
 
   // Sync with developer settings changes in real time
   useEffect(() => {
@@ -226,35 +367,175 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
   }, []);
 
   useEffect(() => {
+    const runMorphInGSAP = () => {
+      if (morphInTlRef.current) morphInTlRef.current.kill();
+
+      const heroEl = heroColRef.current;
+      const coreEl = coreOrbRef.current;
+      const satellites = satelliteNodesRef.current.filter(Boolean);
+      const trackRings = orbTrackRingsRef.current.filter(Boolean);
+      const targetCount = cardsRef.current?.length || 1;
+
+      // If DOM nodes haven't mounted yet, retry on next frame
+      if (!coreEl || satellites.length < targetCount) {
+        requestAnimationFrame(() => runMorphInGSAP());
+        return;
+      }
+
+      const tl = gsap.timeline();
+      morphInTlRef.current = tl;
+
+      // Reset constellation column position, top bar, and all nodes cleanly
+      gsap.set(['.hero-system-column', '.constellation-column', '.constellation-core-orb', '.orbital-track-ring', '.satellite-orb-node'], { clearProps: 'all' });
+      if (kioskTopBarRef.current) gsap.to(kioskTopBarRef.current, { y: 0, opacity: 1, duration: 0.45, ease: 'power3.out', clearProps: 'transform,opacity' });
+
+      // Set initial starting states
+      if (heroEl) gsap.set(heroEl, { x: -280, opacity: 0 });
+      if (coreEl) gsap.set(coreEl, { scale: 0.88, opacity: 1 });
+      trackRings.forEach((el) => gsap.set(el, { scale: 0.7, opacity: 0 }));
+
+      // Phase 1: Hero system column glides in smoothly from the left
+      if (heroEl) {
+        tl.to(heroEl, {
+          x: 0,
+          opacity: 1,
+          duration: 0.65,
+          ease: 'power3.out',
+          clearProps: 'transform,opacity',
+        }, 0.05);
+      }
+
+      // Phase 2: Central Core Ask Aurra sphere stabilizes and pulses at center
+      if (coreEl) {
+        tl.to(coreEl, {
+          scale: 1,
+          opacity: 1,
+          duration: 0.5,
+          ease: 'back.out(1.4)',
+          clearProps: 'transform,opacity',
+        }, 0.04);
+      }
+
+      // Phase 3: Orbital track rings expand into place around the core
+      trackRings.forEach((el, i) => {
+        tl.to(el, {
+          scale: 1,
+          opacity: 1,
+          duration: 0.6,
+          ease: 'power2.out',
+          clearProps: 'transform,opacity',
+        }, 0.1 + i * 0.08);
+      });
+
+      // Phase 4: Rotary Mobile Dialer Circulation - Satellite orbs emerge from the right-down corner
+      // of the core orb and circulate around the orbital dial like a vintage rotary phone into their respective slots
+      satellites.forEach((el, i) => {
+        const slot = getBubbleSlot(i, satellites.length);
+        const rawX = el.style.getPropertyValue('--orb-x');
+        const rawY = el.style.getPropertyValue('--orb-y');
+        const finalX = rawX ? parseFloat(rawX) : (slot.x || 0);
+        const finalY = rawY ? parseFloat(rawY) : (slot.y || 0);
+
+        const finalR = Math.hypot(finalX, finalY);
+        let finalAngle = Math.atan2(finalY, finalX);
+        if (finalAngle < 0) finalAngle += 2 * Math.PI;
+
+        // Emergence point: Right-Down corner (45° in polar screen coordinates) as in Storyboard Frame 1
+        const emergenceAngle = 0.25 * Math.PI; // ~45 degrees (right-down / bottom-right corner)
+        const startAngle = emergenceAngle + (i * 0.08);
+        let targetAngle = finalAngle;
+        while (targetAngle < startAngle + 0.35) {
+          targetAngle += 2 * Math.PI;
+        }
+
+        const startR = 32; // Nestled snugly inside the 154px core orb at the right-down corner
+
+        // Hide and position at right-down corner of core orb initially
+        gsap.set(el, {
+          xPercent: -50,
+          yPercent: -50,
+          x: Math.cos(startAngle) * startR,
+          y: Math.sin(startAngle) * startR,
+          scale: 0.2,
+          opacity: 0,
+        });
+
+        const dialProxy = { progress: 0 };
+
+        // Rotary circulation around dial into slots
+        tl.to(dialProxy, {
+          progress: 1,
+          duration: 1.5,
+          ease: 'power2.out',
+          onUpdate: () => {
+            const p = dialProxy.progress;
+            const curAngle = startAngle + (targetAngle - startAngle) * p;
+            const curR = startR + (finalR - startR) * Math.min(1, p * 1.15);
+            const curScale = 0.2 + 0.8 * Math.min(1, p * 1.25);
+            const curOpacity = Math.min(1, p * 3.5);
+
+            gsap.set(el, {
+              xPercent: -50,
+              yPercent: -50,
+              x: Math.cos(curAngle) * curR,
+              y: Math.sin(curAngle) * curR,
+              scale: curScale,
+              opacity: curOpacity,
+            });
+          },
+          onComplete: () => {
+            // Restore native CSS layout with zero offset jump so ambient bobber floats seamlessly
+            gsap.set(el, {
+              clearProps: 'transform,opacity',
+            });
+          },
+        }, 0.1 + i * 0.12);
+      });
+    };
+
     if (showCardsInitially || (typeof window !== 'undefined' && window.location.search.includes('view=cards'))) {
       setShowSlider(false);
     }
 
-    const handleShowCards = () => {
+    let morphTimer = null;
+    const scheduleMorphIn = () => {
       setShowSlider(false);
-      setIsMorphingIn(true);
-      setTimeout(() => setIsMorphingIn(false), 1200);
-    };
-    const handleMorphCardsIn = () => {
-      setShowSlider(false);
-      setIsMorphingIn(true);
-      setTimeout(() => setIsMorphingIn(false), 1200);
-    };
-    const handleShowSlider = () => {
-      setShowSlider(true);
-      setIsMorphingIn(false);
+      setIsExplainMode(false);
+      if (morphTimer) cancelAnimationFrame(morphTimer);
+      morphTimer = requestAnimationFrame(() => {
+        morphTimer = requestAnimationFrame(() => {
+          morphTimer = null;
+          runMorphInGSAP();
+        });
+      });
     };
 
-    window.addEventListener('aurra_show_cards', handleShowCards);
-    window.addEventListener('aurra_show_features', handleShowCards);
-    window.addEventListener('aurra_morph_cards_in', handleMorphCardsIn);
+    const handleShowSlider = () => {
+      if (morphTimer) {
+        cancelAnimationFrame(morphTimer);
+        morphTimer = null;
+      }
+      setIsExplainMode(false);
+      setShowSlider(true);
+    };
+
+    const handleStartExplainEvent = () => {
+      handleStartExplainRef.current?.();
+    };
+
+    window.addEventListener('aurra_show_cards', scheduleMorphIn);
+    window.addEventListener('aurra_show_features', scheduleMorphIn);
+    window.addEventListener('aurra_morph_cards_in', scheduleMorphIn);
     window.addEventListener('aurra_show_slider', handleShowSlider);
+    window.addEventListener('aurra_start_explain_features', handleStartExplainEvent);
 
     return () => {
-      window.removeEventListener('aurra_show_cards', handleShowCards);
-      window.removeEventListener('aurra_show_features', handleShowCards);
-      window.removeEventListener('aurra_morph_cards_in', handleMorphCardsIn);
+      if (morphTimer) cancelAnimationFrame(morphTimer);
+      window.removeEventListener('aurra_show_cards', scheduleMorphIn);
+      window.removeEventListener('aurra_show_features', scheduleMorphIn);
+      window.removeEventListener('aurra_morph_cards_in', scheduleMorphIn);
       window.removeEventListener('aurra_show_slider', handleShowSlider);
+      window.removeEventListener('aurra_start_explain_features', handleStartExplainEvent);
     };
   }, [showCardsInitially]);
 
@@ -345,6 +626,217 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
     return () => clearTimeout(timer);
   }, [showSlider, slides, currentSlideIndex]);
 
+  // ── Explain Features Mode Controllers & Morph Animation (Storyboard Spec) ──
+  const switchExplainFeature = useCallback((nextIdx, manual = false) => {
+    if (!cards || cards.length === 0) return;
+    const targetIdx = (nextIdx + cards.length) % cards.length;
+    if (manual) setIsAutoPlaying(false);
+
+    const cardEl = explainCardRef.current;
+    if (cardEl) {
+      // Morph: Large rounded rectangle card transitions smoothly with subtle scale
+      gsap.to(cardEl, {
+        scale: 0.94,
+        y: -10,
+        opacity: 0.3,
+        duration: 0.22,
+        ease: 'power2.in',
+        onComplete: () => {
+          setExplainIndex(targetIdx);
+          gsap.fromTo(
+            cardEl,
+            { scale: 0.94, y: 10, opacity: 0.3 },
+            {
+              scale: 1,
+              y: 0,
+              opacity: 1,
+              duration: 0.35,
+              ease: 'power2.out',
+              clearProps: 'transform,opacity',
+            }
+          );
+        },
+      });
+    } else {
+      setExplainIndex(targetIdx);
+    }
+  }, [cards]);
+
+  // ── Seamless In-Place Cinematic Continuous Morph ──
+  const handleStartExplain = useCallback(() => {
+    if (isExplainMode) return;
+    setShowSlider(false);
+
+    const heroEl = heroColRef.current;
+    const coreEl = coreOrbRef.current;
+    const trackRings = orbTrackRingsRef.current.filter(Boolean);
+    const satellites = satelliteNodesRef.current.filter(Boolean);
+    const topBarEl = kioskTopBarRef.current;
+
+    // If elements not mounted, switch directly
+    if (!heroEl && !coreEl && satellites.length === 0) {
+      setIsExplainMode(true);
+      setExplainIndex(0);
+      setIsAutoPlaying(true);
+      return;
+    }
+
+    const tl = gsap.timeline({
+      onComplete: () => {
+        setIsExplainMode(true);
+        setExplainIndex(0);
+        setIsAutoPlaying(true);
+      }
+    });
+
+    // 1. Kiosk Top Bar smoothly glides upward off-screen
+    if (topBarEl) {
+      tl.to(topBarEl, {
+        y: -60,
+        opacity: 0,
+        duration: 0.35,
+        ease: 'power2.inOut',
+      }, 0);
+    }
+
+    // 2. All text in hero-system-column glides smoothly to the left
+    if (heroEl) {
+      tl.to(heroEl, {
+        x: -250,
+        opacity: 0,
+        duration: 0.4,
+        ease: 'power2.in',
+      }, 0);
+    }
+
+    // 3. Central Core Ask Aurra & Track rings smoothly shrink & fade into background
+    if (coreEl) {
+      tl.to(coreEl, {
+        scale: 0.3,
+        opacity: 0,
+        duration: 0.35,
+        ease: 'power2.in',
+      }, 0.02);
+    }
+
+    trackRings.forEach((ring) => {
+      tl.to(ring, {
+        scale: 0.4,
+        opacity: 0,
+        duration: 0.35,
+        ease: 'power2.in',
+      }, 0.02);
+    });
+
+    // 4. Satellite bubbles fade out smoothly in place (NO translating constellation column!)
+    satellites.forEach((el, i) => {
+      tl.to(el, {
+        scale: 0.6,
+        opacity: 0,
+        duration: 0.35,
+        ease: 'power2.in',
+      }, 0.02 + i * 0.03);
+    });
+  }, [isExplainMode]);
+
+  handleStartExplainRef.current = handleStartExplain;
+
+  const handleExitExplain = useCallback(() => {
+    voiceNavigationService.cancelSpeech();
+    if (explainTimerRef.current) clearTimeout(explainTimerRef.current);
+
+    const cardEl = explainCardRef.current;
+    const topRowEl = topNodesRowRef.current;
+    const topBarEl = kioskTopBarRef.current;
+
+    const tl = gsap.timeline({
+      onComplete: () => {
+        setIsExplainMode(false);
+        // Clear all inline transforms and props from previous animations immediately
+        requestAnimationFrame(() => {
+          gsap.set(['.hero-system-column', '.constellation-column', '.constellation-core-orb', '.orbital-track-ring', '.satellite-orb-node'], { clearProps: 'all' });
+          window.dispatchEvent(new CustomEvent('aurra_morph_cards_in'));
+        });
+      }
+    });
+
+    // 1. Center showcase card glides down
+    if (cardEl) {
+      tl.to(cardEl, {
+        scale: 0.9,
+        y: 20,
+        opacity: 0,
+        duration: 0.25,
+        ease: 'power2.in',
+      }, 0);
+    }
+
+    // 2. Top nodes row smoothly glides up
+    if (topRowEl) {
+      tl.to(topRowEl, {
+        y: -20,
+        opacity: 0,
+        duration: 0.2,
+        ease: 'power2.in',
+      }, 0.02);
+    }
+
+    // 3. Kiosk Top Bar smoothly glides back down from above
+    if (topBarEl) {
+      tl.to(topBarEl, {
+        y: 0,
+        opacity: 1,
+        duration: 0.4,
+        ease: 'power3.out',
+        clearProps: 'transform,opacity',
+      }, 0.05);
+    }
+  }, []);
+
+  // Auto-advance & Voice Narration for Explain Features Mode
+  useEffect(() => {
+    if (!isExplainMode || !cards || cards.length === 0) return;
+
+    const curCard = cards[explainIndex];
+    if (curCard) {
+      const exp = getFeatureExplanation(curCard);
+      if (exp?.speech) {
+        voiceNavigationService.speak(exp.speech);
+      }
+    }
+
+    if (isAutoPlaying) {
+      if (explainTimerRef.current) clearTimeout(explainTimerRef.current);
+      explainTimerRef.current = setTimeout(() => {
+        switchExplainFeature((explainIndex + 1) % cards.length);
+      }, 8000);
+    }
+
+    return () => {
+      if (explainTimerRef.current) clearTimeout(explainTimerRef.current);
+    };
+  }, [isExplainMode, explainIndex, isAutoPlaying, cards, switchExplainFeature]);
+
+  // Initial Entry Animation for Explain Mode
+  useEffect(() => {
+    if (isExplainMode) {
+      if (topNodesRowRef.current) {
+        gsap.fromTo(
+          topNodesRowRef.current,
+          { y: -20, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.4, ease: 'back.out(1.2)', clearProps: 'transform,opacity' }
+        );
+      }
+      if (explainCardRef.current) {
+        gsap.fromTo(
+          explainCardRef.current,
+          { scale: 0.9, y: 20, opacity: 0 },
+          { scale: 1, y: 0, opacity: 1, duration: 0.45, ease: 'power3.out', clearProps: 'transform,opacity' }
+        );
+      }
+    }
+  }, [isExplainMode]);
+
   // ── Reload Kiosk Data when Admin Closes ──
   useEffect(() => {
     if (!isAdminOpen) {
@@ -403,9 +895,12 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
   };
 
   return (
-    <div className="home-container">
+    <div className={`home-container ${isExplainMode ? 'in-explain-mode' : ''}`}>
       {/* Top Cyber Telemetry Header Bar */}
-      <header className="kiosk-top-bar">
+      <header 
+        ref={kioskTopBarRef} 
+        className={`kiosk-top-bar ${isExplainMode ? 'kiosk-top-bar-hidden' : ''}`}
+      >
         {/* Left: Cyber Brand Badge */}
         <div 
           className="cyber-brand-badge"
@@ -439,8 +934,38 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
           </div>
         </div>
 
-        {/* Right: Live Real-Time Clock */}
-        <LiveClockTelemetry />
+        {/* Right: Live Real-Time Clock & Action Buttons */}
+        <div className="cyber-top-right-group">
+          <button 
+            className={`cyber-top-explain-btn ${isExplainMode ? 'active-tour' : ''}`}
+            onClick={() => {
+              if (isExplainMode) {
+                handleExitExplain();
+              } else {
+                handleStartExplain();
+              }
+            }}
+            title="Explain All Features with Voice Walkthrough"
+          >
+            <Sparkles size={14} color="#00ffff" />
+            <span>{isExplainMode ? 'Exit Explain' : 'Explain Features'}</span>
+          </button>
+
+          <button 
+            className="cyber-top-features-btn"
+            onClick={() => {
+              if (isExplainMode) setIsExplainMode(false);
+              setShowSlider(false);
+              window.dispatchEvent(new CustomEvent('aurra_show_cards'));
+              window.dispatchEvent(new CustomEvent('aurra_morph_cards_in'));
+            }}
+            title="View Features & Action Cards"
+          >
+            <Sparkles size={15} color="#00ffff" />
+            <span>Features</span>
+          </button>
+          <LiveClockTelemetry />
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -538,11 +1063,156 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
               </div>
             )}
           </div>
+        ) : isExplainMode ? (
+          /* EXPLAIN FEATURES SHOWCASE MODE (STORYBOARD SPEC) */
+          <div className="explain-mode-layout">
+            {/* 1. Top row of circular nodes (O O O O O O) */}
+            <div 
+              ref={topNodesRowRef} 
+              className="explain-top-nodes-row"
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                width: '100%',
+                margin: '0 auto',
+              }}
+            >
+              {cards.map((card, idx) => {
+                const theme = getOrbTheme(card.href, idx, card);
+                const isActive = idx === explainIndex;
+                return (
+                  <div
+                    key={card.id || idx}
+                    className={`explain-top-node ${isActive ? 'active-node' : ''}`}
+                    onClick={() => switchExplainFeature(idx, true)}
+                    style={{
+                      '--node-color': theme.color,
+                      '--node-glow': theme.glow,
+                    }}
+                    title={`Explain ${card.title}`}
+                  >
+                    <div className="explain-top-node-icon">
+                      {getCardIcon(card.href, card.className, 20)}
+                    </div>
+                    <div className="explain-top-node-pill">
+                      {theme.sysId}
+                    </div>
+                    {isActive && <div className="explain-active-ring"></div>}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 2. Center Large Rounded Rectangle Card */}
+            {(() => {
+              const activeCard = cards[explainIndex] || cards[0];
+              if (!activeCard) return null;
+              const theme = getOrbTheme(activeCard.href, explainIndex, activeCard);
+              const exp = getFeatureExplanation(activeCard);
+
+              return (
+                <div className="explain-showcase-container">
+                  <div 
+                    ref={explainCardRef} 
+                    className="explain-showcase-card"
+                    style={{
+                      '--card-color': theme.color,
+                      '--card-glow': theme.glow,
+                    }}
+                  >
+                    {/* Ambient specular highlight */}
+                    <div className="explain-card-specular"></div>
+
+                    {/* Top header within card */}
+                    <div className="explain-card-header">
+                      <div className="explain-header-left">
+                        <div className="explain-icon-box">
+                          {getCardIcon(activeCard.href, activeCard.className, 34)}
+                        </div>
+                        <div>
+                          <div className="explain-sys-badge">{exp.badge || theme.sysId}</div>
+                          <h2 className="explain-card-title">{exp.title || activeCard.title}</h2>
+                          <div className="explain-card-sub">{activeCard.subtitle}</div>
+                        </div>
+                      </div>
+                      <div className="explain-step-counter">
+                        {explainIndex + 1} / {cards.length}
+                      </div>
+                    </div>
+
+                    {/* Middle body: Audio waveform & Bullet capabilities */}
+                    <div className="explain-card-body">
+                      <div className="explain-speech-quote">
+                        <span className="quote-mark">“ </span>
+                        <span>{exp.speech}</span>
+                        <span className="quote-mark"> ”</span>
+                      </div>
+
+                      <div className="explain-bullets-grid">
+                        {exp.bullets?.map((b, i) => (
+                          <div key={i} className="explain-bullet-pill">
+                            <span className="bullet-dot"></span>
+                            <span>{b}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Bottom Actions Row */}
+                    <div className="explain-card-footer">
+                      <div className="explain-nav-controls">
+                        <button 
+                          className="explain-nav-btn"
+                          onClick={() => switchExplainFeature(explainIndex - 1, true)}
+                          title="Previous Feature"
+                        >
+                          ◀ Prev
+                        </button>
+                        <button 
+                          className="explain-nav-btn play-pause"
+                          onClick={() => setIsAutoPlaying(prev => !prev)}
+                          title={isAutoPlaying ? "Pause Auto-tour" : "Play Auto-tour"}
+                        >
+                          {isAutoPlaying ? '⏸ Pause' : '▶ Play'}
+                        </button>
+                        <button 
+                          className="explain-nav-btn"
+                          onClick={() => switchExplainFeature(explainIndex + 1, true)}
+                          title="Next Feature"
+                        >
+                          Next ▶
+                        </button>
+                      </div>
+
+                      <div className="explain-right-actions">
+                        <button 
+                          className="explain-open-btn"
+                          onClick={() => handleCardClick(activeCard)}
+                          title="Open this feature screen"
+                        >
+                          <span>Launch Feature</span>
+                          <ChevronRight size={16} />
+                        </button>
+                        <button 
+                          className="explain-exit-btn"
+                          onClick={handleExitExplain}
+                          title="Exit walkthrough"
+                        >
+                          <span>Exit Tour</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         ) : (
           /* AURRA 4.0 ORBITAL CONSTELLATION VIEW */
-          <div className={`orbital-home-layout ${isMorphingIn ? 'is-morphing-in' : ''}`}>
+          <div ref={orbitalLayoutRef} className="orbital-home-layout">
             {/* Left: Hero System Highlight Command Deck */}
-            <div className="hero-system-column">
+            <div ref={heroColRef} className="hero-system-column">
               <div className="system-highlight-badge">
                 <span className="highlight-pill">SYSTEM HIGHLIGHT</span>
                 <span className="highlight-line"></span>
@@ -588,11 +1258,12 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
             <div className="constellation-column">
               <div className="constellation-canvas">
                 {/* Visual Orbit Tracks */}
-                <div className="orbital-track-ring track-outer"></div>
-                <div className="orbital-track-ring track-inner"></div>
+                <div ref={el => { if (el) orbTrackRingsRef.current[0] = el; }} className="orbital-track-ring track-outer"></div>
+                <div ref={el => { if (el) orbTrackRingsRef.current[1] = el; }} className="orbital-track-ring track-inner"></div>
 
                 {/* Central Core Sphere: Ask Aurra (SYS_01) */}
                 <div 
+                  ref={coreOrbRef}
                   className="constellation-core-orb"
                   onClick={() => {
                     voiceNavigationService.speak('I am Aurra, how can I help you today?');
@@ -619,6 +1290,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                   return (
                     <div
                       key={card.id || idx}
+                      ref={el => { satelliteNodesRef.current[idx] = el; }}
                       className="satellite-orb-node"
                       style={{
                         '--node-idx': idx,

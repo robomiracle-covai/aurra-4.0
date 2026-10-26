@@ -646,6 +646,28 @@ class VoiceNavigationService {
       cleanUtterance.includes('current screen') ||
       (cleanUtterance.includes('feature') && (cleanUtterance.includes('have') || cleanUtterance.includes('what') || cleanUtterance.includes('show') || cleanUtterance.includes('tell')));
 
+    // Check for "Explain Features" intent
+    const isExplainFeaturesIntent =
+      cleanUtterance.includes('explain features') ||
+      cleanUtterance.includes('explain the features') ||
+      cleanUtterance.includes('explain all features') ||
+      cleanUtterance.includes('explain each feature') ||
+      cleanUtterance.includes('feature tour') ||
+      cleanUtterance.includes('walkthrough features') ||
+      cleanUtterance.includes('tour the features') ||
+      cleanUtterance.includes('what are all the features');
+
+    if (isExplainFeaturesIntent) {
+      this.cancelSpeech();
+      this.setFeedback('Starting Feature Walkthrough');
+      this.navigationHandler?.('/?view=cards');
+      this.viewToggleHandler?.(false);
+      window.dispatchEvent(new CustomEvent('aurra_show_cards'));
+      window.dispatchEvent(new CustomEvent('aurra_start_explain_features'));
+      window.dispatchEvent(new CustomEvent('aurra_close_fullscreen_voice'));
+      return;
+    }
+
     if (isCardsIntent) {
       this.cancelSpeech();
       const replyMsg = 'Here are the features and services I offer. You can tap any card or ask me to open a feature.';

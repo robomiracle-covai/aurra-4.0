@@ -20,6 +20,29 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
   const [isCatchingMorph, setIsCatchingMorph] = useState(false);
   const inputRef = useRef(null);
+  const micBtnRef = useRef(null);
+
+  // Expose mic button position globally and listen for landing dock animation
+  useEffect(() => {
+    const update = () => {
+      if (micBtnRef.current) {
+        window.__aurra_mic_btn_rect = micBtnRef.current.getBoundingClientRect();
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+
+    const handleDock = () => {
+      setIsCatchingMorph(true);
+      setTimeout(() => setIsCatchingMorph(false), 900);
+    };
+    window.addEventListener('aurra_voice_bar_dock', handleDock);
+
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('aurra_voice_bar_dock', handleDock);
+    };
+  }, []);
 
   useEffect(() => {
     // Initialize voice navigation service with action callbacks
@@ -60,8 +83,8 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
     const handleMorphCatch = () => {
       setTimeout(() => {
         setIsCatchingMorph(true);
-        setTimeout(() => setIsCatchingMorph(false), 550);
-      }, 400);
+        setTimeout(() => setIsCatchingMorph(false), 1000);
+      }, 800);
     };
 
     window.addEventListener('aurra_open_fullscreen_voice', handleOpenFs);
@@ -121,9 +144,10 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
   };
 
   return (
-    <div className={`voice-assistant-bar ${isKeyboardOpen ? 'keyboard-mode' : ''} ${latestReply ? 'has-reply' : ''} ${isCatchingMorph ? 'morph-catch' : ''}`}>
+    <div className={`voice-assistant-bar ${isKeyboardOpen ? 'keyboard-mode' : ''} ${latestReply ? 'has-reply' : ''} ${isCatchingMorph ? 'morph-catch' : ''} ${isFullscreenOpen && !isCatchingMorph ? 'is-fullscreen-open' : ''}`}>
       {/* Mic Action Toggle Button */}
       <button
+        ref={micBtnRef}
         className={`voice-mic-btn ${isListening ? 'listening' : 'muted'}`}
         onClick={handleToggle}
         title={isListening ? 'Continuous Voice AI Active (Click to mute)' : 'Microphone Muted (Click to talk)'}

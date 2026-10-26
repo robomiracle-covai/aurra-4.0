@@ -239,6 +239,11 @@ class VoiceNavigationService {
     }
     this.isListening = false;
     this.currentTranscript = '';
+    this.speechAccumulator = '';
+    if (this.speechDebounceTimer) {
+      clearTimeout(this.speechDebounceTimer);
+      this.speechDebounceTimer = null;
+    }
     this.notify({ isListening: false, transcript: '' });
 
     const originalOnEnd = options.onEnd;
@@ -262,7 +267,7 @@ class VoiceNavigationService {
       if (settled) return;
       // If hardware is still speaking, poll briefly until speech finishes
       if (isAnySpeaking()) {
-        setTimeout(() => resumeListening(), 250);
+        setTimeout(() => resumeListening(), 200);
         return;
       }
       settled = true;
@@ -271,14 +276,15 @@ class VoiceNavigationService {
       this.lastSpeechEndTime = Date.now();
       this.notify({ isSpeaking: false });
       
-      // Acoustic settling delay (750ms): keep mic quiet until speaker echo in the room fades
+      // Fast settling delay (250ms): ready for user's next question promptly
       setTimeout(() => {
         if (!this.userPaused && !this.manualStop && !this.isSpeakingTts && !isAnySpeaking()) {
           this.currentTranscript = '';
+          this.speechAccumulator = '';
           this.notify({ transcript: '' });
           this.startListening(true);
         }
-      }, 750);
+      }, 250);
     };
 
     speakWithVoice(text, {
@@ -424,13 +430,13 @@ class VoiceNavigationService {
         logger.warn('VOICE', `Android SpeechRecognizer error code: ${errorCode}`);
         this.isListening = false;
         this.notify({ isListening: false });
-        // Auto-recover after normal timeouts (error 7: NO_MATCH, error 6: SPEECH_TIMEOUT)
-        if (!this.manualStop && !this.userPaused && !this.isSpeakingTts && !this.isProcessing && (errorCode === 7 || errorCode === 6)) {
+        // Auto-recover after timeouts and transient error codes (7: NO_MATCH, 6: SPEECH_TIMEOUT, 8: BUSY, 5: CLIENT)
+        if (!this.manualStop && !this.userPaused && !this.isSpeakingTts && !this.isProcessing) {
           setTimeout(() => {
             if (!this.manualStop && !this.userPaused && !this.isSpeakingTts && !this.isProcessing) {
-              this.startListening(false);
+              this.startListening(true);
             }
-          }, 800);
+          }, 350);
         }
       };
 
@@ -484,14 +490,9 @@ class VoiceNavigationService {
           }
         }
 
-        const candidate = (final || interim).toLowerCase().trim();
-
-        // Allow immediate barge-in for urgent navigation/stop commands
-        const isUrgent = candidate === 'stop' || candidate === 'shut up' || candidate === 'cancel' || candidate === 'silence' || candidate === 'home' || candidate === 'go home' || candidate === 'exit';
-        const isBusy = this.isProcessing || this.isSpeakingTts || isAnySpeaking();
-        if (!isUrgent && (isBusy || (this.lastSpeechEndTime && Date.now() - this.lastSpeechEndTime < 750))) {
-          // Mic input is muted while Aurra is processing, speaking, or settling
-          return;
+        // Live user speech detected: cancel any background speech audio immediately
+        if ((final || interim) && (this.isSpeakingTts || isAnySpeaking())) {
+          this.cancelSpeech(false);
         }
 
         // Live visual interim transcript preview
@@ -505,10 +506,7 @@ class VoiceNavigationService {
           const cleanFinal = final.trim();
 
           // Acoustic echo filter (block echo of Aurra's own spoken text)
-          if (this.lastSpokenText && (
-            cleanFinal.toLowerCase().includes(this.lastSpokenText.toLowerCase().slice(0, 25)) ||
-            this.lastSpokenText.toLowerCase().includes(cleanFinal.toLowerCase())
-          )) {
+          if (isAcousticEcho(cleanFinal, this.lastSpokenText)) {
             return;
           }
 
@@ -701,6 +699,41 @@ class VoiceNavigationService {
         timestamp: Date.now(),
       });
       this.speak(greeting);
+      return;
+    }
+
+    // 1C. Instant Identity & Persona Intent (Zero Latency < 1ms)
+    const cleanNoPunct = utterance.replace(/[?.!,]/g, '').trim();
+    const isIdentityIntent =
+      cleanNoPunct === 'who are you' ||
+      cleanNoPunct === 'who are u' ||
+      cleanNoPunct === 'who r u' ||
+      cleanNoPunct === 'who you are' ||
+      cleanNoPunct === 'what is your name' ||
+      cleanNoPunct === 'whats your name' ||
+      cleanNoPunct === 'what is ur name' ||
+      cleanNoPunct === 'whats ur name' ||
+      cleanNoPunct === 'tell me about yourself' ||
+      cleanNoPunct === 'introduce yourself' ||
+      cleanNoPunct === 'about you' ||
+      cleanNoPunct.includes('who are you') ||
+      cleanNoPunct.includes('who are u') ||
+      cleanNoPunct.includes('what is your name') ||
+      cleanNoPunct.includes('whats your name');
+
+    if (isIdentityIntent) {
+      this.cancelSpeech(false);
+      const identityMsg = "I am Aurra, an autonomous humanoid AI receptionist and companion robot created and developed by RoboMiracle Technologies in Coimbatore. I assist visitors, manage registrations, and guide you around our facility.";
+      this.setFeedback(identityMsg);
+      this.setInteractiveReply({
+        query: rawUtterance,
+        reply: identityMsg,
+        source: 'identity',
+        confidence: 100,
+        category: 'About',
+        timestamp: Date.now(),
+      });
+      this.speak(identityMsg);
       return;
     }
 
@@ -948,12 +981,6 @@ class VoiceNavigationService {
       this.cancelSpeech(false);
     }
 
-    // 3. Post-speech acoustic settling delay (350ms only for long speech to avoid speaker echo)
-    const wordCount = rawUtterance.trim().split(/\s+/).length;
-    if (inputType === 'voice' && wordCount > 2 && this.lastSpeechEndTime && (Date.now() - this.lastSpeechEndTime < 350)) {
-      logger.speech('VOICE', `Dropped utterance during acoustic settling: "${rawUtterance}"`);
-      return;
-    }
 
     // 4. Acoustic Self-Echo & System Prompt Rejection - only applies to voice
     if (inputType === 'voice' && (isAcousticEcho(rawUtterance, this.lastFeedback) || isAcousticEcho(rawUtterance, this.lastSpokenText))) {

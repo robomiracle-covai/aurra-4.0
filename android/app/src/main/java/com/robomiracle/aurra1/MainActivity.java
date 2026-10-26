@@ -517,6 +517,14 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                         public void onError(int error) {
                             Log.w(TAG, "SpeechRecognizer error: " + error);
                             isListeningSpeech = false;
+                            if (error == 8 || error == 5) {
+                                try {
+                                    if (speechRecognizer != null) {
+                                        speechRecognizer.destroy();
+                                        speechRecognizer = null;
+                                    }
+                                } catch (Exception ignored) {}
+                            }
                             if (webView != null) {
                                 webView.post(() -> webView.evaluateJavascript("if(window.onAndroidSpeechError){window.onAndroidSpeechError(" + error + ");}", null));
                             }
@@ -572,6 +580,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     initNativeSpeechRecognizer();
                 }
                 if (speechRecognizer != null) {
+                    try {
+                        speechRecognizer.cancel();
+                    } catch (Exception ignored) {}
                     isListeningSpeech = true;
                     speechRecognizer.startListening(speechRecognizerIntent);
                     Log.i(TAG, "Native SpeechRecognizer started listening");

@@ -126,33 +126,79 @@
   background: currentColor;
 }
 
-.hud-telem-pill.telem-online {
-  color: #34d399;
-  border-color: rgba(52, 211, 153, 0.4);
+/* Cyber Telemetry Icon Badges */
+.hud-telem-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(10, 18, 32, 0.85);
+  border: 1.5px solid rgba(0, 255, 255, 0.35);
+  color: #00ffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  touch-action: manipulation;
 }
-.hud-telem-pill.telem-online .telem-dot {
+
+.hud-telem-icon-btn:hover {
+  border-color: #00ffff;
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.hud-telem-icon-btn .telem-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+.hud-telem-icon-btn.telem-online {
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.5);
+}
+.hud-telem-icon-btn.telem-online .telem-dot {
   box-shadow: 0 0 8px #34d399;
 }
 
-.hud-telem-pill.telem-offline {
+.hud-telem-icon-btn.telem-offline {
   color: #f87171;
-  border-color: rgba(248, 113, 113, 0.4);
+  border-color: rgba(248, 113, 113, 0.5);
+}
+.hud-telem-icon-btn.telem-offline .telem-dot {
+  box-shadow: 0 0 8px #f87171;
 }
 
-.hud-telem-pill.telem-db {
+.hud-telem-icon-btn.telem-db {
   color: #38bdf8;
-  border-color: rgba(56, 189, 248, 0.4);
+  border-color: rgba(56, 189, 248, 0.5);
 }
-.hud-telem-pill.telem-db .telem-dot {
+.hud-telem-icon-btn.telem-db .telem-dot {
   box-shadow: 0 0 8px #38bdf8;
 }
 
-.hud-telem-pill.telem-fps {
+.hud-telem-icon-btn.telem-fps {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   color: #00ffff;
-  border-color: rgba(0, 255, 255, 0.4);
+  border-color: rgba(0, 255, 255, 0.45);
 }
-.hud-telem-pill.telem-fps .telem-dot {
-  box-shadow: 0 0 8px #00ffff;
+
+.telem-fps-top-num {
+  font-size: 13px;
+  font-weight: 900;
+  color: #00ffff;
+  line-height: 1;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  letter-spacing: -0.3px;
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
 }
 
 /* Right Clock & Date Container */
@@ -262,37 +308,48 @@
 .cyber-top-right-group {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
-.cyber-top-features-btn {
+/* Cyber Top Action Icon Buttons (Explain Features & Features) */
+.cyber-top-icon-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 14px;
-  border-radius: 9999px;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
   background: rgba(0, 207, 239, 0.12);
-  border: 1px solid rgba(0, 207, 239, 0.4);
+  border: 1.5px solid rgba(0, 207, 239, 0.4);
   color: #00ffff;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 0 14px rgba(0, 207, 239, 0.18);
+  box-shadow: 0 0 12px rgba(0, 207, 239, 0.2);
   user-select: none;
   touch-action: manipulation;
 }
 
-.cyber-top-features-btn:hover {
+.cyber-top-icon-btn:hover {
   background: rgba(0, 207, 239, 0.25);
   border-color: #00ffff;
-  box-shadow: 0 0 18px rgba(0, 207, 239, 0.45);
-  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(0, 207, 239, 0.5);
+  transform: translateY(-1px) scale(1.05);
 }
 
-.cyber-top-features-btn:active {
-  transform: scale(0.96);
+.cyber-top-icon-btn:active {
+  transform: scale(0.95);
+}
+
+.cyber-top-icon-btn.active-tour {
+  background: rgba(0, 255, 255, 0.25);
+  border-color: #00ffff;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+  animation: pulseIconTour 1.5s infinite alternate;
+}
+
+@keyframes pulseIconTour {
+  0% { box-shadow: 0 0 10px rgba(0, 255, 255, 0.4); }
+  100% { box-shadow: 0 0 24px rgba(0, 255, 255, 0.8); }
 }
 
 /* Main Body View */
@@ -463,7 +520,7 @@
 
 /* Left Hero Command Deck */
 .hero-system-column {
-  flex: 0 0 380px;
+  flex: 0 0 420px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -498,32 +555,248 @@
   box-shadow: 0 0 8px #00ffff;
 }
 
-.hero-smart-title {
-  font-size: 46px;
-  font-weight: 900;
-  line-height: 1.05;
-  margin: 0 0 16px 0;
+/* Dynamic Feature Spotlight Rectangle (Enlarged & Styled in Cyber Cyan) */
+.hero-feature-spotlight-card {
+  width: 100%;
+  max-width: 420px;
+  background: linear-gradient(135deg, rgba(8, 16, 32, 0.95) 0%, rgba(13, 27, 54, 0.97) 100%);
+  border: 1.5px solid rgba(0, 255, 255, 0.4);
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.16), inset 0 0 20px rgba(0, 255, 255, 0.04);
+  border-radius: 20px;
+  padding: 18px 22px;
+  box-sizing: border-box;
+  margin-bottom: 18px;
   display: flex;
   flex-direction: column;
-  letter-spacing: -0.5px;
+  gap: 12px;
+  position: relative;
+  backdrop-filter: blur(16px);
+  will-change: transform, opacity;
+  animation: spotlightGlowPulse 4s ease-in-out infinite alternate;
 }
 
-.title-white {
-  color: #ffffff;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+@keyframes spotlightGlowPulse {
+  0% {
+    border-color: rgba(0, 255, 255, 0.35);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.1), inset 0 0 12px rgba(0, 255, 255, 0.02);
+  }
+  100% {
+    border-color: rgba(0, 255, 255, 0.6);
+    box-shadow: 0 0 34px rgba(0, 255, 255, 0.22), inset 0 0 22px rgba(0, 255, 255, 0.05);
+  }
 }
 
-.title-cyan {
+.live-dot-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #00ffff;
+  box-shadow: 0 0 8px #00ffff;
+  animation: dotPulse 1.6s infinite ease-in-out;
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.7); }
+}
+
+.spotlight-card-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 255, 255, 0.12);
+}
+
+.spotlight-sys-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  font-weight: 800;
   color: #00ffff;
-  text-shadow: 0 0 24px rgba(0, 255, 255, 0.45);
+  letter-spacing: 0.8px;
 }
 
-.hero-description-text {
-  font-size: 13.5px;
-  line-height: 1.6;
+.spotlight-step-text {
+  color: #00ffff;
+  font-weight: 800;
+}
+
+.spotlight-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spotlight-arrow-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  color: #00ffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  transition: all 0.2s;
+  padding: 0;
+  touch-action: manipulation;
+}
+
+.spotlight-arrow-btn:hover {
+  background: rgba(0, 255, 255, 0.25);
+  border-color: #00ffff;
+  transform: scale(1.1);
+}
+
+.spotlight-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: spotlightFadeIn 0.35s ease-out;
+}
+
+@keyframes spotlightFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.spotlight-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.spotlight-icon-box {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: rgba(0, 255, 255, 0.12);
+  border: 1.5px solid #00ffff;
+  box-shadow: 0 0 16px rgba(0, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #00ffff;
+}
+
+.spotlight-title-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.spotlight-card-title {
+  font-size: 17.5px;
+  font-weight: 800;
+  margin: 0;
+  line-height: 1.28;
+  letter-spacing: -0.2px;
+}
+
+.spotlight-card-sub {
+  font-size: 11px;
   color: #94a3b8;
-  margin: 0 0 26px 0;
-  max-width: 370px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.spotlight-card-desc {
+  font-size: 12.5px;
+  line-height: 1.52;
+  color: #cbd5e1;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.spotlight-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 2px;
+}
+
+.spotlight-launch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 15px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.16) 0%, rgba(0, 180, 216, 0.25) 100%);
+  border: 1.2px solid #00ffff;
+  color: #00ffff;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+  touch-action: manipulation;
+}
+
+.spotlight-launch-btn:hover {
+  background: #00ffff;
+  color: #000000;
+  box-shadow: 0 0 16px rgba(0, 255, 255, 0.55);
+}
+
+.spotlight-launch-btn:active {
+  transform: scale(0.96);
+}
+
+/* Synchronized Red Color Linking (#ff3b5c) between Spotlight Card and Orbital Node */
+.matched-feature-word {
+  color: #ff3b5c !important;
+  text-shadow: 0 0 12px rgba(255, 59, 92, 0.85), 0 0 24px rgba(255, 59, 92, 0.45) !important;
+  font-weight: 900 !important;
+}
+
+.orb-label-text.inactive-label {
+  color: #e2e8f0 !important;
+  font-weight: 600 !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8) !important;
+}
+
+.orb-label-text.active-label-glow {
+  transform: scale(1.08);
+}
+
+.spotlight-dots-indicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.spotlight-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.spotlight-dot.active {
+  width: 14px;
+  border-radius: 4px;
+  background: #00ffff;
+  box-shadow: 0 0 8px #00ffff;
 }
 
 .hero-actions-row {
@@ -628,17 +901,9 @@
   border: 1px solid rgba(0, 255, 255, 0.1);
 }
 
-/* 3D Glass Specular Reflection Highlight */
+/* 3D Glass Specular Reflection Highlight - Hidden as requested */
 .orb-glass-specular {
-  position: absolute;
-  top: 6px;
-  left: 16px;
-  width: 55%;
-  height: 38%;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0) 80%);
-  pointer-events: none;
-  z-index: 5;
+  display: none !important;
 }
 
 /* Central Core Sphere: Ask Aurra (SYS_01) */
@@ -646,7 +911,7 @@
   width: 154px;
   height: 154px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 25%, #00ffff 0%, #0284c7 55%, #082f49 100%);
+  background: radial-gradient(circle at center, rgba(0, 255, 255, 0.28) 0%, rgba(2, 132, 199, 0.45) 55%, rgba(6, 18, 36, 0.98) 100%);
   position: absolute;
   top: 50%;
   left: 50%;
@@ -657,8 +922,8 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 0 38px rgba(0, 255, 255, 0.58), inset 0 -6px 14px rgba(0, 0, 0, 0.5);
-  border: 2px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 38px rgba(0, 255, 255, 0.58), inset 0 0 20px rgba(0, 255, 255, 0.2);
+  border: 2px solid #00ffff;
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   user-select: none;
   touch-action: manipulation;
@@ -705,7 +970,7 @@
   100% { transform: scale(1); opacity: 0.7; }
 }
 
-/* Orbiting Satellite Spheres */
+/* Orbiting Satellite Spheres (No white bubble reflection) */
 .satellite-orb-node {
   position: absolute;
   top: calc(50% + var(--orb-y, 0px));
@@ -716,16 +981,95 @@
   cursor: pointer;
   z-index: 20;
   transform: translate3d(-50%, -50%, 0);
-  background: radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.3) 0%, var(--orb-bg) 52%, rgba(8, 12, 22, 0.96) 100%);
+  background: radial-gradient(circle at center, rgba(0, 255, 255, 0.16) 0%, rgba(7, 15, 28, 0.96) 80%);
   border: 1.5px solid var(--orb-border);
-  box-shadow: 0 0 14px var(--orb-glow), inset 0 2px 6px rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 16px var(--orb-glow);
   user-select: none;
   touch-action: manipulation;
   will-change: transform, opacity;
+  opacity: 0.95;
+  transition: opacity 0.35s ease, transform 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease;
 }
 
 .satellite-orb-node:active {
   transform: translate3d(-50%, -50%, 0) scale(0.94);
+}
+
+/* HIGH-IMPACT ACTIVE SPOTLIGHT NODE (Visual Clarity in Cyan Glow) */
+.satellite-orb-node.spotlight-active-node {
+  opacity: 1 !important;
+  border-color: #00ffff !important;
+  border-width: 2.5px !important;
+  box-shadow: 0 0 38px #00ffff, 0 0 75px rgba(0, 255, 255, 0.75), inset 0 0 16px rgba(0, 255, 255, 0.5) !important;
+  transform: translate3d(-50%, -50%, 0) scale(1.22) !important;
+  z-index: 45 !important;
+}
+
+/* Dual Concentric Pulsing Cyber Target Rings */
+.spotlight-active-pulse-ring {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.spotlight-active-pulse-ring.ring-inner {
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  border: 1.5px dashed #00ffff;
+  animation: rotateActiveRing 8s linear infinite;
+}
+
+.spotlight-active-pulse-ring.ring-outer {
+  top: -16px;
+  left: -16px;
+  right: -16px;
+  bottom: -16px;
+  border: 1px dotted rgba(0, 255, 255, 0.6);
+  animation: rotateActiveRingRev 12s linear infinite;
+}
+
+@keyframes rotateActiveRingRev {
+  0% { transform: rotate(360deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Floating "ACTIVE" Holographic Callout Badge */
+.spotlight-active-beacon {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 12px;
+  background: #00ffff;
+  color: #000000;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  box-shadow: 0 0 16px #00ffff, 0 0 30px rgba(0, 255, 255, 0.8);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: beaconBob 1.6s ease-in-out infinite alternate;
+  z-index: 50;
+}
+
+.spotlight-active-beacon.beacon-top {
+  top: -24px;
+  bottom: auto;
+}
+
+.spotlight-active-beacon.beacon-bottom {
+  bottom: -22px;
+  top: auto;
+}
+
+@keyframes beaconBob {
+  0% { transform: translateX(-50%) translateY(0); }
+  100% { transform: translateX(-50%) translateY(-4px); }
 }
 
 .orb-gpu-bobber {
@@ -935,7 +1279,7 @@
   width: 54px;
   height: 54px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.2) 0%, rgba(13, 25, 46, 0.95) 70%);
+  background: radial-gradient(circle at center, rgba(0, 255, 255, 0.15) 0%, rgba(13, 25, 46, 0.95) 80%);
   border: 1.5px solid var(--node-color, #00ffff);
   box-shadow: 0 0 12px var(--node-glow, rgba(0, 255, 255, 0.3));
   display: flex;
@@ -957,7 +1301,7 @@
   transform: translateY(-3px) scale(1.12);
   border-color: #ffffff;
   box-shadow: 0 0 24px var(--node-color, #00ffff), inset 0 0 10px var(--node-color, #00ffff);
-  background: radial-gradient(circle at 35% 25%, var(--node-color, #00ffff) 0%, #031428 100%);
+  background: radial-gradient(circle at center, rgba(0, 255, 255, 0.3) 0%, #031428 100%);
 }
 
 .explain-active-ring {
@@ -1022,15 +1366,7 @@
 }
 
 .explain-card-specular {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 50%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, transparent 100%);
-  border-radius: 22px 22px 0 0;
-  pointer-events: none;
-  z-index: 1;
+  display: none !important;
 }
 
 .explain-card-header {

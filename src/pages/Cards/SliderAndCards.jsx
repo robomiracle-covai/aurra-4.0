@@ -27,7 +27,9 @@ import {
   Bot,
   Database,
   Volume2,
-  Pause
+  Pause,
+  Cpu,
+  LayoutGrid
 } from 'lucide-react';
 import { offlineCardService, offlineSliderService, offlineBrandingService } from '../../db/offlineServices';
 import { logger } from '../../services/logger';
@@ -39,19 +41,19 @@ import { esp32Service } from '../../services/esp32Service';
 import './SliderAndCards.css';
 
 // Feature Icon Resolver with Dynamic Bubble Sizing
-const getCardIcon = (href, className, size = 26) => {
-  if (href?.includes('form')) return <FileText size={size} color="#00ffff" />;
-  if (href?.includes('qa')) return <HelpCircle size={size} color="#00ffff" />;
-  if (href?.includes('tour')) return <Compass size={size} color="#00ffff" />;
-  if (href?.includes('facilities')) return <Building2 size={size} color="#00ffff" />;
-  if (href?.includes('face') || href?.includes('greet')) return <Camera size={size} color="#00ffff" />;
-  if (href?.includes('control')) return <Sliders size={size} color="#00ffff" />;
-  if (href?.includes('testing-interaction')) return <FlaskConical size={size} color="#f59e0b" />;
-  if (href?.includes('interaction')) return <Eye size={size} color="#00ffff" />;
-  if (href?.includes('web')) return <Globe size={size} color="#00ffff" />;
-  if (href?.includes('hardware')) return <Activity size={size} color="#00ffff" />;
-  if (href?.includes('pdf')) return <FileText size={size} color="#ff3366" />;
-  return <Sparkles size={size} color="#00ffff" />;
+const getCardIcon = (href, className, size = 26, color = '#00ffff') => {
+  if (href?.includes('form')) return <FileText size={size} color={color} />;
+  if (href?.includes('qa')) return <HelpCircle size={size} color={color} />;
+  if (href?.includes('tour')) return <Compass size={size} color={color} />;
+  if (href?.includes('facilities')) return <Building2 size={size} color={color} />;
+  if (href?.includes('face') || href?.includes('greet')) return <Camera size={size} color={color} />;
+  if (href?.includes('control')) return <Sliders size={size} color={color} />;
+  if (href?.includes('testing-interaction')) return <FlaskConical size={size} color={color} />;
+  if (href?.includes('interaction')) return <Eye size={size} color={color} />;
+  if (href?.includes('web')) return <Globe size={size} color={color} />;
+  if (href?.includes('hardware')) return <Activity size={size} color={color} />;
+  if (href?.includes('pdf')) return <FileText size={size} color={color} />;
+  return <Sparkles size={size} color={color} />;
 };
 
 // Organic Clustered Bubble Slots (Referenced directly from Design Spec: tightly nestled, even spacing, varying radii)
@@ -151,90 +153,102 @@ const getBubbleSlot = (idx, total) => {
   };
 };
 
-// Orbital Sphere Aesthetic Theme Resolver
+// Orbital Sphere Aesthetic Theme Resolver - UNIFIED CYBER NEON CYAN (#00ffff)
 const getOrbTheme = (href, idx, card) => {
+  let sysId = `SYS_0${idx + 2}`;
+  let label = card?.title || 'Feature';
+
   if (href?.includes('face') || href?.includes('greet')) {
-    return { sysId: 'SYS_02', color: '#00A8FF', bg: 'rgba(0, 168, 255, 0.16)', border: '#00E5FF', glow: 'rgba(0, 168, 255, 0.55)', label: card?.title || 'Face Recognition' };
+    sysId = 'SYS_02';
+    label = card?.title || 'Face Recognition';
+  } else if (href?.includes('tour')) {
+    sysId = 'SYS_03';
+    label = card?.title || 'Guided Tour';
+  } else if (href?.includes('facilities')) {
+    sysId = 'SYS_04';
+    label = card?.title || 'Facilities';
+  } else if (href?.includes('form') || href?.includes('register')) {
+    sysId = 'SYS_05';
+    label = card?.title || 'Visitor Form';
+  } else if (href?.includes('web') || href?.includes('qr')) {
+    sysId = 'SYS_06';
+    label = card?.title || 'QR Links';
+  } else if (href?.includes('control') || href?.includes('ros')) {
+    sysId = 'SYS_07';
+    label = card?.title || 'ROS Controls';
+  } else if (href?.includes('pdf') || href?.includes('document')) {
+    sysId = 'SYS_08';
+    label = card?.title || 'PDF AI';
+  } else if (href?.includes('qa') || href?.includes('question')) {
+    sysId = 'SYS_02';
+    label = card?.title || 'Ask Aurra';
   }
-  if (href?.includes('tour')) {
-    return { sysId: 'SYS_03', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.16)', border: '#22d3ee', glow: 'rgba(6, 182, 212, 0.55)', label: card?.title || 'Guided Tour' };
-  }
-  if (href?.includes('facilities')) {
-    return { sysId: 'SYS_04', color: '#10b981', bg: 'rgba(16, 185, 129, 0.16)', border: '#34d399', glow: 'rgba(16, 185, 129, 0.55)', label: card?.title || 'Facilities' };
-  }
-  if (href?.includes('form') || href?.includes('register')) {
-    return { sysId: 'SYS_05', color: '#00d2ff', bg: 'rgba(0, 210, 255, 0.16)', border: '#38bdf8', glow: 'rgba(0, 210, 255, 0.55)', label: card?.title || 'Visitor Form' };
-  }
-  if (href?.includes('web') || href?.includes('qr')) {
-    return { sysId: 'SYS_06', color: '#00CFEF', bg: 'rgba(0, 207, 239, 0.16)', border: '#00E5FF', glow: 'rgba(0, 207, 239, 0.55)', label: card?.title || 'QR Links' };
-  }
-  if (href?.includes('control') || href?.includes('ros')) {
-    return { sysId: 'SYS_07', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.16)', border: '#fbbf24', glow: 'rgba(245, 158, 11, 0.55)', label: card?.title || 'ROS Controls' };
-  }
-  if (href?.includes('pdf') || href?.includes('document')) {
-    return { sysId: 'SYS_08', color: '#ff3366', bg: 'rgba(255, 51, 102, 0.16)', border: '#fb7185', glow: 'rgba(255, 51, 102, 0.55)', label: card?.title || 'PDF AI' };
-  }
-  if (href?.includes('qa') || href?.includes('question')) {
-    return { sysId: 'SYS_02', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.16)', border: '#67e8f9', glow: 'rgba(56, 189, 248, 0.55)', label: card?.title || 'Ask Aurra' };
-  }
-  return { sysId: `SYS_0${idx + 2}`, color: '#00ffff', bg: 'rgba(0, 255, 255, 0.16)', border: '#22d3ee', glow: 'rgba(0, 255, 255, 0.55)', label: card?.title || 'Module' };
+
+  return {
+    sysId,
+    color: '#00ffff',
+    bg: 'rgba(0, 255, 255, 0.12)',
+    border: '#00e5ff',
+    glow: 'rgba(0, 255, 255, 0.5)',
+    label,
+  };
 };
 
-// Rich Storyboard Feature Explanations & Speech Scripts
+// Rich Storyboard Feature Explanations & Speech Scripts (Unified Cyber Theme)
 const FEATURE_EXPLANATIONS = {
   form: {
     title: 'Touchless Visitor Registration',
     badge: 'SYS_05',
-    color: '#00d2ff',
+    color: '#00ffff',
     speech: 'Welcome to Visitor Registration. Guests can check in touchlessly, submit their visit details, and receive instant digital verification.',
     bullets: ['Touchless QR & On-screen Form', 'Instant Local Storage', 'Admin Verified Check-in'],
   },
   qa: {
     title: 'Ask Aurra AI Intelligence',
     badge: 'SYS_02',
-    color: '#38bdf8',
+    color: '#00ffff',
     speech: 'I am Ask Aurra, your interactive voice intelligence. Speak naturally to ask any question about the facility, team, or schedule.',
     bullets: ['Edge AI Voice Recognition', 'Instant Institutional Knowledge', 'Multi-turn Intelligent Dialogue'],
   },
   tour: {
     title: 'Autonomous Guided Robot Tour',
     badge: 'SYS_03',
-    color: '#06b6d4',
+    color: '#00ffff',
     speech: 'Show me around initiates our autonomous Guided Tour. Follow our mobile robot as it escorts visitors through key facility checkpoints.',
     bullets: ['Multi-Stop Waypoint Navigation', 'Live Voice Narrated Waypoints', 'Hands-Free Visitor Escort'],
   },
   facilities: {
     title: 'Public Facilities & Directory',
     badge: 'SYS_04',
-    color: '#10b981',
+    color: '#00ffff',
     speech: 'Public Facilities provides a complete interactive directory of conference halls, labs, rest zones, and office locations.',
     bullets: ['Interactive Floor Directory', 'Live Status & Availability', 'Step-by-step Room Guidance'],
   },
   face: {
     title: 'Facial Vision & Smart Greetings',
     badge: 'SYS_02',
-    color: '#00A8FF',
+    color: '#00ffff',
     speech: 'Face Greetings uses camera vision to detect approaching visitors, recognize registered faces, and deliver personalized audio greetings.',
     bullets: ['High-speed Local Face Matching', 'Emotion & Expression Reflex', 'Automated Visitor Welcoming'],
   },
   control: {
     title: 'Robot Teleoperation & Hardware Cockpit',
     badge: 'SYS_07',
-    color: '#f59e0b',
+    color: '#00ffff',
     speech: 'Robot Control Cockpit gives direct access to our ROS 2 motors, multi-axis servos, camera pan-tilt, and telemetry.',
     bullets: ['ROS 2 Teleoperation Grid', 'Head Pan-Tilt & Arm Articulation', 'Real-time ESP32 Serial Telemetry'],
   },
   pdf: {
     title: 'Interactive PDF Document AI',
     badge: 'SYS_08',
-    color: '#ff3366',
+    color: '#00ffff',
     speech: 'PDF AI allows visitors and staff to converse with complex documents, research whitepapers, and brochures through AI.',
     bullets: ['On-device Document Ingestion', 'Semantic PDF Search', 'Instant Citation Q&A'],
   },
   testing: {
     title: 'Testing & Diagnostic Interactive Lab',
     badge: 'SYS_09',
-    color: '#f59e0b',
+    color: '#00ffff',
     speech: 'Interactive Testing mode lets engineers test 3D face tracking, light reflex simulations, voice channels, and peripheral diagnostics.',
     bullets: ['3D Eye Reflex Simulation', 'Pupil Dilation Dynamics', 'Real-time Diagnostic Metrics'],
   },
@@ -280,7 +294,7 @@ const FpsTelemetry = React.memo(function FpsTelemetry() {
     return () => cancelAnimationFrame(animId);
   }, []);
 
-  return <span>CAM/FPS: {val} FPS</span>;
+  return <span className="telem-fps-top-num">{val}</span>;
 });
 
 // Isolated Live Clock Component (zero re-render overhead on main view)
@@ -327,6 +341,9 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
   const [devSettings, setDevSettings] = useState(devSettingsService.getSettings());
   const [espState, setEspState] = useState(esp32Service.getState());
 
+  // Dynamic Feature Spotlight Deck state (Always-moving feature explanation on Home Screen)
+  const [spotlightIndex, setSpotlightIndex] = useState(0);
+
   // Explain Features Mode state (Storyboard Spec)
   const [isExplainMode, setIsExplainMode] = useState(false);
   const [explainIndex, setExplainIndex] = useState(0);
@@ -352,6 +369,15 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
   useEffect(() => {
     cardsRef.current = cards;
   }, [cards]);
+
+  // Auto-cycle the Feature Spotlight Deck on the Home Screen every 4.5 seconds
+  useEffect(() => {
+    if (showSlider || isExplainMode || !cards || cards.length === 0) return;
+    const interval = setInterval(() => {
+      setSpotlightIndex((prev) => (prev + 1) % cards.length);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, [showSlider, isExplainMode, cards]);
 
   // Sync with developer settings changes in real time
   useEffect(() => {
@@ -730,28 +756,40 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
           </div>
         </div>
 
-        {/* Center: Live Telemetry Cluster */}
+        {/* Center: Live Telemetry Cluster - Converted to Sleek Cyber Icons */}
         <div className="cyber-telemetry-cluster">
-          <div className={`hud-telem-pill ${espState.online ? 'telem-online' : 'telem-offline'}`}>
+          {/* Serial Telemetry Icon */}
+          <div 
+            className={`hud-telem-icon-btn ${espState.online ? 'telem-online' : 'telem-offline'}`}
+            title={`Serial ESP32 Hardware: ${espState.online ? (espState.mode === 'ap' ? 'ONLINE (AP)' : 'ONLINE (STA)') : 'OFFLINE'}`}
+          >
+            <Cpu size={16} />
             <span className="telem-dot"></span>
-            <span>SERIAL: {espState.online ? (espState.mode === 'ap' ? 'ONLINE (AP)' : 'ONLINE (STA)') : 'OFFLINE'}</span>
           </div>
 
-          <div className="hud-telem-pill telem-db">
+          {/* Offline Dexie DB Icon */}
+          <div 
+            className="hud-telem-icon-btn telem-db"
+            title="Offline Database: Dexie IndexedDB (Operational & Synced)"
+          >
+            <Database size={16} />
             <span className="telem-dot"></span>
-            <span>DB: DEXIE LOCAL</span>
           </div>
 
-          <div className="hud-telem-pill telem-fps">
-            <span className="telem-dot"></span>
+          {/* Camera & FPS Telemetry Icon with number alone */}
+          <div 
+            className="hud-telem-icon-btn telem-fps"
+            title="Vision Camera & Display Engine: Live FPS"
+          >
             <FpsTelemetry />
           </div>
         </div>
 
-        {/* Right: Live Real-Time Clock & Action Buttons */}
+        {/* Right: Live Real-Time Clock & Action Icon Buttons */}
         <div className="cyber-top-right-group">
+          {/* Explain Features Walkthrough Icon Button */}
           <button 
-            className={`cyber-top-explain-btn ${isExplainMode ? 'active-tour' : ''}`}
+            className={`cyber-top-icon-btn ${isExplainMode ? 'active-tour' : ''}`}
             onClick={() => {
               if (isExplainMode) {
                 handleExitExplain();
@@ -759,14 +797,14 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                 handleStartExplain();
               }
             }}
-            title="Explain All Features with Voice Walkthrough"
+            title={isExplainMode ? 'Exit Explain Walkthrough' : 'Explain All Features (Voice Walkthrough)'}
           >
-            <Sparkles size={14} color="#00ffff" />
-            <span>{isExplainMode ? 'Exit Explain' : 'Explain Features'}</span>
+            <Sparkles size={16} color="#00ffff" />
           </button>
 
+          {/* Action Cards / Features Grid Icon Button */}
           <button 
-            className="cyber-top-features-btn"
+            className="cyber-top-icon-btn"
             onClick={() => {
               if (isExplainMode) setIsExplainMode(false);
               setShowSlider(false);
@@ -775,9 +813,9 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
             }}
             title="View Features & Action Cards"
           >
-            <Sparkles size={15} color="#00ffff" />
-            <span>Features</span>
+            <LayoutGrid size={16} color="#00ffff" />
           </button>
+
           <LiveClockTelemetry />
         </div>
       </header>
@@ -909,9 +947,6 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                     <div className="explain-top-node-icon">
                       {getCardIcon(card.href, card.className, 20)}
                     </div>
-                    <div className="explain-top-node-pill">
-                      {theme.sysId}
-                    </div>
                     {isActive && <div className="explain-active-ring"></div>}
                   </div>
                 );
@@ -945,8 +980,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                           {getCardIcon(activeCard.href, activeCard.className, 34)}
                         </div>
                         <div>
-                          <div className="explain-sys-badge">{exp.badge || theme.sysId}</div>
-                          <h2 className="explain-card-title">{exp.title || activeCard.title}</h2>
+                          <h2 className="explain-card-title matched-feature-word">{activeCard.title}</h2>
                           <div className="explain-card-sub">{activeCard.subtitle}</div>
                         </div>
                       </div>
@@ -1025,22 +1059,97 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
         ) : (
           /* AURRA 4.0 ORBITAL CONSTELLATION VIEW */
           <div ref={orbitalLayoutRef} className="orbital-home-layout">
-            {/* Left: Hero System Highlight Command Deck */}
+            {/* Left: Hero System Feature Spotlight Column */}
             <div ref={heroColRef} className="hero-system-column">
-              <div className="system-highlight-badge">
-                <span className="highlight-pill">SYSTEM HIGHLIGHT</span>
-                <span className="highlight-line"></span>
-              </div>
+              {/* Dynamic Feature Spotlight Rectangle (Clean & Minimal) */}
+              {(() => {
+                const spotlightCard = cards[spotlightIndex] || cards[0];
+                if (!spotlightCard) return null;
+                const spotlightTheme = getOrbTheme(spotlightCard.href, spotlightIndex, spotlightCard);
+                const spotlightExp = getFeatureExplanation(spotlightCard) || {
+                  title: spotlightCard.title,
+                  speech: spotlightCard.subtitle || 'Autonomous robot smart module.',
+                };
 
-              <h1 className="hero-smart-title">
-                <span className="title-white">Aurra 4.0</span>
-                <span className="title-cyan">Smart System</span>
-              </h1>
+                return (
+                  <div className="hero-feature-spotlight-card">
+                    {/* Top Bar: Progress & Nav */}
+                    <div className="spotlight-card-topbar">
+                      <div className="spotlight-sys-tag">
+                        <span className="live-dot-pulse"></span>
+                        <span className="spotlight-step-text">FEATURE {(spotlightIndex + 1).toString().padStart(2, '0')} / {cards.length.toString().padStart(2, '0')}</span>
+                      </div>
+                      
+                      {/* Manual prev/next navigation arrows */}
+                      <div className="spotlight-nav-controls">
+                        <button
+                          type="button"
+                          className="spotlight-arrow-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSpotlightIndex((prev) => (prev - 1 + cards.length) % cards.length);
+                          }}
+                          title="Previous Feature"
+                        >
+                          ‹
+                        </button>
+                        <button
+                          type="button"
+                          className="spotlight-arrow-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSpotlightIndex((prev) => (prev + 1) % cards.length);
+                          }}
+                          title="Next Feature"
+                        >
+                          ›
+                        </button>
+                      </div>
+                    </div>
 
-              <p className="hero-description-text">
-                On-device edge AI powered by Dexie IndexedDB & touchless voice autonomy. 
-                Ask Aurra sits at the core — tap any node around it or speak naturally to open that module.
-              </p>
+                    {/* Spotlight Visual Presentation - Title matches active node word color */}
+                    <div className="spotlight-card-content" key={spotlightCard.id || spotlightIndex}>
+                      <div className="spotlight-title-row">
+                        <div className="spotlight-icon-box">
+                          {getCardIcon(spotlightCard.href, spotlightCard.className, 24, '#00ffff')}
+                        </div>
+                        <div className="spotlight-title-col">
+                          <h2 className="spotlight-card-title matched-feature-word">{spotlightCard.title}</h2>
+                          <div className="spotlight-card-sub">{spotlightCard.subtitle || 'Kiosk Service'}</div>
+                        </div>
+                      </div>
+
+                      <p className="spotlight-card-desc">
+                        {spotlightExp.speech}
+                      </p>
+                    </div>
+
+                    {/* Visual Bottom Action Row */}
+                    <div className="spotlight-card-footer">
+                      <button 
+                        className="spotlight-launch-btn"
+                        onClick={() => handleCardClick(spotlightCard)}
+                        title={`Open ${spotlightCard.title}`}
+                      >
+                        <Play size={12} fill="#00ffff" color="#00ffff" />
+                        <span>Open</span>
+                        <ChevronRight size={14} />
+                      </button>
+
+                      <div className="spotlight-dots-indicator">
+                        {cards.map((_, i) => (
+                          <span 
+                            key={i} 
+                            className={`spotlight-dot ${i === spotlightIndex ? 'active' : ''}`}
+                            onClick={() => setSpotlightIndex(i)}
+                            title={`Jump to ${cards[i]?.title}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="hero-actions-row">
                 <button 
@@ -1074,7 +1183,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                 <div ref={el => { if (el) orbTrackRingsRef.current[0] = el; }} className="orbital-track-ring track-outer"></div>
                 <div ref={el => { if (el) orbTrackRingsRef.current[1] = el; }} className="orbital-track-ring track-inner"></div>
 
-                {/* Central Core Sphere: Ask Aurra (SYS_01) */}
+                {/* Central Core Sphere: Ask Aurra */}
                 <div 
                   ref={coreOrbRef}
                   className="constellation-core-orb"
@@ -1082,14 +1191,12 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                     window.dispatchEvent(new CustomEvent('aurra_open_fullscreen_voice'));
                     voiceNavigationService.speak('I am Aurra, how can I help you today?');
                   }}
-                  title="SYS_01: Ask Aurra Voice Core (Tap to Talk)"
+                  title="Ask Aurra Voice Core (Tap to Talk)"
                 >
-                  <div className="orb-glass-specular"></div>
                   <div className="core-mic-halo">
                     <Mic size={36} color="#00ffff" />
                   </div>
                   <div className="core-orb-title">Ask Aurra</div>
-                  <div className="core-orb-sys">SYS_01</div>
                   <div className="core-breathing-aura"></div>
                 </div>
 
@@ -1098,12 +1205,13 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                   const theme = getOrbTheme(card.href, idx, card);
                   const total = cards.length || 1;
                   const slot = getBubbleSlot(idx, total);
+                  const isSpotlightActive = idx === spotlightIndex;
 
                   return (
                     <div
                       key={card.id || idx}
                       ref={el => { satelliteNodesRef.current[idx] = el; }}
-                      className="satellite-orb-node"
+                      className={`satellite-orb-node ${isSpotlightActive ? 'spotlight-active-node' : ''}`}
                       style={{
                         '--node-idx': idx,
                         '--orb-x': `${slot.x}px`,
@@ -1119,16 +1227,31 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                         '--orb-border': theme.border,
                         '--float-delay': `${(idx * 0.35).toFixed(2)}s`,
                       }}
-                      onClick={() => handleCardClick(card)}
+                      onClick={() => {
+                        setSpotlightIndex(idx);
+                        handleCardClick(card);
+                      }}
                       title={`Open ${card.title}`}
                     >
+                      {/* Active Spotlight Holographic Beacon & Rings */}
+                      {isSpotlightActive && (
+                        <>
+                          <div className="spotlight-active-pulse-ring ring-inner"></div>
+                          <div className="spotlight-active-pulse-ring ring-outer"></div>
+                          <div className={`spotlight-active-beacon ${slot.y > 10 ? 'beacon-bottom' : 'beacon-top'}`}>
+                            <Sparkles size={10} color="#000" />
+                            <span>ACTIVE</span>
+                          </div>
+                        </>
+                      )}
+
                       <div className="orb-gpu-bobber">
-                        <div className="orb-glass-specular"></div>
                         <div className="orb-icon-glyph">
-                          {getCardIcon(card.href, card.className, slot.iconSize)}
+                          {getCardIcon(card.href, card.className, slot.iconSize, '#00ffff')}
                         </div>
-                        <div className="orb-label-text">{theme.label || card.title}</div>
-                        <div className="orb-sys-badge">{theme.sysId}</div>
+                        <div className={`orb-label-text ${isSpotlightActive ? 'matched-feature-word active-label-glow' : 'inactive-label'}`}>
+                          {theme.label || card.title}
+                        </div>
                       </div>
                     </div>
                   );

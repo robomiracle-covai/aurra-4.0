@@ -311,24 +311,22 @@
   background: rgba(0, 255, 204, 0.3);
 }
 
-/* Speaker Button: Sound ON / Sound OFF (Muted) */
+/* Speaker Button: Sound ON / Sound OFF (Muted) - Circular Icon */
 .voice-speaker-btn,
 .voice-mute-ai-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 15px;
-  border-radius: 20px;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  white-space: nowrap;
   flex-shrink: 0;
   background: rgba(3, 8, 18, 0.85);
   border: 1.5px solid rgba(0, 255, 255, 0.4);
   color: #38bdf8;
+  padding: 0;
 }
 
 .voice-speaker-btn:hover,
@@ -346,24 +344,22 @@
   color: #00ffff;
 }
 
-/* Fullscreen Immersion Button */
+/* Fullscreen Immersion Button - Circular Icon */
 .voice-fullscreen-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: 20px;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  white-space: nowrap;
   flex-shrink: 0;
   background: rgba(3, 8, 18, 0.85);
   border: 1.5px solid rgba(0, 255, 255, 0.45);
   color: #00ffff;
   box-shadow: 0 0 10px rgba(0, 255, 255, 0.15);
+  padding: 0;
 }
 
 .voice-fullscreen-btn:hover {

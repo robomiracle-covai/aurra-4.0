@@ -137,9 +137,32 @@
   color: #ef4444;
 }
 
-.fs-minimize-btn {
-  border-color: rgba(0, 255, 255, 0.35);
-  box-shadow: 0 0 14px rgba(0, 255, 255, 0.15);
+.fs-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 59, 92, 0.5);
+  background: rgba(255, 59, 92, 0.12);
+  color: #ff3b5c;
+  box-shadow: 0 0 14px rgba(255, 59, 92, 0.25);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fs-close-btn:hover {
+  background: #ff3b5c;
+  border-color: #ff3b5c;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(255, 59, 92, 0.6);
+  transform: scale(1.08);
+}
+
+.fs-close-btn:active {
+  transform: scale(0.92);
 }
 
 .fs-features-btn {

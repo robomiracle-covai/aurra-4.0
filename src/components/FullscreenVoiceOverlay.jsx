@@ -721,7 +721,7 @@ export default function FullscreenVoiceOverlay({
         <div className="fs-system-badge">
           <span className="fs-badge-dot"></span>
           <span className="fs-badge-text">
-            {documentContext ? 'SYS_08 • DOCUMENT AI VOICE IMMERSION' : 'SYS_01 • AURRA VOICE IMMERSION'}
+            {documentContext ? 'DOCUMENT AI VOICE IMMERSION' : 'AURRA VOICE IMMERSION'}
           </span>
         </div>
 
@@ -745,12 +745,11 @@ export default function FullscreenVoiceOverlay({
           </button>
 
           <button
-            className="fs-header-btn fs-minimize-btn"
+            className="fs-close-btn"
             onClick={triggerCloseWithMorph}
-            title="Exit Fullscreen Mode (ESC)"
+            title="Close Fullscreen (ESC)"
           >
-            <Minimize2 size={18} color="#00ffff" />
-            <span>Minimize</span>
+            <X size={20} color="#ff3b5c" />
           </button>
         </div>
       </header>

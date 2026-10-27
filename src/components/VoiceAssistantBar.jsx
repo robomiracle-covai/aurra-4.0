@@ -204,115 +204,30 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
       ) : (
         <div className="voice-content-wrap">
           <div className="voice-status-line">
-            <div className="status-line-left">
-              {documentContext ? (
-                <span className="sys-doc-pill">
-                  SYS_08 • 📄 DOC AI ACTIVE
-                </span>
-              ) : (
-                <span className="sys-core-pill">
-                  SYS_01 • ASK AURRA
-                </span>
-              )}
-
-              {isThinking ? (
-                <span className="status-indicator thinking">
-                  <Sparkles size={13} className="sparkle-pulse" />
-                  AURRA THINKING (AI)...
-                </span>
-              ) : isSpeaking ? (
-                <span className="status-indicator speaking">
-                  <div className="gemini-mini-bars">
-                    <span className="g-bar b1"></span>
-                    <span className="g-bar b2"></span>
-                    <span className="g-bar b3"></span>
-                    <span className="g-bar b4"></span>
-                  </div>
-                  AURRA SPEAKING
-                </span>
-              ) : (
-                <span className={`status-indicator ${isListening ? 'live' : 'idle'}`}>
-                  <span className="dot"></span>
-                  {isListening ? 'AURRA LISTENING' : 'MIC PAUSED'}
-                </span>
-              )}
-
-              {latestReply && (
-                <span className={`inline-source-pill source-${latestReply.source || 'default'}`}>
-                  {latestReply.source === 'pdf-document-ai' && '📄 DOCUMENT AI'}
-                  {latestReply.source === 'offline-faq' && '🟢 OFFLINE FAQ'}
-                  {latestReply.source === 'groq-llm' && '⚡ CLOUD AI'}
-                  {latestReply.source === 'hardware' && '⚙️ HARDWARE'}
-                  {latestReply.source === 'navigation' && '🧭 NAVIGATION'}
-                  {(!latestReply.source || latestReply.source === 'fallback') && '🤖 AURRA AI'}
-                </span>
-              )}
-            </div>
-
-            {latestReply && (
-              <button
-                type="button"
-                className="inline-dismiss-btn"
-                onClick={() => {
-                  voiceNavigationService.clearInteractiveReply();
-                  setLatestReply(null);
-                }}
-                title="Clear Response"
-              >
-                <X size={13} />
-              </button>
-            )}
-          </div>
-
-          <div className="voice-speech-text">
-            {latestReply ? (
-              <div className="inline-qa-content">
-                {latestReply.query && (
-                  <div className="inline-user-query">
-                    <span className="query-prefix">You:</span> "{latestReply.query}"
-                  </div>
-                )}
-                <div className="inline-robot-answer">
-                  <span className="answer-prefix">Aurra:</span> {latestReply.reply}
+            {isThinking ? (
+              <span className="status-indicator thinking">
+                <Sparkles size={14} className="sparkle-pulse" />
+                AURRA THINKING
+              </span>
+            ) : isSpeaking ? (
+              <span className="status-indicator speaking">
+                <div className="gemini-mini-bars">
+                  <span className="g-bar b1"></span>
+                  <span className="g-bar b2"></span>
+                  <span className="g-bar b3"></span>
+                  <span className="g-bar b4"></span>
                 </div>
-              </div>
-            ) : transcript ? (
-              <span className="heard-text">"{transcript}"</span>
+                AURRA SPEAKING
+              </span>
             ) : (
-              <span className="prompt-text">
-                {documentContext ? (
-                  isListening 
-                    ? `Ask anything about "${documentContext.title || 'this PDF'}" or tap keyboard...` 
-                    : `Document AI active. Tap keyboard or mic icon to ask about "${documentContext.title || 'this PDF'}"...`
-                ) : (
-                  isListening 
-                    ? 'Voice assistant & multi-intent receptionist — the core Aurra runs from.' 
-                    : 'Microphone paused. Tap keyboard or mic icon to command Aurra.'
-                )}
+              <span className={`status-indicator ${isListening ? 'live' : 'idle'}`}>
+                <span className="dot"></span>
+                {isListening ? 'AURRA LISTENING' : 'MIC PAUSED'}
               </span>
             )}
           </div>
         </div>
       )}
-
-      {/* Real-Time Cyber Audio Equalizer Waveform */}
-      <div 
-        className={`voice-audio-equalizer ${isSpeaking ? 'speaking-bars' : isListening ? 'listening-bars' : 'idle-bars'}`}
-        title={isSpeaking ? 'Aurra Spoken Audio Waveform' : isListening ? 'Live Ambient Microphone Waveform' : 'Microphone Standby'}
-      >
-        <span className="eq-bar bar-1"></span>
-        <span className="eq-bar bar-2"></span>
-        <span className="eq-bar bar-3"></span>
-        <span className="eq-bar bar-4"></span>
-        <span className="eq-bar bar-5"></span>
-        <span className="eq-bar bar-6"></span>
-        <span className="eq-bar bar-7"></span>
-        <span className="eq-bar bar-8"></span>
-        <span className="eq-bar bar-9"></span>
-        <span className="eq-bar bar-10"></span>
-        <span className="eq-bar bar-11"></span>
-        <span className="eq-bar bar-12"></span>
-      </div>
 
       {/* Typing Keyboard Toggle Button */}
       <button
@@ -323,94 +238,35 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
         <Keyboard size={18} />
       </button>
 
-      {/* Voice Hints Guide Toggle */}
-      <button 
-        className="voice-hints-btn" 
-        onClick={() => setShowHints((prev) => !prev)}
-        title="Voice Commands Guide"
-      >
-        <HelpCircle size={18} />
-      </button>
-
-      {/* Pause AI / Resume AI Efficiency Button (Commented out for now as requested) */}
-      {/*
-      <button
-        className={`voice-pause-ai-btn ${isListening ? 'listening' : 'paused'}`}
-        onClick={handleToggle}
-        title={isListening ? 'Pause Continuous Audio Listening' : 'Resume Continuous Audio Listening'}
-      >
-        {isListening ? (
-          <>
-            <Pause size={14} />
-            <span>Pause AI</span>
-          </>
-        ) : (
-          <>
-            <Play size={14} />
-            <span>Resume AI</span>
-          </>
-        )}
-      </button>
-      */}
-
-      {/* Speaker Button: Sound ON / Sound OFF (Muted) */}
+      {/* Speaker Button: Sound ON / Sound OFF (Muted) - Icon Only */}
       <button
         className={`voice-speaker-btn ${isAiMuted ? 'sound-off' : isSpeaking ? 'speaking' : 'sound-on'}`}
         onClick={handleToggleAiMute}
         title={
           isSpeaking
-            ? 'AI is speaking — tap to mute AI speech now'
+            ? 'AI is speaking — tap to mute AI speech'
             : isAiMuted
             ? 'Speaker is OFF (Muted) — tap to turn speaker ON'
             : 'Speaker is ON — tap to turn speaker OFF (Mute AI)'
         }
       >
         {isAiMuted ? (
-          <>
-            <VolumeX size={16} color="#ef4444" />
-            <span>Speaker OFF</span>
-          </>
+          <VolumeX size={18} color="#ef4444" />
         ) : isSpeaking ? (
-          <>
-            <VolumeX size={16} className="speaking-pulse-icon" />
-            <span>Mute AI</span>
-          </>
+          <VolumeX size={18} className="speaking-pulse-icon" />
         ) : (
-          <>
-            <Volume2 size={16} color="#00ffff" />
-            <span>Speaker ON</span>
-          </>
+          <Volume2 size={18} color="#00ffff" />
         )}
       </button>
 
-      {/* Fullscreen Voice Immersion Toggle Button */}
+      {/* Fullscreen Voice Immersion Toggle Button - Icon Only */}
       <button
         className="voice-fullscreen-btn"
         onClick={() => setIsFullscreenOpen(true)}
-        title="Open Fullscreen Voice Assistant (Undulating Wave Horizon)"
+        title="Open Fullscreen Voice Assistant"
       >
-        <Maximize2 size={16} color="#00ffff" />
-        <span>Full Screen</span>
+        <Maximize2 size={18} color="#00ffff" />
       </button>
-
-      {showHints && (
-        <div className="voice-hints-popup" onClick={() => setShowHints(false)}>
-          <div className="hints-header">
-            <strong>AURRA VOICE COMMANDS</strong>
-            <span>(Controlled by Admin Voice Toggles)</span>
-          </div>
-          <ul>
-            <li>🗣️ <em>"Face Greetings"</em> or <em>"Camera"</em> &rarr; Face scanner</li>
-            <li>🗣️ <em>"Facilities"</em> or <em>"Amenities"</em> &rarr; Directory</li>
-            <li>🗣️ <em>"Show me around"</em> or <em>"Tour"</em> &rarr; Guided tour</li>
-            <li>🗣️ <em>"Register"</em> or <em>"Form"</em> &rarr; Admission form</li>
-            <li>🗣️ <em>"Cockpit"</em> or <em>"Control"</em> &rarr; Robot motors</li>
-            <li>🗣️ <em>"Admin"</em> or <em>"Settings"</em> &rarr; Configuration</li>
-            <li>🗣️ <em>"Show cards"</em> &rarr; Open Action Cards Grid</li>
-            <li>🗣️ <em>"Home"</em> or <em>"Banner"</em> &rarr; Return to Main screen</li>
-          </ul>
-        </div>
-      )}
 
       {/* Fullscreen Voice Immersion HUD Overlay */}
       <FullscreenVoiceOverlay

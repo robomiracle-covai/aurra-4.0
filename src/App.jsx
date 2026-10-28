@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import SliderAndCards from './pages/Cards/SliderAndCards';
 import FaceRecognition from './pages/FaceRecognition';
 import QuestionAnswerView from './pages/Questions/QuestionAnswerView';
@@ -17,6 +17,8 @@ import VoiceAssistantBar from './components/VoiceAssistantBar';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import AurraStartupSplashScreen from './components/AurraStartupSplashScreen';
 import { logger } from './services/logger';
+import { voiceNavigationService } from './services/voiceNavigationService';
+import { devSettingsService } from './services/devSettingsService';
 import './App.css';
 
 function App() {
@@ -30,8 +32,8 @@ function App() {
   const handleNavigate = (route, card = null) => {
     logger.breadcrumb('NAV', `Navigated to: ${route || '/'}`, card?.title ? { cardTitle: card.title } : null);
     setSelectedCard(card);
-    if (!route || route === '/' || route === '/home') {
-      setShowCardsView(false);
+    if (!route || route === '/' || route === '/home' || route === 'home') {
+      setShowCardsView(true);
       setIsAdminOpen(false);
       setCurrentRoute('/');
     } else if (route === '/admin') {
@@ -67,6 +69,44 @@ function App() {
   const handleCloseAdmin = () => {
     setIsAdminOpen(false);
   };
+
+  // Keep voice navigation initialized on boot so voice commands work continuously
+  useEffect(() => {
+    const cfg = devSettingsService.getSettings();
+    voiceNavigationService.init({
+      onNavigate: handleNavigate,
+      onOpenAdmin: handleOpenAdmin,
+      onToggleView: handleToggleView,
+      autoStart: cfg.autoListenOnBoot !== false,
+    });
+  }, []);
+
+  // Listen to custom events to guarantee showCardsView stays synchronized with slider/cards state
+  useEffect(() => {
+    const handleShowCards = () => setShowCardsView(true);
+    const handleShowSlider = () => setShowCardsView(false);
+
+    window.addEventListener('aurra_show_cards', handleShowCards);
+    window.addEventListener('aurra_show_features', handleShowCards);
+    window.addEventListener('aurra_morph_cards_in', handleShowCards);
+    window.addEventListener('aurra_show_slider', handleShowSlider);
+
+    return () => {
+      window.removeEventListener('aurra_show_cards', handleShowCards);
+      window.removeEventListener('aurra_show_features', handleShowCards);
+      window.removeEventListener('aurra_morph_cards_in', handleShowCards);
+      window.removeEventListener('aurra_show_slider', handleShowSlider);
+    };
+  }, []);
+
+  // Determine whether the global persistent voice bar should be displayed
+  // MUST NOT appear when the ads card/slideshow is active (both should not appear simultaneously)
+  const isVoiceBarVisible =
+    !isAdminOpen &&
+    currentRoute !== '/form' &&
+    currentRoute !== '/interaction' &&
+    currentRoute !== '/testing-interaction' &&
+    !(currentRoute === '/' && !showCardsView);
 
   return (
     <>
@@ -119,6 +159,7 @@ function App() {
             isAdminOpen={isAdminOpen}
             onOpenAdmin={handleOpenAdmin}
             onCloseAdmin={handleCloseAdmin}
+            onToggleView={handleToggleView}
           />
         )}
       </div>
@@ -131,8 +172,8 @@ function App() {
         />
       )}
 
-      {/* Globally Floating Persistent Voice Assistant Bar (hidden while in Admin, Form, Interaction Mode, and Testing Lab) */}
-      {!isAdminOpen && currentRoute !== '/form' && currentRoute !== '/interaction' && currentRoute !== '/testing-interaction' && (
+      {/* Globally Floating Persistent Voice Assistant Bar (hidden while in Admin, Form, Interaction Mode, Testing Lab, or when Ads Cards appear) */}
+      {isVoiceBarVisible && (
         <div className="global-floating-voice-bar">
           <VoiceAssistantBar
             onNavigate={handleNavigate}

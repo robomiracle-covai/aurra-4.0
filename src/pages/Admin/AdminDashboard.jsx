@@ -275,7 +275,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
   const loadData = useCallback(async () => {
     try {
       const header = await offlineBrandingService.getHeader();
-      setHeaderName(header?.headerName || 'Robomiracle Technologies Private Limited');
+      setHeaderName((header?.headerName && header.headerName !== 'Robomiracle Technologies Private Limited') ? header.headerName.replace(/\s*4\.0/gi, '').trim() : 'AURRA');
 
       const cardList = await offlineCardService.getCards();
       setCards(cardList || []);
@@ -2041,7 +2041,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                       className="adm-form-input"
                       value={headerName}
                       onChange={(e) => setHeaderName(e.target.value)}
-                      placeholder="e.g. Robomiracle Technologies Private Limited"
+                      placeholder="e.g. AURRA"
                       required
                     />
                   </div>
@@ -2049,7 +2049,7 @@ export default function AdminDashboard({ onNavigate, onClose }) {
                   <div className="adm-preview-box">
                     <span className="adm-preview-label">LIVE PREVIEW ON HOME SCREEN:</span>
                     <div className="adm-header-preview-capsule">
-                      <h2 className="adm-preview-heading">{headerName || 'Robomiracle Technologies'}</h2>
+                      <h2 className="adm-preview-heading">{headerName || 'AURRA'}</h2>
                     </div>
                   </div>
 

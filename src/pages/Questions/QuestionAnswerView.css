@@ -8,7 +8,21 @@
   flex-direction: column;
   height: 100vh;
   width: 100vw;
-  background: radial-gradient(circle at 50% 20%, #0d1933 0%, #050814 80%);
+  background-color: #03060d;
+  background-image:
+    linear-gradient(rgba(0, 255, 255, 0.095) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.095) 1px, transparent 1px),
+    url('/aurra_constellation_bg.png');
+  background-size:
+    40px 40px,
+    40px 40px,
+    cover;
+  background-position:
+    0 0,
+    0 0,
+    center center;
+  background-repeat: repeat, repeat, no-repeat;
+  background-attachment: fixed;
   color: #e2e8f0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   overflow: hidden;
@@ -21,9 +35,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 24px;
-  background: rgba(10, 18, 36, 0.85);
-  border-bottom: 1px solid rgba(0, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
+  background: #ffffff !important;
+  border-bottom: 1.5px solid rgba(0, 210, 255, 0.45) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
   z-index: 10;
 }
 
@@ -42,26 +58,31 @@
 }
 
 .qa-back-btn {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #94a3b8;
+  background: linear-gradient(135deg, rgba(9, 44, 76, 0.88) 0%, rgba(2, 132, 199, 0.75) 50%, rgba(0, 196, 219, 0.82) 100%) !important;
+  border: 1.5px solid rgba(0, 255, 255, 0.55) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(0, 255, 255, 0.3) !important;
+  backdrop-filter: blur(10px);
 }
 
 .qa-back-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.3);
+  background: linear-gradient(135deg, #0d3b66 0%, #0396e6 50%, #00e5ff 100%) !important;
+  color: #ffffff !important;
+  border-color: #00ffff !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 255, 255, 0.65) !important;
+  transform: translateY(-1px);
 }
 
 .qa-admin-btn {
-  background: rgba(0, 255, 255, 0.1);
-  border: 1px solid rgba(0, 255, 255, 0.3);
-  color: #00ffff;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  border: 1.5px solid rgba(0, 255, 255, 0.4) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3) !important;
 }
 
 .qa-admin-btn:hover {
-  background: rgba(0, 255, 255, 0.2);
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+  background: linear-gradient(135deg, #0d3b66 0%, #0396e6 50%, #00e5ff 100%) !important;
+  box-shadow: 0 0 18px rgba(0, 255, 255, 0.5) !important;
 }
 
 .qa-title-group {
@@ -71,19 +92,23 @@
 .qa-title-group h1 {
   margin: 0;
   font-size: 1.15rem;
-  font-weight: 800;
+  font-weight: 900 !important;
   letter-spacing: 0.08em;
-  color: #ffffff;
-  text-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+  text-shadow: none !important;
 }
 
 .qa-badge {
   font-size: 0.65rem;
-  font-weight: 700;
-  color: #00ffff;
+  font-weight: 800;
+  color: #ffffff !important;
   letter-spacing: 0.12em;
-  padding: 2px 8px;
-  background: rgba(0, 255, 255, 0.12);
+  padding: 3px 10px;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
   border-radius: 10px;
 }
 
@@ -97,17 +122,18 @@
   padding-bottom: 85px; /* Leave space for floating bottom voice bar */
 }
 
-/* Left Panel: Holographic Aurra Core & Quick Chips */
+/* Left Panel: Holographic Aurra Core & Quick Chips (Porcelain White Card) */
 .qa-core-panel {
   width: 320px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: rgba(13, 24, 48, 0.6);
-  border: 1px solid rgba(0, 255, 255, 0.15);
-  border-radius: 16px;
+  background: #ffffff !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.45) !important;
+  border-radius: 20px !important;
   padding: 20px 16px;
   backdrop-filter: blur(12px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), 0 0 16px rgba(0, 255, 255, 0.2) !important;
   gap: 16px;
   flex-shrink: 0;
 }
@@ -237,10 +263,14 @@
 }
 
 .chips-title {
-  font-size: 0.7rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 800;
   letter-spacing: 0.08em;
-  color: #94a3b8;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
   padding-left: 4px;
 }
 
@@ -257,11 +287,12 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(0, 255, 255, 0.12);
-  border-radius: 8px;
+  background: rgba(0, 210, 255, 0.08) !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.35) !important;
+  border-radius: 10px;
   padding: 8px 10px;
-  color: #cbd5e1;
+  color: #092c4c !important;
+  font-weight: 700 !important;
   font-size: 0.78rem;
   text-align: left;
   cursor: pointer;
@@ -269,21 +300,22 @@
 }
 
 .qa-chip:hover {
-  background: rgba(0, 255, 255, 0.12);
-  border-color: rgba(0, 255, 255, 0.35);
-  color: #00ffff;
+  background: rgba(0, 210, 255, 0.18) !important;
+  border-color: #00c4db !important;
+  color: #0284c7 !important;
   transform: translateX(3px);
 }
 
-/* Right Panel: Conversation Stream */
+/* Right Panel: Conversation Stream (Porcelain White Card) */
 .qa-chat-panel {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: rgba(10, 18, 36, 0.5);
-  border: 1px solid rgba(0, 255, 255, 0.15);
-  border-radius: 16px;
+  background: #ffffff !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.45) !important;
+  border-radius: 20px !important;
   backdrop-filter: blur(12px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), 0 0 16px rgba(0, 255, 255, 0.2) !important;
   overflow: hidden;
 }
 
@@ -311,16 +343,22 @@
 
 .bubble-aurra {
   align-self: flex-start;
-  background: rgba(15, 29, 58, 0.9);
-  border: 1px solid rgba(0, 255, 255, 0.25);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  background: #f8fafc !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.4) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+}
+
+.bubble-aurra .bubble-text {
+  color: #0f172a !important;
+  font-weight: 500;
 }
 
 .bubble-user {
   align-self: flex-end;
-  background: rgba(3, 105, 161, 0.35);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  color: #f1f5f9;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  border: 1.5px solid rgba(0, 255, 255, 0.45) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.3) !important;
 }
 
 .bubble-header {
@@ -332,13 +370,19 @@
 }
 
 .sender-tag {
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.05em;
-  color: #00ffff;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
 }
 
 .bubble-user .sender-tag {
-  color: #93c5fd;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: none !important;
 }
 
 .time-tag {
@@ -715,51 +759,55 @@
   color: #ef4444;
 }
 
-/* Interactive Input Bar */
+/* Interactive Input Bar (Porcelain White with Cyan Accent) */
 .qa-input-bar {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-top: 10px;
-  padding: 8px 12px;
-  background: rgba(10, 18, 36, 0.85);
-  border: 1px solid rgba(0, 255, 255, 0.2);
-  border-radius: 12px;
+  padding: 8px 14px;
+  background: #ffffff !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.45) !important;
+  border-radius: 14px;
   backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 0 12px rgba(0, 255, 255, 0.15) !important;
 }
 
 .qa-chat-input {
   flex: 1;
   background: transparent;
   border: none;
-  color: #ffffff;
+  color: #092c4c !important;
+  font-weight: 600 !important;
   font-size: 0.88rem;
   outline: none;
   font-family: inherit;
 }
 
 .qa-chat-input::placeholder {
-  color: rgba(148, 163, 184, 0.6);
+  color: #94a3b8;
 }
 
 .qa-send-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #00ffff 0%, #0284c7 100%);
-  border: none;
-  border-radius: 8px;
-  color: #031127;
-  font-weight: 700;
+  padding: 8px 18px;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  border: 1px solid rgba(0, 255, 255, 0.4) !important;
+  border-radius: 10px;
+  color: #ffffff !important;
+  font-weight: 800;
   font-size: 0.82rem;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.3) !important;
 }
 
 .qa-send-btn:hover:not(:disabled) {
-  box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+  background: linear-gradient(135deg, #0d3b66 0%, #0396e6 50%, #00e5ff 100%) !important;
+  box-shadow: 0 0 16px rgba(0, 255, 255, 0.5) !important;
   transform: translateY(-1px);
 }
 

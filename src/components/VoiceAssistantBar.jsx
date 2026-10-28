@@ -255,7 +255,7 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
         ) : isSpeaking ? (
           <VolumeX size={18} className="speaking-pulse-icon" />
         ) : (
-          <Volume2 size={18} color="#00ffff" />
+          <Volume2 size={18} color="#000000" />
         )}
       </button>
 
@@ -265,7 +265,7 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
         onClick={() => setIsFullscreenOpen(true)}
         title="Open Fullscreen Voice Assistant"
       >
-        <Maximize2 size={18} color="#00ffff" />
+        <Maximize2 size={18} color="#000000" />
       </button>
 
       {/* Fullscreen Voice Immersion HUD Overlay */}

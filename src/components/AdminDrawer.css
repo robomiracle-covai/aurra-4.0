@@ -22,12 +22,14 @@
   width: 100%;
   max-width: 720px;
   height: 100%;
-  background: #090d14;
-  border-left: 2px solid #00ffff;
-  box-shadow: -10px 0 35px rgba(0, 255, 255, 0.25);
+  background: #ffffff !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-left: 2px solid #00c4db !important;
+  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.25) !important;
   display: flex;
   flex-direction: column;
-  color: #e2e8f0;
+  color: #092c4c !important;
   font-family: system-ui, -apple-system, sans-serif;
   animation: slideDrawerLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -42,8 +44,11 @@
   justify-content: space-between;
   align-items: center;
   padding: 18px 24px;
-  background: #0f1624;
-  border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+  background: #ffffff !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1.5px solid rgba(0, 210, 255, 0.35) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
 .admin-title-row {
@@ -56,30 +61,37 @@
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: rgba(0, 255, 255, 0.1);
-  border: 1px solid #00ffff;
+  background: rgba(0, 210, 255, 0.12) !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.4) !important;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #0284c7 !important;
 }
 
 .admin-header h2 {
   font-size: 17px;
+  font-weight: 900 !important;
   letter-spacing: 1px;
-  color: #00ffff;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
   margin: 0;
   text-transform: uppercase;
 }
 
 .admin-subtitle {
   font-size: 12px;
-  color: #94a3b8;
+  color: #475569 !important;
+  font-weight: 500;
 }
 
 .admin-close-btn {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #e2e8f0;
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 210, 255, 0.4) !important;
+  color: #092c4c !important;
   width: 36px;
   height: 36px;
   border-radius: 8px;
@@ -91,8 +103,8 @@
 }
 
 .admin-close-btn:hover {
-  border-color: #ff3366;
-  color: #ff3366;
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
 }
 
 .admin-toast {
@@ -100,17 +112,17 @@
   align-items: center;
   gap: 8px;
   padding: 8px 24px;
-  background: rgba(0, 255, 204, 0.15);
-  border-bottom: 1px solid #00ffcc;
-  color: #00ffcc;
+  background: rgba(16, 185, 129, 0.15) !important;
+  border-bottom: 1px solid #10b981 !important;
+  color: #047857 !important;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .admin-tabs {
   display: flex;
-  background: #0b111c;
-  border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+  background: #f8fafc !important;
+  border-bottom: 1.5px solid rgba(0, 210, 255, 0.25) !important;
   padding: 0 16px;
 }
 
@@ -122,21 +134,20 @@
   background: transparent;
   border: none;
   border-bottom: 3px solid transparent;
-  color: #94a3b8;
+  color: #64748b !important;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .admin-tab-btn:hover {
-  color: #00ffff;
+  color: #0284c7 !important;
 }
 
 .admin-tab-btn.active {
-  color: #00ffff;
-  border-bottom-color: #00ffff;
-  background: rgba(0, 255, 255, 0.05);
+  color: #0284c7 !important;
+  border-bottom: 3px solid #00c4db !important;
 }
 
 .admin-body {

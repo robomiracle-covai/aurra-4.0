@@ -52,7 +52,7 @@ export default function AdminDrawer({ isOpen, onClose, onRefreshData }) {
       setSlides(loadedSlides || []);
 
       const header = await offlineBrandingService.getHeader();
-      setHeaderTitle(header?.headerName || 'Robomiracle Technologies Private Limited');
+      setHeaderTitle((header?.headerName && header.headerName !== 'Robomiracle Technologies Private Limited') ? header.headerName.replace(/\s*4\.0/gi, '').trim() : 'AURRA');
     } catch (err) {
       logger.error('ADMIN', `Failed to load admin data: ${err.message}`);
     }
@@ -386,7 +386,7 @@ export default function AdminDrawer({ isOpen, onClose, onRefreshData }) {
                     type="text"
                     value={headerTitle}
                     onChange={(e) => setHeaderTitle(e.target.value)}
-                    placeholder="e.g. Robomiracle Technologies Private Limited"
+                    placeholder="e.g. AURRA 4.0"
                   />
                   <button 
                     className="admin-action-btn primary" 

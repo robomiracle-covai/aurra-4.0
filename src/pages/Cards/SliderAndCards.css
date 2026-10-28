@@ -4,12 +4,22 @@
   position: relative;
   width: 100vw;
   height: 100vh;
-  background-color: #06090e;
-  background-image: 
-    radial-gradient(circle at 50% 10%, rgba(0, 255, 255, 0.08) 0%, transparent 60%),
-    linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 100% 100%, 40px 40px, 40px 40px;
+  background-color: #03060d;
+  background-image:
+    /* Layer 0: Transparent Cyber Checked Grid with increased brightness */
+    linear-gradient(rgba(0, 255, 255, 0.095) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.095) 1px, transparent 1px),
+    /* Layer 1: Ambient Cyan Background Image */
+    url('/aurra_constellation_bg.png');
+  background-size:
+    40px 40px,
+    40px 40px,
+    cover;
+  background-position:
+    0 0,
+    0 0,
+    center center;
+  background-repeat: repeat, repeat, no-repeat;
   color: #f1f5f9;
   font-family: system-ui, -apple-system, sans-serif;
   display: flex;
@@ -29,10 +39,25 @@
   z-index: 10;
 }
 
-.hud-corner-tag.top-left { top: 6px; left: 16px; }
-.hud-corner-tag.top-right { top: 6px; right: 16px; }
-.hud-corner-tag.bottom-left { bottom: 6px; left: 16px; }
-.hud-corner-tag.bottom-right { bottom: 6px; right: 16px; }
+.hud-corner-tag.top-left {
+  top: 6px;
+  left: 16px;
+}
+
+.hud-corner-tag.top-right {
+  top: 6px;
+  right: 16px;
+}
+
+.hud-corner-tag.bottom-left {
+  bottom: 6px;
+  left: 16px;
+}
+
+.hud-corner-tag.bottom-right {
+  bottom: 6px;
+  right: 16px;
+}
 
 /* Top Cyber Telemetry Header Bar - Modeled after Aurra 2.0 / 4.0 */
 .kiosk-top-bar {
@@ -79,23 +104,16 @@
 .brand-text-col {
   display: flex;
   flex-direction: column;
+  justify-content: center;
 }
 
 .brand-title {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 900;
   color: #ffffff;
   letter-spacing: 2px;
-  text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+  text-shadow: 0 0 12px rgba(0, 255, 255, 0.55);
   line-height: 1.2;
-}
-
-.brand-sub {
-  font-size: 9.5px;
-  font-weight: 700;
-  color: #00ffff;
-  letter-spacing: 1.2px;
-  opacity: 0.85;
 }
 
 /* Center Telemetry Indicator Cluster */
@@ -126,7 +144,7 @@
   background: currentColor;
 }
 
-/* Cyber Telemetry Icon Badges */
+/* Cyber Telemetry Icon Badges - Matching background gradient */
 .hud-telem-icon-btn {
   display: inline-flex;
   align-items: center;
@@ -135,18 +153,28 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(10, 18, 32, 0.85);
-  border: 1.5px solid rgba(0, 255, 255, 0.35);
-  color: #00ffff;
+  background: linear-gradient(135deg, rgba(9, 44, 76, 0.88) 0%, rgba(2, 132, 199, 0.75) 50%, rgba(0, 196, 219, 0.82) 100%) !important;
+  border: 1.5px solid rgba(0, 255, 255, 0.55) !important;
+  color: #ffffff !important;
   cursor: pointer;
   transition: all 0.2s ease;
   user-select: none;
   touch-action: manipulation;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(0, 255, 255, 0.3) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.hud-telem-icon-btn svg,
+.hud-telem-icon-btn svg * {
+  stroke: #ffffff !important;
+  color: #ffffff !important;
+  filter: drop-shadow(0 0 4px rgba(0, 255, 255, 0.7)) !important;
 }
 
 .hud-telem-icon-btn:hover {
-  border-color: #00ffff;
-  box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+  border-color: #00ffff !important;
+  box-shadow: 0 0 18px rgba(0, 255, 255, 0.6) !important;
   transform: translateY(-1px);
 }
 
@@ -157,26 +185,32 @@
 }
 
 .hud-telem-icon-btn.telem-online {
-  color: #34d399;
-  border-color: rgba(52, 211, 153, 0.5);
+  color: #ffffff !important;
+  border-color: rgba(0, 255, 255, 0.55) !important;
 }
+
 .hud-telem-icon-btn.telem-online .telem-dot {
-  box-shadow: 0 0 8px #34d399;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
 }
 
 .hud-telem-icon-btn.telem-offline {
-  color: #f87171;
-  border-color: rgba(248, 113, 113, 0.5);
+  color: #ffffff !important;
+  border-color: rgba(239, 68, 68, 0.6) !important;
 }
+
 .hud-telem-icon-btn.telem-offline .telem-dot {
-  box-shadow: 0 0 8px #f87171;
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
 }
 
 .hud-telem-icon-btn.telem-db {
-  color: #38bdf8;
-  border-color: rgba(56, 189, 248, 0.5);
+  color: #ffffff !important;
+  border-color: rgba(0, 255, 255, 0.55) !important;
 }
+
 .hud-telem-icon-btn.telem-db .telem-dot {
+  background: #38bdf8;
   box-shadow: 0 0 8px #38bdf8;
 }
 
@@ -187,18 +221,21 @@
   width: 36px;
   height: 36px;
   padding: 0;
-  color: #00ffff;
-  border-color: rgba(0, 255, 255, 0.45);
+  color: #ffffff !important;
+  border-color: rgba(0, 255, 255, 0.55) !important;
 }
 
 .telem-fps-top-num {
   font-size: 13px;
   font-weight: 900;
-  color: #00ffff;
+  color: #ffffff !important;
   line-height: 1;
   font-family: 'JetBrains Mono', Consolas, monospace;
   letter-spacing: -0.3px;
-  text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.8) !important;
+  background: none !important;
+  -webkit-text-fill-color: #ffffff !important;
+  display: inline-block;
 }
 
 /* Right Clock & Date Container */
@@ -311,7 +348,26 @@
   gap: 12px;
 }
 
-/* Cyber Top Action Icon Buttons (Explain Features & Features) */
+.cyber-top-right-group .cyber-top-icon-btn,
+.cyber-top-right-group .hud-telem-icon-btn {
+  background: linear-gradient(135deg, rgba(9, 44, 76, 0.88) 0%, rgba(2, 132, 199, 0.75) 50%, rgba(0, 196, 219, 0.82) 100%) !important;
+  border: 1.5px solid rgba(0, 255, 255, 0.55) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(0, 255, 255, 0.3) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.cyber-top-right-group .cyber-top-icon-btn svg,
+.cyber-top-right-group .hud-telem-icon-btn svg,
+.cyber-top-right-group .cyber-top-icon-btn svg *,
+.cyber-top-right-group .hud-telem-icon-btn svg * {
+  stroke: #ffffff !important;
+  color: #ffffff !important;
+  filter: drop-shadow(0 0 4px rgba(0, 255, 255, 0.7)) !important;
+}
+
+/* Cyber Top Action Icon Buttons (Explain Features & Features) - Matching background gradient */
 .cyber-top-icon-btn {
   display: inline-flex;
   align-items: center;
@@ -319,21 +375,30 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: rgba(0, 207, 239, 0.12);
-  border: 1.5px solid rgba(0, 207, 239, 0.4);
-  color: #00ffff;
+  background: linear-gradient(135deg, rgba(9, 44, 76, 0.88) 0%, rgba(2, 132, 199, 0.75) 50%, rgba(0, 196, 219, 0.82) 100%) !important;
+  border: 1.5px solid rgba(0, 255, 255, 0.55) !important;
+  color: #ffffff !important;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 0 12px rgba(0, 207, 239, 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(0, 255, 255, 0.3) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   user-select: none;
   touch-action: manipulation;
 }
 
+.cyber-top-icon-btn svg,
+.cyber-top-icon-btn svg * {
+  stroke: #ffffff !important;
+  color: #ffffff !important;
+  filter: drop-shadow(0 0 4px rgba(0, 255, 255, 0.7)) !important;
+}
+
 .cyber-top-icon-btn:hover {
-  background: rgba(0, 207, 239, 0.25);
-  border-color: #00ffff;
-  box-shadow: 0 0 18px rgba(0, 207, 239, 0.5);
-  transform: translateY(-1px) scale(1.05);
+  background: linear-gradient(135deg, #0d3b66 0%, #0396e6 50%, #00e5ff 100%) !important;
+  border-color: #00ffff !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 255, 255, 0.65) !important;
+  transform: translateY(-1px) scale(1.06);
 }
 
 .cyber-top-icon-btn:active {
@@ -341,15 +406,20 @@
 }
 
 .cyber-top-icon-btn.active-tour {
-  background: rgba(0, 255, 255, 0.25);
-  border-color: #00ffff;
-  box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+  background: linear-gradient(135deg, #0d3b66 0%, #0396e6 50%, #00e5ff 100%) !important;
+  border-color: #00ffff !important;
+  box-shadow: 0 0 24px rgba(0, 255, 255, 0.8), inset 0 0 10px rgba(0, 255, 255, 0.4) !important;
   animation: pulseIconTour 1.5s infinite alternate;
 }
 
 @keyframes pulseIconTour {
-  0% { box-shadow: 0 0 10px rgba(0, 255, 255, 0.4); }
-  100% { box-shadow: 0 0 24px rgba(0, 255, 255, 0.8); }
+  0% {
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
+  }
+
+  100% {
+    box-shadow: 0 0 24px rgba(0, 255, 255, 0.8);
+  }
 }
 
 /* Main Body View */
@@ -379,6 +449,9 @@
   display: flex;
   flex-direction: column;
   cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .slider-viewport {
@@ -410,9 +483,9 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-image: 
-    linear-gradient(rgba(0, 255, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 255, 255, 0.08) 1px, transparent 1px);
+  background-image:
+    linear-gradient(rgba(0, 255, 255, 0.095) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.095) 1px, transparent 1px);
   background-size: 32px 32px;
   pointer-events: none;
 }
@@ -507,15 +580,14 @@
 .orbital-home-layout {
   display: flex;
   width: 100%;
-  max-width: 1260px;
+  max-width: 100%;
   height: 100%;
-  padding: 0 20px;
+  padding: 0;
   box-sizing: border-box;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   position: relative;
   z-index: 10;
-  gap: 30px;
 }
 
 /* Left Hero Command Deck */
@@ -555,13 +627,13 @@
   box-shadow: 0 0 8px #00ffff;
 }
 
-/* Dynamic Feature Spotlight Rectangle (Enlarged & Styled in Cyber Cyan) */
+/* Dynamic Feature Spotlight Rectangle (White porcelain card with black text, preserving red title) */
 .hero-feature-spotlight-card {
   width: 100%;
   max-width: 420px;
-  background: linear-gradient(135deg, rgba(8, 16, 32, 0.95) 0%, rgba(13, 27, 54, 0.97) 100%);
-  border: 1.5px solid rgba(0, 255, 255, 0.4);
-  box-shadow: 0 0 30px rgba(0, 255, 255, 0.16), inset 0 0 20px rgba(0, 255, 255, 0.04);
+  background: #ffffff !important;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.45), 0 0 20px rgba(0, 255, 255, 0.2);
   border-radius: 20px;
   padding: 18px 22px;
   box-sizing: border-box;
@@ -577,82 +649,12 @@
 
 @keyframes spotlightGlowPulse {
   0% {
-    border-color: rgba(0, 255, 255, 0.35);
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.1), inset 0 0 12px rgba(0, 255, 255, 0.02);
+    box-shadow: 0 14px 38px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 255, 255, 0.15);
   }
+
   100% {
-    border-color: rgba(0, 255, 255, 0.6);
-    box-shadow: 0 0 34px rgba(0, 255, 255, 0.22), inset 0 0 22px rgba(0, 255, 255, 0.05);
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.5), 0 0 26px rgba(0, 255, 255, 0.3);
   }
-}
-
-.live-dot-pulse {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #00ffff;
-  box-shadow: 0 0 8px #00ffff;
-  animation: dotPulse 1.6s infinite ease-in-out;
-}
-
-@keyframes dotPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(0.7); }
-}
-
-.spotlight-card-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(0, 255, 255, 0.12);
-}
-
-.spotlight-sys-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 10px;
-  font-weight: 800;
-  color: #00ffff;
-  letter-spacing: 0.8px;
-}
-
-.spotlight-step-text {
-  color: #00ffff;
-  font-weight: 800;
-}
-
-.spotlight-nav-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.spotlight-arrow-btn {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: rgba(0, 255, 255, 0.1);
-  border: 1px solid rgba(0, 255, 255, 0.3);
-  color: #00ffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
-  font-weight: 700;
-  transition: all 0.2s;
-  padding: 0;
-  touch-action: manipulation;
-}
-
-.spotlight-arrow-btn:hover {
-  background: rgba(0, 255, 255, 0.25);
-  border-color: #00ffff;
-  transform: scale(1.1);
 }
 
 .spotlight-card-content {
@@ -667,6 +669,7 @@
     opacity: 0;
     transform: translateY(4px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -683,14 +686,19 @@
   width: 46px;
   height: 46px;
   border-radius: 14px;
-  background: rgba(0, 255, 255, 0.12);
-  border: 1.5px solid #00ffff;
-  box-shadow: 0 0 16px rgba(0, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.05);
+  border: 1.5px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: #00ffff;
+  color: #000000;
+}
+
+.spotlight-icon-box svg {
+  stroke: #000000 !important;
+  color: #000000 !important;
 }
 
 .spotlight-title-col {
@@ -709,15 +717,18 @@
 
 .spotlight-card-sub {
   font-size: 11px;
-  color: #94a3b8;
-  font-weight: 600;
+  color: #000000 !important;
+  font-weight: 700;
   margin-top: 2px;
+  opacity: 0.75;
 }
 
 .spotlight-card-desc {
   font-size: 12.5px;
   line-height: 1.52;
-  color: #cbd5e1;
+  color: #000000 !important;
+  opacity: 0.88;
+  font-weight: 500;
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -728,9 +739,9 @@
 .spotlight-card-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
   margin-top: 2px;
 }
 
@@ -740,9 +751,9 @@
   gap: 6px;
   padding: 6px 15px;
   border-radius: 16px;
-  background: linear-gradient(135deg, rgba(0, 255, 255, 0.16) 0%, rgba(0, 180, 216, 0.25) 100%);
-  border: 1.2px solid #00ffff;
-  color: #00ffff;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1.2px solid rgba(0, 0, 0, 0.18);
+  color: #000000 !important;
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
@@ -750,131 +761,82 @@
   touch-action: manipulation;
 }
 
+.spotlight-launch-btn svg {
+  stroke: #000000 !important;
+  color: #000000 !important;
+  fill: #000000 !important;
+}
+
 .spotlight-launch-btn:hover {
-  background: #00ffff;
-  color: #000000;
-  box-shadow: 0 0 16px rgba(0, 255, 255, 0.55);
+  background: #000000;
+  color: #ffffff !important;
+  border-color: #000000;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.spotlight-launch-btn:hover svg {
+  stroke: #ffffff !important;
+  color: #ffffff !important;
+  fill: #ffffff !important;
 }
 
 .spotlight-launch-btn:active {
   transform: scale(0.96);
 }
 
-/* Synchronized Red Color Linking (#ff3b5c) between Spotlight Card and Orbital Node */
+/* Synchronized Red Color Linking (#dc2626) between Spotlight Card and Orbital Node */
 .matched-feature-word {
-  color: #ff3b5c !important;
-  text-shadow: 0 0 12px rgba(255, 59, 92, 0.85), 0 0 24px rgba(255, 59, 92, 0.45) !important;
+  color: #dc2626 !important;
+  text-shadow: none !important;
   font-weight: 900 !important;
 }
 
-.orb-label-text.inactive-label {
-  color: #e2e8f0 !important;
-  font-weight: 600 !important;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8) !important;
+.orb-label-text.inactive-label,
+.orb-label-text.matched-feature-word {
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+  font-weight: 800 !important;
+  text-shadow: none !important;
 }
 
 .orb-label-text.active-label-glow {
-  transform: scale(1.08);
+  transform: scale(1.06);
+  background: linear-gradient(135deg, #0284c7 0%, #00b4d8 50%, #00f0ff 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+  text-shadow: none !important;
 }
 
-.spotlight-dots-indicator {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
 
-.spotlight-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  cursor: pointer;
-  transition: all 0.2s;
-}
 
-.spotlight-dot.active {
-  width: 14px;
-  border-radius: 4px;
-  background: #00ffff;
-  box-shadow: 0 0 8px #00ffff;
-}
 
-.hero-actions-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
 
-.talk-to-aurra-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 24px;
-  border-radius: 30px;
-  background: linear-gradient(135deg, #00d2ff 0%, #0088ff 100%);
-  border: none;
-  color: #000000;
-  font-size: 14.5px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  box-shadow: 0 0 24px rgba(0, 210, 255, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.4);
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
-  user-select: none;
-  touch-action: manipulation;
-}
-
-.talk-to-aurra-btn:active {
-  transform: scale(0.96);
-}
-
-.play-icon-circle {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.screensaver-switch-btn {
-  padding: 10px 18px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #cbd5e1;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
-  touch-action: manipulation;
-}
-
-.screensaver-switch-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(0, 255, 255, 0.4);
-  color: #00ffff;
-}
-
-/* Right Orbital Constellation Column */
+/* Centered Orbital Constellation Column */
 .constellation-column {
   flex: 1;
+  width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  margin: 0 auto;
 }
 
 .constellation-canvas {
-  width: 620px;
-  height: 500px;
+  width: 100%;
+  max-width: 680px;
+  height: 520px;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 0 auto;
 }
 
 /* Subtle Organic Ambient Halos */
@@ -888,15 +850,15 @@
 }
 
 .track-outer {
-  width: 460px;
-  height: 460px;
+  width: 450px;
+  height: 450px;
   background: radial-gradient(circle, rgba(0, 255, 255, 0.04) 0%, rgba(0, 210, 255, 0.015) 50%, transparent 70%);
   border: 1px solid rgba(0, 255, 255, 0.08);
 }
 
 .track-inner {
-  width: 290px;
-  height: 290px;
+  width: 304px;
+  height: 304px;
   background: radial-gradient(circle, rgba(0, 255, 255, 0.06) 0%, transparent 70%);
   border: 1px solid rgba(0, 255, 255, 0.1);
 }
@@ -906,12 +868,12 @@
   display: none !important;
 }
 
-/* Central Core Sphere: Ask Aurra (SYS_01) */
+/* Central Core Sphere: Ask Aurra (SYS_01) - White porcelain orb with black text */
 .constellation-core-orb {
   width: 154px;
   height: 154px;
   border-radius: 50%;
-  background: radial-gradient(circle at center, rgba(0, 255, 255, 0.28) 0%, rgba(2, 132, 199, 0.45) 55%, rgba(6, 18, 36, 0.98) 100%);
+  background: #ffffff !important;
   position: absolute;
   top: 50%;
   left: 50%;
@@ -922,8 +884,8 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 0 38px rgba(0, 255, 255, 0.58), inset 0 0 20px rgba(0, 255, 255, 0.2);
-  border: 2px solid #00ffff;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45), 0 0 24px rgba(0, 255, 255, 0.35);
+  border: 2.5px solid #ffffff;
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   user-select: none;
   touch-action: manipulation;
@@ -933,25 +895,104 @@
   transform: translate(-50%, -50%) scale(0.95);
 }
 
+.core-robot-face-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 2px;
+  margin-bottom: 2px;
+  position: relative;
+  z-index: 2;
+}
+
+.core-robot-face-img {
+  width: 86px;
+  height: auto;
+  max-height: 64px;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+  animation: aurraCoreFloat 3.8s ease-in-out infinite;
+  transform-origin: center bottom;
+  will-change: transform, filter;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
+}
+
+@keyframes aurraCoreFloat {
+  0% {
+    transform: translateY(0px) rotate(0deg) scale(1);
+    filter: drop-shadow(0 4px 12px rgba(0, 180, 255, 0.28));
+  }
+  25% {
+    transform: translateY(-2.5px) rotate(0.8deg) scale(1.015);
+    filter: drop-shadow(0 6px 16px rgba(0, 210, 255, 0.42));
+  }
+  50% {
+    transform: translateY(-4.5px) rotate(0deg) scale(1.025);
+    filter: drop-shadow(0 8px 20px rgba(0, 240, 255, 0.55));
+  }
+  75% {
+    transform: translateY(-2px) rotate(-0.8deg) scale(1.015);
+    filter: drop-shadow(0 6px 16px rgba(0, 210, 255, 0.42));
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg) scale(1);
+    filter: drop-shadow(0 4px 12px rgba(0, 180, 255, 0.28));
+  }
+}
+
+.constellation-core-orb:hover .core-robot-face-img {
+  animation-play-state: paused;
+  transform: translateY(-5px) scale(1.08);
+  filter: drop-shadow(0 8px 24px rgba(0, 240, 255, 0.7));
+}
+
+.constellation-core-orb:active .core-robot-face-img {
+  animation-play-state: paused;
+  transform: translateY(1px) scale(0.95);
+  filter: drop-shadow(0 2px 8px rgba(0, 180, 255, 0.4));
+  transition: transform 0.1s ease;
+}
+
 .core-mic-halo {
   margin-bottom: 2px;
-  filter: drop-shadow(0 0 8px #00ffff);
+  filter: none;
+}
+
+.core-mic-halo svg {
+  stroke: url(#aurra-constellation-gradient), #0284c7 !important;
+  color: #0284c7 !important;
 }
 
 .core-orb-title {
   font-size: 15px;
   font-weight: 900;
-  color: #ffffff;
   letter-spacing: 0.5px;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+  display: inline-block;
+  text-shadow: none !important;
+  margin-top: 2px;
+  position: relative;
+  z-index: 2;
 }
 
 .core-orb-sys {
   font-size: 9px;
   font-weight: 800;
-  color: #00ffff;
   letter-spacing: 1px;
-  opacity: 0.9;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+  display: inline-block;
+  opacity: 0.85;
+  text-shadow: none !important;
 }
 
 .core-breathing-aura {
@@ -959,18 +1000,29 @@
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  border: 2px solid #00ffff;
+  border: 2px solid rgba(0, 255, 255, 0.65);
   animation: coreAuraBreathe 3s infinite ease-in-out;
   pointer-events: none;
 }
 
 @keyframes coreAuraBreathe {
-  0% { transform: scale(1); opacity: 0.7; }
-  50% { transform: scale(1.15); opacity: 0.2; }
-  100% { transform: scale(1); opacity: 0.7; }
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: scale(1.15);
+    opacity: 0.2;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
 }
 
-/* Orbiting Satellite Spheres (No white bubble reflection) */
+/* Orbiting Satellite Spheres (White porcelain discs with dark typography) */
 .satellite-orb-node {
   position: absolute;
   top: calc(50% + var(--orb-y, 0px));
@@ -981,13 +1033,13 @@
   cursor: pointer;
   z-index: 20;
   transform: translate3d(-50%, -50%, 0);
-  background: radial-gradient(circle at center, rgba(0, 255, 255, 0.16) 0%, rgba(7, 15, 28, 0.96) 80%);
-  border: 1.5px solid var(--orb-border);
-  box-shadow: 0 0 16px var(--orb-glow);
+  background: #ffffff !important;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 255, 255, 0.22);
   user-select: none;
   touch-action: manipulation;
   will-change: transform, opacity;
-  opacity: 0.95;
+  opacity: 0.98;
   transition: opacity 0.35s ease, transform 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease;
 }
 
@@ -995,17 +1047,59 @@
   transform: translate3d(-50%, -50%, 0) scale(0.94);
 }
 
-/* HIGH-IMPACT ACTIVE SPOTLIGHT NODE (Visual Clarity in Cyan Glow) */
+.satellite-orb-node.prominent-larger-orb {
+  background: #ffffff !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 22px rgba(0, 255, 255, 0.3);
+  border-width: 2.5px;
+  border-color: #ffffff;
+}
+
+/* HIGH-IMPACT ACTIVE SPOTLIGHT NODE (Visual Clarity in Softened Cyan Glow)
+   Moves outward along --push-x / --push-y with a controlled 1.08 scale to NEVER touch central core orb */
 .satellite-orb-node.spotlight-active-node {
   opacity: 1 !important;
-  border-color: #00ffff !important;
-  border-width: 2.5px !important;
-  box-shadow: 0 0 38px #00ffff, 0 0 75px rgba(0, 255, 255, 0.75), inset 0 0 16px rgba(0, 255, 255, 0.5) !important;
-  transform: translate3d(-50%, -50%, 0) scale(1.22) !important;
+  background: #ffffff !important;
+  border-color: rgba(0, 255, 255, 0.85) !important;
+  border-width: 2.2px !important;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.48), 0 0 24px rgba(0, 255, 255, 0.55), inset 0 0 6px rgba(0, 255, 255, 0.2) !important;
+  transform: translate3d(calc(-50% + var(--push-x, 0px)), calc(-50% + var(--push-y, 0px)), 0) scale(1.08) !important;
   z-index: 45 !important;
 }
 
-/* Dual Concentric Pulsing Cyber Target Rings */
+/* ADJUSTED GPU BOBBER SPECIFICALLY DURING HIGHLIGHTING ANIMATION:
+   Decreased brightness, bobs in outward radial direction (--bob-x, --bob-y) away from constellation core orb */
+.satellite-orb-node.spotlight-active-node .orb-gpu-bobber {
+  animation: activeOrbGpuBobber 2.4s ease-in-out infinite alternate !important;
+  animation-delay: 0s !important;
+  will-change: transform;
+  filter: brightness(0.9) contrast(0.95);
+}
+
+.satellite-orb-node.spotlight-active-node .orb-icon-glyph {
+  filter: drop-shadow(0 0 3px rgba(0, 255, 255, 0.45));
+}
+
+.satellite-orb-node.spotlight-active-node .orb-label-text {
+  background: linear-gradient(135deg, #0284c7 0%, #00b4d8 50%, #00f0ff 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+  font-weight: 900 !important;
+  text-shadow: none !important;
+}
+
+@keyframes activeOrbGpuBobber {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  100% {
+    transform: translate3d(var(--bob-x, 0px), var(--bob-y, 0px), 0) scale(1.03);
+  }
+}
+
+/* Dual Concentric Pulsing Cyber Target Rings - Accent rings in deep cyber theme */
 .spotlight-active-pulse-ring {
   position: absolute;
   border-radius: 50%;
@@ -1013,29 +1107,36 @@
 }
 
 .spotlight-active-pulse-ring.ring-inner {
-  top: -8px;
-  left: -8px;
-  right: -8px;
-  bottom: -8px;
-  border: 1.5px dashed #00ffff;
+  top: -5px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
+  border: 1.5px dashed rgba(8, 16, 32, 0.9);
+  box-shadow: 0 0 6px rgba(0, 255, 255, 0.25);
   animation: rotateActiveRing 8s linear infinite;
 }
 
 .spotlight-active-pulse-ring.ring-outer {
-  top: -16px;
-  left: -16px;
-  right: -16px;
-  bottom: -16px;
-  border: 1px dotted rgba(0, 255, 255, 0.6);
+  top: -9px;
+  left: -9px;
+  right: -9px;
+  bottom: -9px;
+  border: 1px dotted rgba(8, 16, 32, 0.85);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.15);
   animation: rotateActiveRingRev 12s linear infinite;
 }
 
 @keyframes rotateActiveRingRev {
-  0% { transform: rotate(360deg); }
-  100% { transform: rotate(0deg); }
+  0% {
+    transform: rotate(360deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
 }
 
-/* Floating "ACTIVE" Holographic Callout Badge */
+/* Floating "ACTIVE" Holographic Callout Badge - Sleek deep cyber theme */
 .spotlight-active-beacon {
   position: absolute;
   left: 50%;
@@ -1045,12 +1146,13 @@
   gap: 4px;
   padding: 3px 9px;
   border-radius: 12px;
-  background: #00ffff;
-  color: #000000;
+  background: rgba(8, 16, 32, 0.9) !important;
+  border: 1px solid rgba(0, 255, 255, 0.45);
+  color: #00ffff;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 1px;
-  box-shadow: 0 0 16px #00ffff, 0 0 30px rgba(0, 255, 255, 0.8);
+  box-shadow: 0 0 10px rgba(8, 16, 32, 0.9), 0 0 12px rgba(0, 255, 255, 0.25);
   white-space: nowrap;
   pointer-events: none;
   animation: beaconBob 1.6s ease-in-out infinite alternate;
@@ -1068,8 +1170,13 @@
 }
 
 @keyframes beaconBob {
-  0% { transform: translateX(-50%) translateY(0); }
-  100% { transform: translateX(-50%) translateY(-4px); }
+  0% {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  100% {
+    transform: translateX(-50%) translateY(-4px);
+  }
 }
 
 .orb-gpu-bobber {
@@ -1089,25 +1196,42 @@
 }
 
 @keyframes satelliteBob {
-  0% { transform: translate3d(0, -3px, 0); }
-  100% { transform: translate3d(0, 3px, 0); }
+  0% {
+    transform: translate3d(0, -3px, 0);
+  }
+
+  100% {
+    transform: translate3d(0, 3px, 0);
+  }
 }
 
 .orb-icon-glyph {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 2px;
-  filter: drop-shadow(0 0 6px var(--orb-color));
+  margin-bottom: 3px;
+  filter: none !important;
+  color: #0284c7;
+}
+
+.orb-icon-glyph svg {
+  stroke: url(#aurra-constellation-gradient), #0284c7 !important;
+  color: #0284c7 !important;
+  filter: none !important;
 }
 
 .orb-label-text {
   font-size: var(--orb-font-size, 10.5px);
   font-weight: 800;
-  color: #ffffff;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+  display: inline-block;
   line-height: 1.15;
   max-width: var(--orb-label-max, 84px);
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  text-shadow: none !important;
 }
 
 .orb-sys-badge {
@@ -1152,6 +1276,7 @@
     opacity: 0;
     transform: translate3d(-55px, 0, 0);
   }
+
   100% {
     opacity: 1;
     transform: translate3d(0, 0, 0);
@@ -1170,31 +1295,29 @@
     opacity: 0;
     transform: translate(-50%, -50%) scale(0.35);
   }
+
   100% {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
   }
 }
 
-/* Frame 4 & 5: Big center card ("Ask Aurra") emerges from left corner to focal center */
+/* Center card ("Ask Aurra") emerges to focal center */
 .orbital-home-layout.is-morphing-in .constellation-core-orb {
-  animation: coreOrbFromLeftCorner 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: coreOrbCenterPulseIn 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
   animation-delay: 0.28s;
   will-change: transform, opacity;
 }
 
-@keyframes coreOrbFromLeftCorner {
+@keyframes coreOrbCenterPulseIn {
   0% {
     opacity: 0;
-    transform: translate3d(calc(-50% - 360px), calc(-50% + 160px), 0) scale(0.22);
+    transform: translate(-50%, -50%) scale(0.35);
   }
-  42% {
-    opacity: 1;
-    transform: translate3d(calc(-50% - 80px), calc(-50% + 35px), 0) scale(0.82);
-  }
+
   100% {
     opacity: 1;
-    transform: translate3d(-50%, -50%, 0) scale(1);
+    transform: translate(-50%, -50%) scale(1);
   }
 }
 
@@ -1317,8 +1440,13 @@
 }
 
 @keyframes rotateActiveRing {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .explain-top-node-icon {
@@ -1581,6 +1709,3 @@
   background: rgba(239, 68, 68, 0.25);
   color: #ffffff;
 }
-
-
-

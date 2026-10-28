@@ -28,7 +28,7 @@ db.version(2).stores({
   }
   const headerCount = await tx.table('headers').count();
   if (headerCount === 0) {
-    await tx.table('headers').add({ headerName: 'Robomiracle Technologies Private Limited' });
+    await tx.table('headers').add({ headerName: 'AURRA' });
   }
 });
 
@@ -356,6 +356,41 @@ db.version(12).stores({
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
+  }
+});
+
+// Version 13: 6-Feature Default Constellation Matrix (Register, QA, Facilities, Face Greetings, Weblinks, PDF AI)
+db.version(13).stores({
+  userFaces: '++id, name',
+  cards: '++id, title, href, isEnabled, voiceAccessEnabled',
+  images: '++id, title, isSelected',
+  headers: '++id, headerName',
+  qaQuestions: '++id, question, category',
+  visitors: '++id, name, phone, email, company, purpose, host, badgeType, badgeNumber, checkInTime, checkOutTime, status',
+  weblinks: 'id, title, category, url, isEnabled, sortOrder',
+  tourStops: '++id, name, area, orderIndex, isEnabled',
+  robotTours: 'id, slug, title, orderIndex, isEnabled',
+  chatSessions: 'id, title, createdAt, updatedAt, messageCount',
+  chatMessages: '++id, sessionId, role, text, timestamp, inputType, source, confidence',
+  facilities: 'id, code, name, floor, category, isEnabled, sortOrder',
+  pdfDocuments: 'id, title, fileName, fileSize, pageCount, createdAt, updatedAt',
+  pdfChunks: '++id, documentId, pageNumber, chunkIndex, text',
+  pdfChatMessages: '++id, documentId, role, text, citations, timestamp',
+}).upgrade(async (tx) => {
+  const cardsTable = tx.table('cards');
+  const defaultSixHrefs = new Set(['/form', '/qa', '/facilities', '/face-recognition', '/weblinks', '/pdf']);
+  const allCards = await cardsTable.toArray();
+  for (const c of allCards) {
+    const shouldEnable = defaultSixHrefs.has(c.href);
+    await cardsTable.update(c.id, { isEnabled: shouldEnable });
+  }
+
+  const headersTable = tx.table('headers');
+  const allHeaders = await headersTable.toArray();
+  for (const h of allHeaders) {
+    if (h.headerName === 'AURRA 4.0' || h.headerName === 'Robomiracle Technologies Private Limited') {
+      await headersTable.update(h.id, { headerName: 'AURRA' });
+    }
   }
 });
 

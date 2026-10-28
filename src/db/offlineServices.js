@@ -186,9 +186,14 @@ export const offlineBrandingService = {
   getHeader: async () => {
     const headers = await db.headers.toArray();
     if (!headers || headers.length === 0) {
-      const defaultHeader = { headerName: 'Robomiracle Technologies Private Limited' };
+      const defaultHeader = { headerName: 'AURRA 4.0' };
       const id = await db.headers.add(defaultHeader);
       return { id, ...defaultHeader };
+    }
+    // Auto-migrate legacy default 'Robomiracle Technologies Private Limited' to 'AURRA 4.0'
+    if (headers[0]?.headerName === 'Robomiracle Technologies Private Limited') {
+      await db.headers.update(headers[0].id, { headerName: 'AURRA 4.0' });
+      return { ...headers[0], headerName: 'AURRA 4.0' };
     }
     return headers[0];
   },
@@ -478,7 +483,7 @@ export const offlineBackupService = {
 
   resetAllToFactoryDefaults: async () => {
     await db.headers.clear();
-    await db.headers.add({ headerName: 'Robomiracle Technologies Private Limited' });
+    await db.headers.add({ headerName: 'AURRA 4.0' });
     await db.cards.clear();
     await db.cards.bulkAdd(DEFAULT_REGISTRATION_CARDS);
     await db.images.clear();

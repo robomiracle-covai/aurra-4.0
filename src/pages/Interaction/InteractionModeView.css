@@ -7,7 +7,21 @@
   position: relative;
   width: 100vw;
   height: 100vh;
-  background: #030712;
+  background-color: #03060d;
+  background-image:
+    linear-gradient(rgba(0, 255, 255, 0.095) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.095) 1px, transparent 1px),
+    url('/aurra_constellation_bg.png');
+  background-size:
+    40px 40px,
+    40px 40px,
+    cover;
+  background-position:
+    0 0,
+    0 0,
+    center center;
+  background-repeat: repeat, repeat, no-repeat;
+  background-attachment: fixed;
   color: #f8fafc;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow: hidden;
@@ -21,10 +35,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: radial-gradient(circle at 50% 50%, transparent 30%, rgba(3, 17, 39, 0.9) 90%),
-              linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 100% 100%, 40px 40px, 40px 40px;
+  background: radial-gradient(circle at 50% 50%, transparent 40%, rgba(3, 10, 24, 0.5) 90%);
   pointer-events: none;
   z-index: 1;
 }
@@ -101,8 +112,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 28px;
-  background: linear-gradient(180deg, rgba(3, 17, 39, 0.95) 0%, rgba(3, 17, 39, 0) 100%);
-  backdrop-filter: blur(12px);
+  background: #ffffff !important;
+  border-bottom: 2px solid rgba(0, 210, 255, 0.45) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 16px rgba(0, 255, 255, 0.15) !important;
   z-index: 10;
   box-sizing: border-box;
 }
@@ -113,19 +125,21 @@
   gap: 8px;
   padding: 10px 18px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #e2e8f0;
+  background: linear-gradient(135deg, rgba(9, 44, 76, 0.88) 0%, rgba(2, 132, 199, 0.75) 50%, rgba(0, 196, 219, 0.82) 100%) !important;
+  border: 1.5px solid rgba(0, 255, 255, 0.55) !important;
+  color: #ffffff !important;
   font-weight: 700;
   font-size: 0.85rem;
   cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(0, 255, 255, 0.3) !important;
   transition: all 0.2s ease;
 }
 
 .hud-back-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: #00ffff;
-  color: #00ffff;
+  background: linear-gradient(135deg, #0d3b66 0%, #0396e6 50%, #00e5ff 100%) !important;
+  border-color: #00ffff !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 255, 255, 0.65) !important;
 }
 
 .hud-header-title {
@@ -137,8 +151,12 @@
   font-size: 1.25rem;
   font-weight: 900;
   letter-spacing: 0.12em;
-  color: #ffffff;
-  text-shadow: 0 0 16px rgba(0, 255, 255, 0.5);
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+  text-shadow: none !important;
 }
 
 .hud-status-badge {
@@ -147,11 +165,13 @@
   gap: 6px;
   font-size: 0.68rem;
   font-weight: 800;
-  color: #00ffff;
+  color: #0284c7 !important;
   letter-spacing: 0.1em;
   padding: 2px 10px;
-  background: rgba(0, 255, 255, 0.12);
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 210, 255, 0.45) !important;
   border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 210, 255, 0.2) !important;
   margin-top: 4px;
 }
 
@@ -388,12 +408,11 @@
 /* Spoken Feedback Card */
 .hud-feedback-card {
   width: 100%;
-  background: rgba(3, 17, 39, 0.9);
-  border: 1px solid rgba(0, 255, 255, 0.35);
-  border-radius: 16px;
+  background: #ffffff !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.45) !important;
+  border-radius: 20px !important;
   padding: 14px 20px;
-  backdrop-filter: blur(14px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 255, 255, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), 0 0 16px rgba(0, 255, 255, 0.15) !important;
   pointer-events: auto;
   animation: slideUpFeedback 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -417,13 +436,13 @@
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.1em;
-  color: #00ffff;
+  color: #0284c7 !important;
 }
 
 .feedback-close-btn {
   background: none;
   border: none;
-  color: #94a3b8;
+  color: #64748b !important;
   font-size: 0.9rem;
   cursor: pointer;
   padding: 2px 6px;
@@ -439,7 +458,7 @@
 .feedback-card-text {
   margin: 0;
   font-size: 0.95rem;
-  color: #f1f5f9;
+  color: #0f172a !important;
   line-height: 1.4;
   font-weight: 600;
 }
@@ -451,8 +470,9 @@
   left: 0;
   width: 100%;
   padding: 16px 28px;
-  background: linear-gradient(0deg, rgba(3, 17, 39, 0.95) 0%, rgba(3, 17, 39, 0) 100%);
-  backdrop-filter: blur(12px);
+  background: #ffffff !important;
+  border-top: 2px solid rgba(0, 210, 255, 0.35) !important;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08) !important;
   z-index: 10;
   display: flex;
   justify-content: center;

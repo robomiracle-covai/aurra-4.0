@@ -23,15 +23,15 @@
 }
 
 .admin-modal-content {
-  background: linear-gradient(135deg, #020b15, #07192b) !important;
-  border: 1.5px solid #00D5FF !important;
-  box-shadow: 0 0 35px rgba(0, 213, 255, 0.35), inset 0 0 20px rgba(0, 213, 255, 0.1) !important;
+  background: #ffffff !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.45) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.16), 0 0 24px rgba(0, 255, 255, 0.2) !important;
   border-radius: 24px !important;
   width: 90%;
   max-width: 440px;
   padding: 35px 25px;
   position: relative;
-  color: #fff;
+  color: #0f172a !important;
   text-align: center;
   animation: authSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-sizing: border-box;
@@ -52,23 +52,23 @@
   position: absolute;
   top: 18px;
   right: 18px;
-  background: rgba(0, 213, 255, 0.08) !important;
-  border: 1.5px solid rgba(0, 213, 255, 0.3) !important;
+  background: #f8fafc !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.35) !important;
   border-radius: 50% !important;
   width: 36px !important;
   height: 36px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  color: #00D5FF !important;
+  color: #0284c7 !important;
   cursor: pointer;
   transition: all 0.25s ease;
   padding: 0 !important;
 }
 
 .admin-modal-close:hover {
-  border-color: #00FFFF !important;
-  background: rgba(0, 213, 255, 0.25) !important;
+  border-color: #00c4db !important;
+  background: #ffffff !important;
   color: #ff0055 !important;
   transform: scale(1.08);
 }
@@ -78,13 +78,14 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  border: 2px solid #00FFFF;
-  background: rgba(0, 25, 45, 0.85);
+  border: 2px solid #00c4db !important;
+  background: #ffffff !important;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 16px auto;
-  box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 210, 255, 0.25) !important;
+  color: #0284c7 !important;
 }
 
 .adm-auth-title-block {
@@ -96,7 +97,7 @@
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 3px;
-  color: rgba(255, 255, 255, 0.7);
+  color: #64748b !important;
   display: block;
 }
 
@@ -105,8 +106,12 @@
   font-size: 24px;
   font-weight: 800;
   letter-spacing: 3px;
-  color: #00D5FF !important;
-  text-shadow: 0 0 14px rgba(0, 213, 255, 0.6) !important;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
+  text-shadow: none !important;
   margin: 4px 0 0 0 !important;
 }
 
@@ -122,7 +127,7 @@
 
 .adm-auth-line {
   height: 1px;
-  background: rgba(0, 213, 255, 0.25);
+  background: rgba(0, 210, 255, 0.25);
   flex: 1;
 }
 
@@ -130,12 +135,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #00D5FF;
+  color: #0284c7 !important;
 }
 
 .adm-auth-subtitle {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.65) !important;
+  color: #64748b !important;
   margin: 0 auto 22px auto;
   max-width: 320px;
   line-height: 1.4;
@@ -158,7 +163,7 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 2px;
-  color: #00D5FF;
+  color: #0284c7 !important;
   display: block;
 }
 
@@ -166,8 +171,8 @@
 .adm-auth-input-row {
   display: flex;
   align-items: center;
-  background: rgba(2, 12, 27, 0.7);
-  border: 1.5px solid rgba(0, 213, 255, 0.4);
+  background: #f8fafc !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.4) !important;
   border-radius: 14px;
   height: 54px;
   padding: 0 16px;
@@ -178,14 +183,14 @@
 }
 
 .adm-auth-input-row:focus-within {
-  border-color: #00FFFF;
-  box-shadow: 0 0 18px rgba(0, 255, 255, 0.35);
+  border-color: #00c4db !important;
+  box-shadow: 0 0 18px rgba(0, 210, 255, 0.25) !important;
 }
 
 .adm-auth-lock-icon {
   display: flex;
   align-items: center;
-  color: #00D5FF;
+  color: #0284c7 !important;
   margin-right: 12px;
 }
 
@@ -222,36 +227,36 @@
 
 .adm-auth-dot {
   font-size: 24px;
-  color: rgba(0, 213, 255, 0.25);
+  color: rgba(0, 210, 255, 0.35) !important;
   transition: all 0.2s ease;
   font-family: monospace;
 }
 
 .adm-auth-dot.filled {
-  color: #00FFFF;
-  text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+  color: #0284c7 !important;
+  text-shadow: 0 0 10px rgba(0, 210, 255, 0.6) !important;
 }
 
 .adm-auth-dot.success {
-  color: #00FF88 !important;
-  text-shadow: 0 0 14px rgba(0, 255, 136, 0.9) !important;
+  color: #059669 !important;
+  text-shadow: 0 0 14px rgba(5, 150, 105, 0.6) !important;
 }
 
 .auth-unlocked {
-  border-color: #00FF88 !important;
-  box-shadow: 0 0 45px rgba(0, 255, 136, 0.4), inset 0 0 25px rgba(0, 255, 136, 0.15) !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 0 35px rgba(16, 185, 129, 0.3) !important;
 }
 
 .adm-auth-robot-circle.unlocked {
-  border-color: #00FF88 !important;
-  background: rgba(0, 45, 25, 0.9) !important;
-  box-shadow: 0 0 25px rgba(0, 255, 136, 0.6) !important;
+  border-color: #10b981 !important;
+  background: #f0fdf4 !important;
+  box-shadow: 0 0 25px rgba(16, 185, 129, 0.5) !important;
 }
 
 .adm-auth-eye-btn {
   background: transparent !important;
   border: none !important;
-  color: #00D5FF !important;
+  color: #0284c7 !important;
   cursor: pointer;
   padding: 4px !important;
   display: flex !important;
@@ -261,7 +266,7 @@
 }
 
 .adm-auth-eye-btn:hover {
-  color: #00FFFF !important;
+  color: #00c4db !important;
   transform: scale(1.1);
 }
 
@@ -276,10 +281,10 @@
 
 .adm-keypad-btn {
   height: 48px;
-  background: rgba(3, 18, 36, 0.8) !important;
-  border: 1.5px solid rgba(0, 213, 255, 0.3) !important;
+  background: #ffffff !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.35) !important;
   border-radius: 12px !important;
-  color: #00FFFF !important;
+  color: #0284c7 !important;
   font-size: 20px !important;
   font-weight: 700 !important;
   font-family: inherit !important;
@@ -291,19 +296,20 @@
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   padding: 0 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
 }
 
 .adm-keypad-btn:active:not(:disabled) {
-  background: rgba(0, 213, 255, 0.3) !important;
-  border-color: #00FFFF !important;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 100%) !important;
+  border-color: #00ffff !important;
+  color: #ffffff !important;
   box-shadow: 0 0 16px rgba(0, 255, 255, 0.5) !important;
   transform: scale(0.94);
 }
 
 .adm-keypad-btn:hover:not(:disabled) {
-  background: rgba(0, 213, 255, 0.15) !important;
-  border-color: #00FFFF !important;
+  background: #f8fafc !important;
+  border-color: #00c4db !important;
 }
 
 .adm-keypad-btn:disabled {
@@ -315,41 +321,41 @@
   font-size: 13px !important;
   font-weight: 700 !important;
   letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.75) !important;
-  background: rgba(8, 22, 42, 0.6) !important;
+  color: #475569 !important;
+  background: #f1f5f9 !important;
 }
 
 .adm-keypad-btn.action-btn.clear {
-  color: #ffaa00 !important;
-  border-color: rgba(255, 170, 0, 0.3) !important;
+  color: #d97706 !important;
+  border-color: rgba(217, 119, 6, 0.3) !important;
 }
 
 .adm-keypad-btn.action-btn.delete {
-  color: #ff3366 !important;
-  border-color: rgba(255, 51, 102, 0.3) !important;
+  color: #e11d48 !important;
+  border-color: rgba(225, 29, 72, 0.3) !important;
 }
 
 .adm-quick-code-hint {
   margin-top: 12px;
   padding: 8px 12px;
-  background: rgba(0, 213, 255, 0.08);
-  border: 1px dashed rgba(0, 213, 255, 0.3);
+  background: #f8fafc !important;
+  border: 1px dashed rgba(0, 210, 255, 0.35) !important;
   border-radius: 8px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
+  color: #64748b !important;
   cursor: pointer;
   transition: all 0.2s ease;
   user-select: none;
 }
 
 .adm-quick-code-hint:hover {
-  background: rgba(0, 213, 255, 0.16);
-  border-color: #00FFFF;
-  color: #fff;
+  background: #ffffff !important;
+  border-color: #00c4db !important;
+  color: #0284c7 !important;
 }
 
 .adm-quick-code-hint strong {
-  color: #00FFFF;
+  color: #0284c7 !important;
   letter-spacing: 1.5px;
 }
 

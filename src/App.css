@@ -6,7 +6,21 @@
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
-  background-color: #06090e;
+  background-color: #03060d;
+  background-image:
+    linear-gradient(rgba(0, 255, 255, 0.095) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.095) 1px, transparent 1px),
+    url('/aurra_constellation_bg.png');
+  background-size:
+    40px 40px,
+    40px 40px,
+    cover;
+  background-position:
+    0 0,
+    0 0,
+    center center;
+  background-repeat: repeat, repeat, no-repeat;
+  background-attachment: fixed;
   display: flex;
   flex-direction: column;
 }
@@ -20,6 +34,7 @@
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   flex: 1 1 auto;
+  background-color: transparent;
   /* Scroll fix: was 'overflow: hidden' which blocked all page scrolling */
 }
 

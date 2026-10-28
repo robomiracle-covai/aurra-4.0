@@ -5,8 +5,21 @@
   flex-direction: column;
   width: 100vw;
   height: 100vh;
-  background: radial-gradient(circle at 15% 20%, rgba(10, 20, 35, 0.95), rgba(3, 7, 18, 0.98)),
-              radial-gradient(circle at 85% 80%, rgba(30, 10, 25, 0.4), rgba(3, 7, 18, 0.98));
+  background-color: #03060d;
+  background-image:
+    linear-gradient(rgba(0, 255, 255, 0.095) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.095) 1px, transparent 1px),
+    url('/aurra_constellation_bg.png');
+  background-size:
+    40px 40px,
+    40px 40px,
+    cover;
+  background-position:
+    0 0,
+    0 0,
+    center center;
+  background-repeat: repeat, repeat, no-repeat;
+  background-attachment: fixed;
   color: #f1f5f9;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   overflow: hidden;
@@ -20,10 +33,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 28px;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(0, 255, 255, 0.2);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+  background: #ffffff !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1.5px solid rgba(0, 210, 255, 0.45) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
   z-index: 50;
   gap: 16px;
 }
@@ -38,9 +52,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(0, 255, 255, 0.35);
-  color: #00ffff;
+  background: linear-gradient(135deg, rgba(9, 44, 76, 0.88) 0%, rgba(2, 132, 199, 0.75) 50%, rgba(0, 196, 219, 0.82) 100%) !important;
+  border: 1.5px solid rgba(0, 255, 255, 0.55) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(0, 255, 255, 0.3) !important;
+  backdrop-filter: blur(10px);
   padding: 10px 18px;
   border-radius: 12px;
   font-weight: 700;
@@ -51,19 +67,22 @@
 }
 
 .pdf-back-btn:hover {
-  background: rgba(0, 255, 255, 0.15);
-  box-shadow: 0 0 16px rgba(0, 255, 255, 0.4);
+  background: linear-gradient(135deg, #0d3b66 0%, #0396e6 50%, #00e5ff 100%) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 255, 255, 0.65) !important;
   transform: translateX(-2px);
+  border-color: #00ffff !important;
 }
 
 .pdf-title-group h1 {
   margin: 0;
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 900 !important;
   letter-spacing: 0.06em;
-  background: linear-gradient(135deg, #ffffff 30%, #ff3366 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -72,13 +91,13 @@
 .pdf-header-badge {
   display: inline-block;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.1em;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(255, 51, 102, 0.15);
-  border: 1px solid rgba(255, 51, 102, 0.4);
-  color: #ff3366;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  border: 1px solid rgba(0, 255, 255, 0.4) !important;
+  color: #ffffff !important;
   text-transform: uppercase;
 }
 
@@ -95,33 +114,34 @@
   padding: 9px 16px;
   border-radius: 10px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
   border: 1px solid transparent;
 }
 
 .pdf-action-btn.upload-btn {
-  background: linear-gradient(135deg, rgba(255, 51, 102, 0.9), rgba(225, 29, 72, 0.9));
-  color: #ffffff;
-  border-color: rgba(255, 51, 102, 0.5);
-  box-shadow: 0 0 14px rgba(255, 51, 102, 0.35);
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  color: #ffffff !important;
+  border-color: rgba(0, 255, 255, 0.45) !important;
+  box-shadow: 0 0 14px rgba(2, 132, 199, 0.35) !important;
 }
 
 .pdf-action-btn.upload-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 0 20px rgba(255, 51, 102, 0.6);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.6) !important;
 }
 
 .pdf-action-btn.secondary-btn {
-  background: rgba(255, 255, 255, 0.05);
-  color: #cbd5e1;
-  border-color: rgba(255, 255, 255, 0.15);
+  background: #ffffff !important;
+  color: #092c4c !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.4) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
 }
 
 .pdf-action-btn.secondary-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  background: rgba(0, 210, 255, 0.1) !important;
+  color: #0284c7 !important;
 }
 
 /* ── Split Work Area ── */
@@ -135,11 +155,12 @@
   touch-action: pan-y;
 }
 
-/* ── Left Document & Page Drawer ── */
+/* ── Left Document & Page Drawer (Porcelain White Panel) ── */
 .pdf-sidebar {
-  background: rgba(11, 18, 33, 0.75);
+  background: #ffffff !important;
   backdrop-filter: blur(16px);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1.5px solid rgba(0, 210, 255, 0.4) !important;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.12) !important;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -150,7 +171,7 @@
 
 .pdf-sidebar-header {
   padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(0, 210, 255, 0.2) !important;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -158,17 +179,21 @@
 
 .pdf-sidebar-title {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800 !important;
   letter-spacing: 0.08em;
-  color: #94a3b8;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
   text-transform: uppercase;
 }
 
 /* Active Document Metadata Card */
 .pdf-active-card {
   padding: 16px 20px;
-  background: rgba(255, 51, 102, 0.04);
-  border-bottom: 1px solid rgba(255, 51, 102, 0.15);
+  background: rgba(0, 210, 255, 0.08) !important;
+  border-bottom: 1.5px solid rgba(0, 210, 255, 0.3) !important;
 }
 
 .pdf-doc-meta-row {
@@ -181,12 +206,12 @@
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: rgba(255, 51, 102, 0.15);
-  border: 1px solid rgba(255, 51, 102, 0.3);
+  background: rgba(0, 210, 255, 0.12) !important;
+  border: 1px solid rgba(0, 210, 255, 0.35) !important;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ff3366;
+  color: #0284c7 !important;
   flex-shrink: 0;
 }
 
@@ -197,8 +222,12 @@
 
 .pdf-doc-title {
   font-size: 14px;
-  font-weight: 700;
-  color: #ffffff;
+  font-weight: 800 !important;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -207,18 +236,19 @@
 
 .pdf-doc-subtext {
   font-size: 11px;
-  color: #94a3b8;
+  color: #475569 !important;
+  font-weight: 500;
   display: flex;
   gap: 8px;
 }
 
-/* Upload Dropzone */
+/* Upload Dropzone (Porcelain Cyan Accent) */
 .pdf-dropzone {
   margin: 16px 20px;
   padding: 24px 16px;
-  border: 2px dashed rgba(255, 51, 102, 0.35);
-  border-radius: 14px;
-  background: rgba(255, 51, 102, 0.03);
+  border: 2px dashed rgba(0, 210, 255, 0.45) !important;
+  border-radius: 16px;
+  background: rgba(0, 210, 255, 0.04) !important;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -229,16 +259,16 @@
 }
 
 .pdf-dropzone:hover, .pdf-dropzone.drag-active {
-  border-color: #ff3366;
-  background: rgba(255, 51, 102, 0.08);
-  box-shadow: 0 0 24px rgba(255, 51, 102, 0.2);
+  border-color: #00c4db !important;
+  background: rgba(0, 210, 255, 0.1) !important;
+  box-shadow: 0 0 24px rgba(0, 210, 255, 0.25) !important;
 }
 
 .pdf-dropzone p {
   margin: 8px 0 2px 0;
   font-size: 13px;
-  font-weight: 600;
-  color: #f1f5f9;
+  font-weight: 700;
+  color: #092c4c !important;
 }
 
 .pdf-dropzone span {
@@ -246,13 +276,14 @@
   color: #64748b;
 }
 
-/* Google Drive & Web Link Import Card */
+/* Google Drive & Web Link Import Card (Porcelain White Card) */
 .pdf-url-import-card {
   margin: 0 20px 16px 20px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(0, 255, 255, 0.2);
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #ffffff !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.4) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06), 0 0 10px rgba(0, 255, 255, 0.1) !important;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -262,10 +293,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800 !important;
   letter-spacing: 0.08em;
-  color: #00ffff;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  color: transparent !important;
   text-transform: uppercase;
 }
 
@@ -277,29 +312,30 @@
 
 .pdf-url-input {
   flex: 1;
-  background: rgba(3, 7, 18, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #ffffff !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.4) !important;
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 12px;
-  color: #ffffff;
+  font-weight: 600;
+  color: #092c4c !important;
   outline: none;
   transition: all 0.2s;
 }
 
 .pdf-url-input:focus {
-  border-color: #00ffff;
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.25);
+  border-color: #00c4db !important;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.35) !important;
 }
 
 .pdf-url-input::placeholder {
-  color: #64748b;
+  color: #94a3b8;
 }
 
 .pdf-url-fetch-btn {
-  background: linear-gradient(135deg, rgba(0, 255, 255, 0.85), rgba(14, 165, 233, 0.85));
-  border: none;
-  color: #030712;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  border: 1px solid rgba(0, 255, 255, 0.4) !important;
+  color: #ffffff !important;
   font-weight: 800;
   font-size: 11px;
   letter-spacing: 0.05em;
@@ -310,7 +346,7 @@
 }
 
 .pdf-url-fetch-btn:hover:not(:disabled) {
-  box-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+  box-shadow: 0 0 14px rgba(0, 255, 255, 0.5) !important;
   transform: translateY(-1px);
 }
 
@@ -490,13 +526,13 @@
   background: rgba(239, 68, 68, 0.15);
 }
 
-/* ── Right Chat Area ── */
+/* ── Right Chat Area (Porcelain Background with Cyan Accents) ── */
 .pdf-chat-area {
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background: rgba(3, 7, 18, 0.4);
+  background: rgba(255, 255, 255, 0.85) !important;
   touch-action: pan-y;
 }
 
@@ -509,18 +545,18 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(15, 23, 42, 0.3);
+  border-bottom: 1.5px solid rgba(0, 210, 255, 0.25) !important;
+  background: #ffffff !important;
 }
 
 .pdf-suggestion-chip {
   padding: 7px 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(0, 255, 255, 0.2);
-  color: #cbd5e1;
+  background: rgba(0, 210, 255, 0.08) !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.35) !important;
+  color: #092c4c !important;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700 !important;
   white-space: nowrap;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -530,9 +566,9 @@
 }
 
 .pdf-suggestion-chip:hover {
-  background: rgba(0, 255, 255, 0.12);
-  border-color: #00ffff;
-  color: #ffffff;
+  background: rgba(0, 210, 255, 0.18) !important;
+  border-color: #00c4db !important;
+  color: #0284c7 !important;
   transform: translateY(-1px);
 }
 
@@ -572,18 +608,18 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
 }
 
 .pdf-avatar.assistant-avatar {
-  background: linear-gradient(135deg, #ff3366, #ff0055);
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
   color: #ffffff;
-  border: 1px solid rgba(255, 51, 102, 0.6);
-  box-shadow: 0 0 16px rgba(255, 51, 102, 0.4);
+  border: 1.5px solid rgba(0, 255, 255, 0.5) !important;
+  box-shadow: 0 0 16px rgba(0, 210, 255, 0.4) !important;
 }
 
 .pdf-avatar.user-avatar {
-  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  background: linear-gradient(135deg, #0284c7 0%, #00c4db 100%) !important;
   color: #ffffff;
 }
 
@@ -597,19 +633,19 @@
 }
 
 .pdf-message-row.assistant .pdf-bubble {
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #f1f5f9;
+  background: #ffffff !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.4) !important;
+  color: #0f172a !important;
   border-top-left-radius: 4px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
 }
 
 .pdf-message-row.user .pdf-bubble {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.85), rgba(2, 132, 199, 0.85));
-  color: #ffffff;
-  border: 1px solid rgba(14, 165, 233, 0.5);
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  color: #ffffff !important;
+  border: 1.5px solid rgba(0, 255, 255, 0.45) !important;
   border-top-right-radius: 4px;
-  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.25);
+  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.3) !important;
 }
 
 .pdf-bubble-footer {
@@ -698,51 +734,53 @@
   40% { opacity: 1; transform: scale(1.2); }
 }
 
-/* ── Bottom Input & Voice Bar ── */
+/* ── Bottom Input & Voice Bar (Porcelain White Theme) ── */
 .pdf-input-bar-container {
   padding: 16px 28px 20px 28px;
-  background: rgba(15, 23, 42, 0.85);
+  background: #ffffff !important;
   backdrop-filter: blur(20px);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1.5px solid rgba(0, 210, 255, 0.4) !important;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08) !important;
 }
 
 .pdf-input-form {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(3, 7, 18, 0.6);
-  border: 1px solid rgba(0, 255, 255, 0.25);
+  background: #ffffff !important;
+  border: 1.5px solid rgba(0, 210, 255, 0.45) !important;
   border-radius: 14px;
   padding: 6px 10px 6px 18px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
   transition: all 0.25s ease;
 }
 
 .pdf-input-form:focus-within {
-  border-color: #00ffff;
-  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+  border-color: #00c4db !important;
+  box-shadow: 0 0 20px rgba(0, 210, 255, 0.4) !important;
 }
 
 .pdf-text-input {
   flex: 1;
   background: none;
   border: none;
-  color: #ffffff;
+  color: #092c4c !important;
+  font-weight: 600 !important;
   font-size: 14px;
   outline: none;
 }
 
 .pdf-text-input::placeholder {
-  color: #64748b;
+  color: #94a3b8;
 }
 
 .pdf-mic-btn {
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  border: 1px solid rgba(0, 255, 255, 0.3);
-  background: rgba(0, 255, 255, 0.08);
-  color: #00ffff;
+  border: 1.5px solid rgba(0, 210, 255, 0.4) !important;
+  background: rgba(0, 210, 255, 0.08) !important;
+  color: #0284c7 !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -751,14 +789,14 @@
 }
 
 .pdf-mic-btn:hover {
-  background: rgba(0, 255, 255, 0.2);
+  background: rgba(0, 210, 255, 0.2) !important;
   box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
 }
 
 .pdf-mic-btn.active-listening {
-  background: #ef4444;
-  border-color: #ef4444;
-  color: #ffffff;
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
   box-shadow: 0 0 18px rgba(239, 68, 68, 0.6);
   animation: pdfPulse 1.5s infinite;
 }
@@ -773,20 +811,20 @@
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  border: none;
-  background: linear-gradient(135deg, #ff3366, #ff0055);
-  color: #ffffff;
+  border: 1px solid rgba(0, 255, 255, 0.4) !important;
+  background: linear-gradient(135deg, #092c4c 0%, #0284c7 50%, #00c4db 100%) !important;
+  color: #ffffff !important;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 0 12px rgba(255, 51, 102, 0.4);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35) !important;
 }
 
 .pdf-send-btn:hover:not(:disabled) {
   transform: scale(1.05);
-  box-shadow: 0 0 20px rgba(255, 51, 102, 0.7);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.6) !important;
 }
 
 .pdf-send-btn:disabled {

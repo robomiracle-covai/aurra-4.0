@@ -357,9 +357,9 @@ export default function FullscreenVoiceOverlay({
           width: barWidth,
           height: barHeight,
           borderRadius: '9999px',
-          backgroundColor: '#090e17',
-          borderColor: 'rgba(0, 255, 255, 0.45)',
-          boxShadow: '0 0 24px rgba(0, 255, 255, 0.25), inset 0 0 10px rgba(0, 255, 255, 0.08)',
+          backgroundColor: '#ffffff',
+          borderColor: '#ffffff',
+          boxShadow: '0 12px 36px rgba(0, 0, 0, 0.35), 0 0 20px rgba(0, 255, 255, 0.18)',
           opacity: 1,
           duration: 0.75,
           ease: 'power3.inOut',
@@ -732,7 +732,6 @@ export default function FullscreenVoiceOverlay({
             title="View Features & Action Cards"
           >
             <Sparkles size={16} color="#00ffff" />
-            <span>Features</span>
           </button>
 
           <button
@@ -741,7 +740,6 @@ export default function FullscreenVoiceOverlay({
             title={isAiMuted ? 'Speaker Muted — Tap to Unmute' : 'Speaker Active — Tap to Mute'}
           >
             {isAiMuted ? <VolumeX size={18} color="#ef4444" /> : <Volume2 size={18} color="#00ffff" />}
-            <span>{isAiMuted ? 'Muted' : 'Sound ON'}</span>
           </button>
 
           <button

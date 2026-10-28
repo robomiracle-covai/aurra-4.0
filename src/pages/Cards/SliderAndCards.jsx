@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { gsap } from 'gsap';
-import { 
-  Shield, 
-  Terminal, 
-  Camera, 
-  Layers, 
-  Tv, 
-  Sparkles, 
-  Mic, 
-  MicOff, 
+import {
+  Shield,
+  Terminal,
+  Camera,
+  Layers,
+  Tv,
+  Sparkles,
+  Mic,
+  MicOff,
   RefreshCw,
   Compass,
   FileText,
@@ -56,101 +56,113 @@ const getCardIcon = (href, className, size = 26, color = '#00ffff') => {
   return <Sparkles size={size} color={color} />;
 };
 
-// Organic Clustered Bubble Slots (Referenced directly from Design Spec: tightly nestled, even spacing, varying radii)
+// Organic Clustered Bubble Slots (Tightly nestled closer to the constellation core, even spacing, collision-free)
 const CLUSTER_CONFIGS = {
   // If 5 cards:
   5: [
-    { x: 0, y: -138, size: 116, iconSize: 25, fontSize: 10.5, labelMax: 90 }, // Top
-    { x: 132, y: -43, size: 126, iconSize: 28, fontSize: 11.5, labelMax: 96 }, // Top-Right
-    { x: 82, y: 114, size: 114, iconSize: 24, fontSize: 10.5, labelMax: 88 }, // Bottom-Right
-    { x: -82, y: 114, size: 106, iconSize: 22, fontSize: 10, labelMax: 84 }, // Bottom-Left
-    { x: -132, y: -43, size: 122, iconSize: 26, fontSize: 11, labelMax: 92 }, // Top-Left
+    { x: 0, y: -146, size: 108, iconSize: 24, fontSize: 10, labelMax: 86 }, // Top
+    { x: 144, y: -46, size: 138, iconSize: 32, fontSize: 12.5, labelMax: 108 }, // Top-Right (Prominent Larger Orb)
+    { x: 86, y: 122, size: 108, iconSize: 24, fontSize: 10, labelMax: 86 }, // Bottom-Right
+    { x: -86, y: 122, size: 104, iconSize: 22, fontSize: 9.5, labelMax: 82 }, // Bottom-Left
+    { x: -142, y: -46, size: 108, iconSize: 24, fontSize: 10, labelMax: 88 }, // Top-Left
   ],
   // If 6 cards:
   6: [
-    { x: 0, y: -136, size: 118, iconSize: 26, fontSize: 11, labelMax: 92 }, // Top
-    { x: 126, y: -72, size: 128, iconSize: 28, fontSize: 11.5, labelMax: 98 }, // Top-Right
-    { x: 124, y: 72, size: 116, iconSize: 26, fontSize: 11, labelMax: 90 }, // Bottom-Right
-    { x: 0, y: 134, size: 104, iconSize: 22, fontSize: 10, labelMax: 84 }, // Bottom
-    { x: -120, y: 68, size: 110, iconSize: 24, fontSize: 10.5, labelMax: 86 }, // Bottom-Left
-    { x: -124, y: -72, size: 122, iconSize: 26, fontSize: 11, labelMax: 94 }, // Top-Left
+    { x: 0, y: -146, size: 108, iconSize: 24, fontSize: 10, labelMax: 88 }, // Top
+    { x: 136, y: -76, size: 138, iconSize: 32, fontSize: 12.5, labelMax: 108 }, // Top-Right (Prominent Larger Orb)
+    { x: 130, y: 74, size: 108, iconSize: 24, fontSize: 10, labelMax: 86 }, // Bottom-Right
+    { x: 0, y: 144, size: 102, iconSize: 22, fontSize: 9.5, labelMax: 82 }, // Bottom
+    { x: -128, y: 74, size: 106, iconSize: 22, fontSize: 10, labelMax: 84 }, // Bottom-Left
+    { x: -132, y: -76, size: 108, iconSize: 24, fontSize: 10, labelMax: 88 }, // Top-Left
   ],
   // If 7 cards:
   7: [
-    { x: 0, y: -136, size: 116, iconSize: 26, fontSize: 11, labelMax: 92 }, // Top
-    { x: 114, y: -90, size: 124, iconSize: 28, fontSize: 11.5, labelMax: 98 }, // Top-Right
-    { x: 142, y: 32, size: 114, iconSize: 24, fontSize: 10.5, labelMax: 88 }, // Right
-    { x: 62, y: 130, size: 104, iconSize: 22, fontSize: 10, labelMax: 84 }, // Bottom-Right
-    { x: -62, y: 130, size: 100, iconSize: 22, fontSize: 10, labelMax: 82 }, // Bottom-Left
-    { x: -140, y: 32, size: 118, iconSize: 26, fontSize: 11, labelMax: 90 }, // Left-Bottom
-    { x: -114, y: -90, size: 112, iconSize: 24, fontSize: 10.5, labelMax: 86 }, // Left-Top
+    { x: 0, y: -148, size: 108, iconSize: 24, fontSize: 10.5, labelMax: 88 }, // Top
+    { x: 130, y: -98, size: 140, iconSize: 32, fontSize: 12.5, labelMax: 110 }, // Top-Right (Prominent Larger Hero Orb)
+    { x: 154, y: 34, size: 108, iconSize: 24, fontSize: 10.5, labelMax: 88 }, // Right
+    { x: 68, y: 140, size: 104, iconSize: 22, fontSize: 10, labelMax: 84 }, // Bottom-Right
+    { x: -68, y: 140, size: 100, iconSize: 22, fontSize: 10, labelMax: 82 }, // Bottom-Left
+    { x: -150, y: 34, size: 108, iconSize: 24, fontSize: 10.5, labelMax: 88 }, // Left-Bottom
+    { x: -122, y: -96, size: 106, iconSize: 24, fontSize: 10.5, labelMax: 86 }, // Left-Top
   ],
   // If 8 cards:
   8: [
-    { x: 0, y: -140, size: 106, iconSize: 24, fontSize: 10.5, labelMax: 86 },
-    { x: 112, y: -96, size: 108, iconSize: 24, fontSize: 10.5, labelMax: 88 },
-    { x: 154, y: 18, size: 106, iconSize: 24, fontSize: 10.5, labelMax: 86 },
-    { x: 92, y: 126, size: 102, iconSize: 22, fontSize: 10, labelMax: 84 },
-    { x: -44, y: 148, size: 100, iconSize: 22, fontSize: 10, labelMax: 82 },
-    { x: -142, y: 78, size: 104, iconSize: 22, fontSize: 10, labelMax: 84 },
-    { x: -158, y: -42, size: 106, iconSize: 24, fontSize: 10.5, labelMax: 86 },
-    { x: -82, y: -130, size: 102, iconSize: 22, fontSize: 10, labelMax: 84 },
+    { x: 0, y: -148, size: 104, iconSize: 22, fontSize: 10, labelMax: 84 },
+    { x: 120, y: -100, size: 138, iconSize: 30, fontSize: 12, labelMax: 106 }, // Prominent Larger Orb
+    { x: 158, y: 18, size: 104, iconSize: 22, fontSize: 10, labelMax: 84 },
+    { x: 96, y: 130, size: 100, iconSize: 22, fontSize: 9.5, labelMax: 82 },
+    { x: -46, y: 152, size: 98, iconSize: 22, fontSize: 9.5, labelMax: 80 },
+    { x: -148, y: 80, size: 102, iconSize: 22, fontSize: 10, labelMax: 82 },
+    { x: -162, y: -42, size: 104, iconSize: 24, fontSize: 10, labelMax: 84 },
+    { x: -86, y: -134, size: 100, iconSize: 22, fontSize: 9.5, labelMax: 82 },
   ],
   // If 9 or 10 cards: Curated 2-tier alternating inner/outer planetary constellation
   10: [
-    { x: 0, y: -140, size: 102, iconSize: 24, fontSize: 10, labelMax: 80 },     // 0: Top (Inner)
-    { x: 122, y: -164, size: 96, iconSize: 22, fontSize: 9.5, labelMax: 76 },  // 1: Top-Right (Outer)
-    { x: 142, y: -42, size: 102, iconSize: 24, fontSize: 10, labelMax: 80 },   // 2: Right-Top (Inner)
-    { x: 196, y: 64, size: 96, iconSize: 22, fontSize: 9.5, labelMax: 76 },    // 3: Right-Bottom (Outer)
-    { x: 82, y: 118, size: 102, iconSize: 24, fontSize: 10, labelMax: 80 },    // 4: Bottom-Right (Inner)
-    { x: 0, y: 212, size: 96, iconSize: 22, fontSize: 9.5, labelMax: 76 },      // 5: Bottom (Outer)
-    { x: -82, y: 118, size: 102, iconSize: 24, fontSize: 10, labelMax: 80 },   // 6: Bottom-Left (Inner)
-    { x: -196, y: 64, size: 96, iconSize: 22, fontSize: 9.5, labelMax: 76 },   // 7: Left-Bottom (Outer)
-    { x: -142, y: -42, size: 102, iconSize: 24, fontSize: 10, labelMax: 80 },  // 8: Left-Top (Inner)
-    { x: -122, y: -164, size: 96, iconSize: 22, fontSize: 9.5, labelMax: 76 }, // 9: Top-Left (Outer)
+    { x: 0, y: -148, size: 100, iconSize: 22, fontSize: 9.5, labelMax: 78 },     // 0: Top (Inner)
+    { x: 126, y: -168, size: 94, iconSize: 22, fontSize: 9.5, labelMax: 76 },  // 1: Top-Right (Outer)
+    { x: 152, y: -42, size: 134, iconSize: 30, fontSize: 12, labelMax: 102 },   // 2: Right-Top (Inner - Prominent Larger Orb)
+    { x: 202, y: 66, size: 94, iconSize: 22, fontSize: 9.5, labelMax: 76 },    // 3: Right-Bottom (Outer)
+    { x: 86, y: 124, size: 100, iconSize: 22, fontSize: 9.5, labelMax: 78 },    // 4: Bottom-Right (Inner)
+    { x: 0, y: 216, size: 94, iconSize: 22, fontSize: 9.5, labelMax: 76 },      // 5: Bottom (Outer)
+    { x: -86, y: 124, size: 100, iconSize: 22, fontSize: 9.5, labelMax: 78 },   // 6: Bottom-Left (Inner)
+    { x: -202, y: 66, size: 94, iconSize: 22, fontSize: 9.5, labelMax: 76 },   // 7: Left-Bottom (Outer)
+    { x: -148, y: -42, size: 100, iconSize: 22, fontSize: 9.5, labelMax: 78 },  // 8: Left-Top (Inner)
+    { x: -126, y: -168, size: 94, iconSize: 22, fontSize: 9.5, labelMax: 76 }, // 9: Top-Left (Outer)
   ],
 };
 
 const getBubbleSlot = (idx, total) => {
+  let slot;
   // If exact configuration exists, use curated slot
   if (CLUSTER_CONFIGS[total] && CLUSTER_CONFIGS[total][idx]) {
-    return CLUSTER_CONFIGS[total][idx];
-  }
-
-  // If <= 7 cards and no exact config, calculate single-tier circle
-  if (total <= 7) {
+    slot = { ...CLUSTER_CONFIGS[total][idx] };
+  } else if (total <= 7) {
+    // If <= 7 cards and no exact config, calculate single-tier circle closer to core
+    const isFeatured = idx === 1;
     const angleDeg = (idx / total) * 360 - 90;
     const angleRad = (angleDeg * Math.PI) / 180;
-    const r = 142;
-    return {
+    const r = isFeatured ? 162 : 148;
+    slot = {
       x: Math.round(r * Math.cos(angleRad)),
       y: Math.round(r * Math.sin(angleRad)),
-      size: 112,
-      iconSize: 24,
-      fontSize: 10.5,
-      labelMax: 88,
+      size: isFeatured ? 142 : 108,
+      iconSize: isFeatured ? 32 : 24,
+      fontSize: isFeatured ? 12.5 : 10,
+      labelMax: isFeatured ? 108 : 84,
+    };
+  } else {
+    // For 8+ cards: Dynamic 2-tier alternating concentric orbits (Inner Track & Outer Track)
+    const isFeatured = idx === 1;
+    const isInner = idx % 2 === 0;
+    const r = isFeatured ? 158 : (isInner ? 146 : 210);
+    const size = isFeatured ? 136 : (isInner ? 100 : 94);
+    const iconSize = isFeatured ? 30 : (isInner ? 24 : 22);
+    const fontSize = isFeatured ? 12 : (isInner ? 10 : 9.5);
+    const labelMax = isFeatured ? 104 : (isInner ? 80 : 76);
+    const angleDeg = (idx / total) * 360 - 90;
+    const angleRad = (angleDeg * Math.PI) / 180;
+    slot = {
+      x: Math.round(r * Math.cos(angleRad)),
+      y: Math.round(r * Math.sin(angleRad)),
+      size,
+      iconSize,
+      fontSize,
+      labelMax,
     };
   }
 
-  // For 8+ cards: Dynamic 2-tier alternating concentric orbits (Inner Track & Outer Track)
-  // This guarantees ZERO overlapping bubbles regardless of how many action cards exist!
-  const isInner = idx % 2 === 0;
-  const r = isInner ? 138 : 208;
-  const size = isInner ? 102 : 96;
-  const iconSize = isInner ? 24 : 22;
-  const fontSize = isInner ? 10 : 9.5;
-  const labelMax = isInner ? 80 : 76;
-  const angleDeg = (idx / total) * 360 - 90;
-  const angleRad = (angleDeg * Math.PI) / 180;
+  // Calculate radial outward unit vectors to propel highlighted orb and gpu bobber away from constellation core orb
+  const dist = Math.hypot(slot.x, slot.y) || 1;
+  const ux = slot.x / dist;
+  const uy = slot.y / dist;
+  // Shift highlighted orb node 12px outward away from central Ask Aurra core
+  slot.pushX = Math.round(ux * 12);
+  slot.pushY = Math.round(uy * 12);
+  // Direct gpu bobber floating animation 4px outward during highlighting
+  slot.bobX = Math.round(ux * 4);
+  slot.bobY = Math.round(uy * 4);
 
-  return {
-    x: Math.round(r * Math.cos(angleRad)),
-    y: Math.round(r * Math.sin(angleRad)),
-    size,
-    iconSize,
-    fontSize,
-    labelMax,
-  };
+  return slot;
 };
 
 // Orbital Sphere Aesthetic Theme Resolver - UNIFIED CYBER NEON CYAN (#00ffff)
@@ -330,11 +342,11 @@ const LiveClockTelemetry = React.memo(function LiveClockTelemetry() {
   );
 });
 
-export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, showCardsInitially = false }) {
+export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, showCardsInitially = false, onToggleView }) {
   const [slides, setSlides] = useState([]);
   const [cards, setCards] = useState([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const [showSlider, setShowSlider] = useState(true);
+  const [showSlider, setShowSlider] = useState(!showCardsInitially);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isLogsOpen, setIsLogsOpen] = useState(false);
   const [headerTitle, setHeaderTitle] = useState('AURRA 4.0');
@@ -356,11 +368,14 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
 
   const tapCountRef = useRef(0);
   const tapTimerRef = useRef(null);
+  const idleTimerRef = useRef(null);
+  const isFsVoiceOpenRef = useRef(false);
+  const lastSliderTapRef = useRef(0);
 
   // GSAP refs for morph-in animation targets
   const orbitalLayoutRef = useRef(null);
   const coreOrbRef = useRef(null);
-  const heroColRef = useRef(null);
+
   const satelliteNodesRef = useRef([]);
   const orbTrackRingsRef = useRef([]);
   const morphInTlRef = useRef(null);
@@ -379,6 +394,89 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
     return () => clearInterval(interval);
   }, [showSlider, isExplainMode, cards]);
 
+  // Track Fullscreen Voice state to prevent idle interrupt while voice interaction is active
+  useEffect(() => {
+    const handleFsOpen = () => { isFsVoiceOpenRef.current = true; };
+    const handleFsClose = () => { isFsVoiceOpenRef.current = false; };
+    window.addEventListener('aurra_open_fullscreen_voice', handleFsOpen);
+    window.addEventListener('aurra_close_fullscreen_voice', handleFsClose);
+    return () => {
+      window.removeEventListener('aurra_open_fullscreen_voice', handleFsOpen);
+      window.removeEventListener('aurra_close_fullscreen_voice', handleFsClose);
+    };
+  }, []);
+
+  // ── Auto-return to Ads Card / Slideshow after 1 minute of inactivity on the main page ──
+  useEffect(() => {
+    // Only track idle inactivity when on the main cards view (not already on the ads card)
+    if (showSlider) {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+      return;
+    }
+
+    const IDLE_TIMEOUT_MS = 60 * 1000; // 1 minute (60,000ms)
+
+    const resetIdleTimer = () => {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+      }
+      idleTimerRef.current = setTimeout(() => {
+        // Guard: Don't trigger if admin modal, auth modal, logs, or fullscreen voice are open
+        if (isAdminOpen || isAuthModalOpen || isLogsOpen || isFsVoiceOpenRef.current) {
+          resetIdleTimer();
+          return;
+        }
+
+        // Guard: Don't trigger if voice is actively speaking or speech synthesis is busy
+        if (window.speechSynthesis?.speaking) {
+          resetIdleTimer();
+          return;
+        }
+
+        logger.info('IDLE', 'No interaction for 1 minute on main page; showing ads card automatically.');
+        if (isExplainMode) {
+          setIsExplainMode(false);
+        }
+        setShowSlider(true);
+        onToggleView?.(true);
+      }, IDLE_TIMEOUT_MS);
+    };
+
+    // Arm the 1-minute timer immediately upon viewing cards
+    resetIdleTimer();
+
+    // Throttled user activity listener (tap, click, mousemove, keydown, wheel)
+    let lastActivity = Date.now();
+    const handleUserActivity = () => {
+      const now = Date.now();
+      if (now - lastActivity < 400) return;
+      lastActivity = now;
+      resetIdleTimer();
+    };
+
+    const userEvents = ['pointerdown', 'touchstart', 'click', 'keydown', 'wheel'];
+    userEvents.forEach((evt) => window.addEventListener(evt, handleUserActivity, { passive: true }));
+
+    // Also reset timer whenever user interacts via voice commands
+    const unsubVoice = voiceNavigationService.subscribe((vState) => {
+      if (vState.transcript || vState.isSpeaking || vState.isThinking) {
+        resetIdleTimer();
+      }
+    });
+
+    return () => {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+      userEvents.forEach((evt) => window.removeEventListener(evt, handleUserActivity));
+      unsubVoice();
+    };
+  }, [showSlider, isAdminOpen, isAuthModalOpen, isLogsOpen, isExplainMode]);
+
   // Sync with developer settings changes in real time
   useEffect(() => {
     const handleSettingsChange = (e) => {
@@ -396,7 +494,6 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
     const runMorphInGSAP = () => {
       if (morphInTlRef.current) morphInTlRef.current.kill();
 
-      const heroEl = heroColRef.current;
       const coreEl = coreOrbRef.current;
       const satellites = satelliteNodesRef.current.filter(Boolean);
       const trackRings = orbTrackRingsRef.current.filter(Boolean);
@@ -406,15 +503,6 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
 
       const tl = gsap.timeline();
       morphInTlRef.current = tl;
-
-      // Hero system column glides in from left
-      if (heroEl) {
-        tl.fromTo(heroEl,
-          { x: -50, opacity: 0 },
-          { x: 0, opacity: 1, duration: 0.45, ease: 'power2.out', clearProps: 'transform,opacity' },
-          0
-        );
-      }
 
       // Central core Ask Aurra sphere stabilizes and pulses
       if (coreEl) {
@@ -446,12 +534,15 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
 
     if (showCardsInitially || (typeof window !== 'undefined' && window.location.search.includes('view=cards'))) {
       setShowSlider(false);
+    } else {
+      setShowSlider(true);
     }
 
     let morphTimer = null;
     const scheduleMorphIn = () => {
       setShowSlider(false);
       setIsExplainMode(false);
+      onToggleView?.(false);
       if (morphTimer) cancelAnimationFrame(morphTimer);
       morphTimer = requestAnimationFrame(() => {
         morphTimer = requestAnimationFrame(() => {
@@ -468,6 +559,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
       }
       setIsExplainMode(false);
       setShowSlider(true);
+      onToggleView?.(true);
     };
 
     const handleStartExplainEvent = () => {
@@ -494,8 +586,10 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
   const loadKioskData = useCallback(async () => {
     try {
       const header = await offlineBrandingService.getHeader();
-      if (header?.headerName) {
+      if (header?.headerName && header.headerName !== 'Robomiracle Technologies Private Limited') {
         setHeaderTitle(header.headerName);
+      } else {
+        setHeaderTitle('AURRA 4.0');
       }
 
       const rawSlides = await offlineSliderService.getSlideImages();
@@ -620,7 +714,8 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
     setIsExplainMode(true);
     setExplainIndex(0);
     setIsAutoPlaying(true);
-  }, [isExplainMode]);
+    onToggleView?.(false);
+  }, [isExplainMode, onToggleView]);
 
   handleStartExplainRef.current = handleStartExplain;
 
@@ -629,9 +724,10 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
     if (explainTimerRef.current) clearTimeout(explainTimerRef.current);
     setIsExplainMode(false);
     setShowSlider(false);
+    onToggleView?.(false);
     // Smoothly animate constellation cards in
     window.dispatchEvent(new CustomEvent('aurra_morph_cards_in'));
-  }, []);
+  }, [onToggleView]);
 
   // Auto-advance & Voice Narration for Explain Features Mode
   useEffect(() => {
@@ -734,88 +830,73 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
     subtitle: 'Autonomous AI Humanoid Receptionist',
   };
 
+  const handleSliderDoubleTap = useCallback(() => {
+    logger.info('HOME', 'Double tap on slider outer frame detected, entering main cards page');
+    if (isExplainMode) setIsExplainMode(false);
+    setShowSlider(false);
+    onToggleView?.(false);
+    window.dispatchEvent(new CustomEvent('aurra_show_cards'));
+    window.dispatchEvent(new CustomEvent('aurra_morph_cards_in'));
+  }, [isExplainMode, onToggleView]);
+
+  const handleSliderTap = (e) => {
+    const now = Date.now();
+    const diff = now - lastSliderTapRef.current;
+    if (diff > 0 && diff < 450) {
+      lastSliderTapRef.current = 0;
+      handleSliderDoubleTap();
+      return;
+    }
+    lastSliderTapRef.current = now;
+
+    // Single click/tap behavior: unmute video if present
+    const vid = e.currentTarget.querySelector('video');
+    if (vid && activeSlide.isMuted !== true) {
+      vid.muted = false;
+      vid.volume = 1.0;
+      vid.play().catch(() => { });
+    }
+  };
+
   return (
     <div className={`home-container ${isExplainMode ? 'in-explain-mode' : ''}`}>
+      {/* Global SVG Gradients matching background (deep navy to ocean blue to cyan) */}
+      <svg width="0" height="0" style={{ position: 'absolute', pointerEvents: 'none', opacity: 0, width: 0, height: 0 }} aria-hidden="true">
+        <defs>
+          <linearGradient id="aurra-bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#092c4c" />
+            <stop offset="50%" stopColor="#0284c7" />
+            <stop offset="100%" stopColor="#00c4db" />
+          </linearGradient>
+          <linearGradient id="aurra-constellation-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#092c4c" />
+            <stop offset="50%" stopColor="#0284c7" />
+            <stop offset="100%" stopColor="#00c4db" />
+          </linearGradient>
+        </defs>
+      </svg>
+
       {/* Top Cyber Telemetry Header Bar */}
-      <header 
-        ref={kioskTopBarRef} 
+      <header
+        ref={kioskTopBarRef}
         className="kiosk-top-bar"
       >
         {/* Left: Cyber Brand Badge */}
-        <div 
+        <div
           className="cyber-brand-badge"
           onClick={handleHeadingTap}
-          title="Aurra 4.0 System (Tap 4 times to access Admin)"
+          title="Aurra System (Tap 4 times to access Admin)"
         >
           <div className="brand-robot-icon">
             <Bot size={22} color="#00ffff" />
           </div>
           <div className="brand-text-col">
-            <div className="brand-title">AURRA 4.0</div>
-            <div className="brand-sub">ROBOMIRACLE AI SYSTEM</div>
+            <div className="brand-title">{(!headerTitle || headerTitle === 'Robomiracle Technologies Private Limited' || headerTitle === 'AURRA 4.0' || headerTitle === 'AURRA') ? 'AURRA' : headerTitle.replace(/\s*4\.0/gi, '').trim()}</div>
           </div>
         </div>
 
-        {/* Center: Live Telemetry Cluster - Converted to Sleek Cyber Icons */}
-        <div className="cyber-telemetry-cluster">
-          {/* Serial Telemetry Icon */}
-          <div 
-            className={`hud-telem-icon-btn ${espState.online ? 'telem-online' : 'telem-offline'}`}
-            title={`Serial ESP32 Hardware: ${espState.online ? (espState.mode === 'ap' ? 'ONLINE (AP)' : 'ONLINE (STA)') : 'OFFLINE'}`}
-          >
-            <Cpu size={16} />
-            <span className="telem-dot"></span>
-          </div>
-
-          {/* Offline Dexie DB Icon */}
-          <div 
-            className="hud-telem-icon-btn telem-db"
-            title="Offline Database: Dexie IndexedDB (Operational & Synced)"
-          >
-            <Database size={16} />
-            <span className="telem-dot"></span>
-          </div>
-
-          {/* Camera & FPS Telemetry Icon with number alone */}
-          <div 
-            className="hud-telem-icon-btn telem-fps"
-            title="Vision Camera & Display Engine: Live FPS"
-          >
-            <FpsTelemetry />
-          </div>
-        </div>
-
-        {/* Right: Live Real-Time Clock & Action Icon Buttons */}
+        {/* Right: Real-Time Clock */}
         <div className="cyber-top-right-group">
-          {/* Explain Features Walkthrough Icon Button */}
-          <button 
-            className={`cyber-top-icon-btn ${isExplainMode ? 'active-tour' : ''}`}
-            onClick={() => {
-              if (isExplainMode) {
-                handleExitExplain();
-              } else {
-                handleStartExplain();
-              }
-            }}
-            title={isExplainMode ? 'Exit Explain Walkthrough' : 'Explain All Features (Voice Walkthrough)'}
-          >
-            <Sparkles size={16} color="#00ffff" />
-          </button>
-
-          {/* Action Cards / Features Grid Icon Button */}
-          <button 
-            className="cyber-top-icon-btn"
-            onClick={() => {
-              if (isExplainMode) setIsExplainMode(false);
-              setShowSlider(false);
-              window.dispatchEvent(new CustomEvent('aurra_show_cards'));
-              window.dispatchEvent(new CustomEvent('aurra_morph_cards_in'));
-            }}
-            title="View Features & Action Cards"
-          >
-            <LayoutGrid size={16} color="#00ffff" />
-          </button>
-
           <LiveClockTelemetry />
         </div>
       </header>
@@ -826,13 +907,16 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
           /* SLIDESHOW BANNER VIEW */
           <div
             className="slider-outer-frame"
-            onDoubleClick={() => setShowSlider(false)}
-            onClick={(e) => {
-              const vid = e.currentTarget.querySelector('video');
-              if (vid && activeSlide.isMuted !== true) {
-                vid.muted = false;
-                vid.volume = 1.0;
-                vid.play().catch(() => {});
+            onClick={handleSliderTap}
+            onDoubleClick={handleSliderDoubleTap}
+            onTouchEnd={(e) => {
+              const now = Date.now();
+              const diff = now - lastSliderTapRef.current;
+              if (diff > 0 && diff < 450) {
+                lastSliderTapRef.current = 0;
+                handleSliderDoubleTap();
+              } else {
+                lastSliderTapRef.current = now;
               }
             }}
           >
@@ -867,7 +951,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                           playPromise.catch(() => {
                             if (!isMuted) {
                               videoEl.muted = true;
-                              videoEl.play().catch(() => {});
+                              videoEl.play().catch(() => { });
                             }
                           });
                         }
@@ -919,8 +1003,8 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
           /* EXPLAIN FEATURES SHOWCASE MODE (STORYBOARD SPEC) */
           <div className="explain-mode-layout">
             {/* 1. Top row of circular nodes (O O O O O O) */}
-            <div 
-              ref={topNodesRowRef} 
+            <div
+              ref={topNodesRowRef}
               className="explain-top-nodes-row"
               style={{
                 display: 'flex',
@@ -962,8 +1046,8 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
 
               return (
                 <div className="explain-showcase-container">
-                  <div 
-                    ref={explainCardRef} 
+                  <div
+                    ref={explainCardRef}
                     className="explain-showcase-card"
                     style={{
                       '--card-color': theme.color,
@@ -1010,21 +1094,21 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                     {/* Bottom Actions Row */}
                     <div className="explain-card-footer">
                       <div className="explain-nav-controls">
-                        <button 
+                        <button
                           className="explain-nav-btn"
                           onClick={() => switchExplainFeature(explainIndex - 1, true)}
                           title="Previous Feature"
                         >
                           ◀ Prev
                         </button>
-                        <button 
+                        <button
                           className="explain-nav-btn play-pause"
                           onClick={() => setIsAutoPlaying(prev => !prev)}
                           title={isAutoPlaying ? "Pause Auto-tour" : "Play Auto-tour"}
                         >
                           {isAutoPlaying ? '⏸ Pause' : '▶ Play'}
                         </button>
-                        <button 
+                        <button
                           className="explain-nav-btn"
                           onClick={() => switchExplainFeature(explainIndex + 1, true)}
                           title="Next Feature"
@@ -1034,7 +1118,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                       </div>
 
                       <div className="explain-right-actions">
-                        <button 
+                        <button
                           className="explain-open-btn"
                           onClick={() => handleCardClick(activeCard)}
                           title="Open this feature screen"
@@ -1042,7 +1126,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                           <span>Launch Feature</span>
                           <ChevronRight size={16} />
                         </button>
-                        <button 
+                        <button
                           className="explain-exit-btn"
                           onClick={handleExitExplain}
                           title="Exit walkthrough"
@@ -1059,124 +1143,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
         ) : (
           /* AURRA 4.0 ORBITAL CONSTELLATION VIEW */
           <div ref={orbitalLayoutRef} className="orbital-home-layout">
-            {/* Left: Hero System Feature Spotlight Column */}
-            <div ref={heroColRef} className="hero-system-column">
-              {/* Dynamic Feature Spotlight Rectangle (Clean & Minimal) */}
-              {(() => {
-                const spotlightCard = cards[spotlightIndex] || cards[0];
-                if (!spotlightCard) return null;
-                const spotlightTheme = getOrbTheme(spotlightCard.href, spotlightIndex, spotlightCard);
-                const spotlightExp = getFeatureExplanation(spotlightCard) || {
-                  title: spotlightCard.title,
-                  speech: spotlightCard.subtitle || 'Autonomous robot smart module.',
-                };
-
-                return (
-                  <div className="hero-feature-spotlight-card">
-                    {/* Top Bar: Progress & Nav */}
-                    <div className="spotlight-card-topbar">
-                      <div className="spotlight-sys-tag">
-                        <span className="live-dot-pulse"></span>
-                        <span className="spotlight-step-text">FEATURE {(spotlightIndex + 1).toString().padStart(2, '0')} / {cards.length.toString().padStart(2, '0')}</span>
-                      </div>
-                      
-                      {/* Manual prev/next navigation arrows */}
-                      <div className="spotlight-nav-controls">
-                        <button
-                          type="button"
-                          className="spotlight-arrow-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSpotlightIndex((prev) => (prev - 1 + cards.length) % cards.length);
-                          }}
-                          title="Previous Feature"
-                        >
-                          ‹
-                        </button>
-                        <button
-                          type="button"
-                          className="spotlight-arrow-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSpotlightIndex((prev) => (prev + 1) % cards.length);
-                          }}
-                          title="Next Feature"
-                        >
-                          ›
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Spotlight Visual Presentation - Title matches active node word color */}
-                    <div className="spotlight-card-content" key={spotlightCard.id || spotlightIndex}>
-                      <div className="spotlight-title-row">
-                        <div className="spotlight-icon-box">
-                          {getCardIcon(spotlightCard.href, spotlightCard.className, 24, '#00ffff')}
-                        </div>
-                        <div className="spotlight-title-col">
-                          <h2 className="spotlight-card-title matched-feature-word">{spotlightCard.title}</h2>
-                          <div className="spotlight-card-sub">{spotlightCard.subtitle || 'Kiosk Service'}</div>
-                        </div>
-                      </div>
-
-                      <p className="spotlight-card-desc">
-                        {spotlightExp.speech}
-                      </p>
-                    </div>
-
-                    {/* Visual Bottom Action Row */}
-                    <div className="spotlight-card-footer">
-                      <button 
-                        className="spotlight-launch-btn"
-                        onClick={() => handleCardClick(spotlightCard)}
-                        title={`Open ${spotlightCard.title}`}
-                      >
-                        <Play size={12} fill="#00ffff" color="#00ffff" />
-                        <span>Open</span>
-                        <ChevronRight size={14} />
-                      </button>
-
-                      <div className="spotlight-dots-indicator">
-                        {cards.map((_, i) => (
-                          <span 
-                            key={i} 
-                            className={`spotlight-dot ${i === spotlightIndex ? 'active' : ''}`}
-                            onClick={() => setSpotlightIndex(i)}
-                            title={`Jump to ${cards[i]?.title}`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div className="hero-actions-row">
-                <button 
-                  className="talk-to-aurra-btn"
-                  onClick={() => {
-                    window.dispatchEvent(new CustomEvent('aurra_open_fullscreen_voice'));
-                    voiceNavigationService.speak('I am listening. Ask any question or command.');
-                  }}
-                  title="Activate Hands-Free Voice Listening"
-                >
-                  <div className="play-icon-circle">
-                    <Play size={16} fill="#000" color="#000" />
-                  </div>
-                  <span>Talk to Aurra</span>
-                </button>
-
-                <button
-                  className="screensaver-switch-btn"
-                  onClick={() => setShowSlider(true)}
-                  title="Switch to Slideshow Screensaver"
-                >
-                  <span>Screensaver</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Right: The Planetary Orbital Constellation */}
+            {/* Planetary Orbital Constellation (Centered) */}
             <div className="constellation-column">
               <div className="constellation-canvas">
                 {/* Visual Orbit Tracks */}
@@ -1184,7 +1151,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                 <div ref={el => { if (el) orbTrackRingsRef.current[1] = el; }} className="orbital-track-ring track-inner"></div>
 
                 {/* Central Core Sphere: Ask Aurra */}
-                <div 
+                <div
                   ref={coreOrbRef}
                   className="constellation-core-orb"
                   onClick={() => {
@@ -1193,8 +1160,12 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                   }}
                   title="Ask Aurra Voice Core (Tap to Talk)"
                 >
-                  <div className="core-mic-halo">
-                    <Mic size={36} color="#00ffff" />
+                  <div className="core-robot-face-wrapper">
+                    <img
+                      src="/aurra_core_robot.png"
+                      alt="Aurra Robot"
+                      className="core-robot-face-img"
+                    />
                   </div>
                   <div className="core-orb-title">Ask Aurra</div>
                   <div className="core-breathing-aura"></div>
@@ -1211,11 +1182,15 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                     <div
                       key={card.id || idx}
                       ref={el => { satelliteNodesRef.current[idx] = el; }}
-                      className={`satellite-orb-node ${isSpotlightActive ? 'spotlight-active-node' : ''}`}
+                      className={`satellite-orb-node ${isSpotlightActive ? 'spotlight-active-node' : ''} ${slot.size >= 130 ? 'prominent-larger-orb' : ''}`}
                       style={{
                         '--node-idx': idx,
                         '--orb-x': `${slot.x}px`,
                         '--orb-y': `${slot.y}px`,
+                        '--push-x': `${slot.pushX || 0}px`,
+                        '--push-y': `${slot.pushY || 0}px`,
+                        '--bob-x': `${slot.bobX || 0}px`,
+                        '--bob-y': `${slot.bobY || 0}px`,
                         top: `calc(50% + ${slot.y}px)`,
                         left: `calc(50% + ${slot.x}px)`,
                         '--orb-size': `${slot.size}px`,
@@ -1239,7 +1214,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                           <div className="spotlight-active-pulse-ring ring-inner"></div>
                           <div className="spotlight-active-pulse-ring ring-outer"></div>
                           <div className={`spotlight-active-beacon ${slot.y > 10 ? 'beacon-bottom' : 'beacon-top'}`}>
-                            <Sparkles size={10} color="#000" />
+                            <Sparkles size={10} color="#00ffff" />
                             <span>ACTIVE</span>
                           </div>
                         </>
@@ -1247,7 +1222,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
 
                       <div className="orb-gpu-bobber">
                         <div className="orb-icon-glyph">
-                          {getCardIcon(card.href, card.className, slot.iconSize, '#00ffff')}
+                          {getCardIcon(card.href, card.className, slot.iconSize, 'url(#aurra-constellation-gradient)')}
                         </div>
                         <div className={`orb-label-text ${isSpotlightActive ? 'matched-feature-word active-label-glow' : 'inactive-label'}`}>
                           {theme.label || card.title}
@@ -1262,8 +1237,8 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
         )}
       </main>
 
-      {/* Bottom spacer for global floating voice bar */}
-      <div className="bottom-global-voice-spacer"></div>
+      {/* Bottom spacer for global floating voice bar (only when cards are showing) */}
+      {!showSlider && <div className="bottom-global-voice-spacer"></div>}
 
       {/* Secret PIN Authentication Modal */}
       <AdminAuthModal

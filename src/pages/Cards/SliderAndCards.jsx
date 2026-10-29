@@ -38,6 +38,7 @@ import { voiceNavigationService } from '../../services/voiceNavigationService';
 import AdminAuthModal from '../../components/AdminAuthModal';
 import { LogViewerModal } from '../../components/LogViewerModal';
 import { esp32Service } from '../../services/esp32Service';
+import '../../components/FullscreenVoiceOverlay.css';
 import './SliderAndCards.css';
 
 // Feature Icon Resolver with Dynamic Bubble Sizing
@@ -356,9 +357,12 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
   // Dynamic Feature Spotlight Deck state (Always-moving feature explanation on Home Screen)
   const [spotlightIndex, setSpotlightIndex] = useState(0);
 
-  // Real-time voice listening state for Constellation Core frequency animation
+  // Real-time voice state for Constellation Core frequency animation & bottom dual Q&A panels
   const [isVoiceListening, setIsVoiceListening] = useState(() => Boolean(voiceNavigationService?.isListening));
   const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
+  const [isVoiceThinking, setIsVoiceThinking] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [voiceLatestReply, setVoiceLatestReply] = useState(() => voiceNavigationService?.latestInteractiveReply || null);
 
   useEffect(() => {
     const unsubVoiceState = voiceNavigationService.subscribe((vState) => {
@@ -368,8 +372,35 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
       if (vState.isSpeaking !== undefined) {
         setIsVoiceSpeaking(Boolean(vState.isSpeaking));
       }
+      if (vState.isThinking !== undefined) {
+        setIsVoiceThinking(Boolean(vState.isThinking));
+      }
+      if (vState.transcript !== undefined) {
+        setVoiceTranscript(vState.transcript);
+        if (vState.transcript && vState.transcript.trim().length > 0) {
+          setVoiceLatestReply(null);
+        }
+      }
+      if (vState.latestReply !== undefined && vState.latestReply) {
+        setVoiceLatestReply(vState.latestReply);
+      }
     });
-    return () => unsubVoiceState();
+
+    const handleQaAnswered = (e) => {
+      if (e?.detail) {
+        setVoiceLatestReply({
+          query: e.detail.query,
+          reply: e.detail.match?.answer || e.detail.reply || '',
+          timestamp: Date.now(),
+        });
+      }
+    };
+    window.addEventListener('aurra:qa-answered', handleQaAnswered);
+
+    return () => {
+      unsubVoiceState();
+      window.removeEventListener('aurra:qa-answered', handleQaAnswered);
+    };
   }, []);
 
   // Explain Features Mode state (Storyboard Spec)
@@ -1307,8 +1338,82 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
         )}
       </main>
 
-      {/* Bottom spacer for global floating voice bar (only when cards are showing) */}
-      {!showSlider && <div className="bottom-global-voice-spacer"></div>}
+      {/* Bottom Dual Side-by-Side Q&A Panels (Replacing Floating Voice Assistant Bar on Main Page) */}
+      {!showSlider && !isExplainMode && (
+        <div className="main-page-dual-dialog-wrapper">
+          <div className="fs-dual-dialog-container main-dual-dialog-container">
+            {/* Left Panel: Question + Embedded Cyber Waveform */}
+            <div
+              className="fs-dialog-panel fs-question-panel main-question-panel"
+              onClick={() => voiceNavigationService.toggleListening()}
+              title={isVoiceListening ? "Listening Active (Tap to Mute)" : "Mic Paused (Tap to Speak)"}
+            >
+              <div className="main-panel-header-row">
+                <span className="main-panel-tag">USER QUERY</span>
+                <span className={`main-panel-status-pill ${isVoiceListening ? 'is-listening' : 'is-idle'}`}>
+                  {isVoiceListening ? 'LISTENING' : 'TAP TO TALK'}
+                </span>
+              </div>
+
+              <div className="fs-panel-query-text">
+                {voiceLatestReply?.query || voiceTranscript || (isVoiceListening ? "Listening to your voice..." : "Ask Aurra anything...")}
+              </div>
+
+              {/* Embedded Audio Waveform in Left Panel */}
+              <div className={`fs-card-waveform ${isVoiceSpeaking ? 'is-speaking' : isVoiceListening ? 'is-listening' : 'is-idle'}`}>
+                {Array.from({ length: 32 }, (_, i) => {
+                  const distFromCenter = Math.abs(i - 15.5) / 15.5;
+                  const baseHeight = Math.max(3, Math.round((1 - distFromCenter * distFromCenter) * 18));
+                  return (
+                    <span
+                      key={i}
+                      className="fs-card-wave-bar"
+                      style={{
+                        '--bar-h': `${baseHeight}px`,
+                        '--anim-delay': `${(i % 10) * 0.08}s`,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Edge Neon Accent */}
+              <div className="fs-panel-edge-glow"></div>
+            </div>
+
+            {/* Right Panel: Aurra Answer with Cyber Corner Accent */}
+            <div
+              className="fs-dialog-panel fs-answer-panel main-answer-panel"
+              onClick={() => {
+                if (isVoiceSpeaking) voiceNavigationService.cancelSpeech();
+              }}
+              title={isVoiceSpeaking ? "Tap to silence Aurra" : undefined}
+            >
+              {/* Sleek Top-Right Cyber Corner Notch/Graphic */}
+              <div className="fs-cyber-corner-accent">
+                <svg width="44" height="26" viewBox="0 0 44 26" fill="none">
+                  <path d="M0 2 H34 L42 10 V26" stroke="#00E5FF" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="42" cy="18" r="1.5" fill="#00E5FF" />
+                  <line x1="22" y1="2" x2="34" y2="2" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" />
+                </svg>
+              </div>
+
+              <div className="main-panel-header-row">
+                <span className="main-panel-tag">AURRA AI</span>
+                {isVoiceSpeaking && <span className="main-panel-speaking-badge">SPEAKING</span>}
+                {isVoiceThinking && <span className="main-panel-thinking-badge">THINKING</span>}
+              </div>
+
+              <div className="fs-panel-answer-text">
+                {voiceLatestReply?.reply || (isVoiceThinking ? 'Aurra is processing your question...' : isVoiceSpeaking ? 'Aurra is speaking...' : voiceTranscript ? 'Aurra is thinking...' : 'I am Aurra, your humanoid AI assistant. Ask me anything or tap any feature.')}
+              </div>
+
+              {/* Edge Neon Accent */}
+              <div className="fs-panel-edge-glow"></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Secret PIN Authentication Modal */}
       <AdminAuthModal

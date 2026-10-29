@@ -172,13 +172,14 @@ function App() {
         />
       )}
 
-      {/* Globally Floating Persistent Voice Assistant Bar (hidden while in Admin, Form, Interaction Mode, Testing Lab, or when Ads Cards appear) */}
+      {/* Globally Floating Persistent Voice Assistant Bar (hidden on main page, replaced by dual panels) */}
       {isVoiceBarVisible && (
-        <div className="global-floating-voice-bar">
+        <div className={`global-floating-voice-bar ${currentRoute === '/' || currentRoute === '/home' || currentRoute === 'home' ? 'hide-on-main-page' : ''}`}>
           <VoiceAssistantBar
             onNavigate={handleNavigate}
             onOpenAdmin={handleOpenAdmin}
             onToggleView={handleToggleView}
+            hideBarOnly={currentRoute === '/' || currentRoute === '/home' || currentRoute === 'home'}
           />
         </div>
       )}

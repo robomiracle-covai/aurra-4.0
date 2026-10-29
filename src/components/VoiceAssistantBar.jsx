@@ -5,7 +5,7 @@ import { kioskConfigService } from '../services/kioskConfigService';
 import FullscreenVoiceOverlay from './FullscreenVoiceOverlay';
 import './VoiceAssistantBar.css';
 
-export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleView }) {
+export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleView, hideBarOnly = false }) {
   const [isListening, setIsListening] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -154,7 +154,9 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
   };
 
   return (
-    <div className={`voice-assistant-bar ${isKeyboardOpen ? 'keyboard-mode' : ''} ${latestReply ? 'has-reply' : ''} ${isCatchingMorph ? 'morph-catch' : ''} ${isFullscreenOpen && !isCatchingMorph ? 'is-fullscreen-open' : ''}`}>
+    <>
+      {!hideBarOnly && (
+        <div className={`voice-assistant-bar ${isKeyboardOpen ? 'keyboard-mode' : ''} ${latestReply ? 'has-reply' : ''} ${isCatchingMorph ? 'morph-catch' : ''} ${isFullscreenOpen && !isCatchingMorph ? 'is-fullscreen-open' : ''}`}>
       {/* Mic Action Toggle Button */}
       <button
         ref={micBtnRef}
@@ -267,6 +269,8 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
       >
         <Maximize2 size={18} color="#000000" />
       </button>
+        </div>
+      )}
 
       {/* Fullscreen Voice Immersion HUD Overlay */}
       <FullscreenVoiceOverlay
@@ -283,6 +287,6 @@ export default function VoiceAssistantBar({ onNavigate, onOpenAdmin, onToggleVie
         onToggleListening={handleToggle}
         onToggleAiMute={handleToggleAiMute}
       />
-    </div>
+    </>
   );
 }

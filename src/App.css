@@ -55,6 +55,11 @@
   pointer-events: auto;
 }
 
+.global-floating-voice-bar.hide-on-main-page {
+  display: none !important;
+  pointer-events: none !important;
+}
+
 @keyframes floatIn {
   from {
     transform: translate(-50%, 20px);

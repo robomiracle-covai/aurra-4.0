@@ -60,6 +60,16 @@
   pointer-events: none !important;
 }
 
+/* Suppress Voice Assistant Bar on Face Greetings Diagnostic page */
+body:has(.face-recognition-page-wrapper) .global-floating-voice-bar,
+.aurra-app-root:has(.face-recognition-page-wrapper) .global-floating-voice-bar,
+#main-app-container:has(.face-recognition-page-wrapper) .global-floating-voice-bar,
+.aurra-view-container:has(.face-recognition-page-wrapper) ~ .global-floating-voice-bar,
+.aurra-view-container:has(.face-recognition-page-wrapper) + .global-floating-voice-bar {
+  display: none !important;
+  pointer-events: none !important;
+}
+
 @keyframes floatIn {
   from {
     transform: translate(-50%, 20px);

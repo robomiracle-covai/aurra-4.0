@@ -4,7 +4,7 @@
   flex-direction: column;
   box-sizing: border-box;
   position: relative;
-  padding: 16px 24px 140px 24px;
+  padding: 16px 24px 32px 24px;
   background-color: #03060d;
   background-image:
     linear-gradient(rgba(0, 255, 255, 0.095) 1px, transparent 1px),
@@ -291,4 +291,13 @@
 
 .delete-user-btn:hover {
   color: #ef4444;
+}
+
+/* Suppress Voice Assistant Bar on Face Greetings Diagnostic page */
+body:has(.face-recognition-page-wrapper) .global-floating-voice-bar,
+.aurra-app-root:has(.face-recognition-page-wrapper) .global-floating-voice-bar,
+#main-app-container:has(.face-recognition-page-wrapper) .global-floating-voice-bar,
+.aurra-view-container:has(.face-recognition-page-wrapper) ~ .global-floating-voice-bar {
+  display: none !important;
+  pointer-events: none !important;
 }

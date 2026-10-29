@@ -1177,25 +1177,29 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                   title={isVoiceListening ? "Aurra is Listening (Tap to Talk)" : "Ask Aurra Voice Core (Tap to Talk)"}
                 >
                   <div className="core-robot-face-wrapper">
-                    {isVoiceListening ? (
-                      <div className="core-wave-frequency-container">
-                        <div className={`core-frequency-bars ${isVoiceSpeaking ? 'speaking-mode' : 'listening-mode'}`}>
+                    <div className="core-robot-head-container">
+                      {/* Aurra Robot Head with Face Visor */}
+                      <img
+                        src="/aurra_core_robot_eyeless.png"
+                        alt="Aurra Robot"
+                        className="core-robot-face-img"
+                      />
+
+                      {/* Wave Frequency Animation directly inside the Robo Eyes */}
+                      <div className={`core-robot-eyes-wave-overlay ${isVoiceListening ? 'is-listening' : 'is-idle'} ${isVoiceSpeaking ? 'is-speaking' : ''}`}>
+                        {/* Left Eye Frequency Spectrum Cluster */}
+                        <div className="core-eye-spectrum left-eye-spectrum">
                           {[
-                            { min: 6, mid: 22, max: 12, delay: 0.0 },
-                            { min: 10, mid: 32, max: 16, delay: 0.12 },
-                            { min: 14, mid: 42, max: 22, delay: 0.24 },
-                            { min: 18, mid: 50, max: 28, delay: 0.18 },
-                            { min: 22, mid: 56, max: 34, delay: 0.06 },
-                            { min: 24, mid: 60, max: 38, delay: 0.28 },
-                            { min: 22, mid: 56, max: 34, delay: 0.14 },
-                            { min: 18, mid: 50, max: 28, delay: 0.2 },
-                            { min: 14, mid: 42, max: 22, delay: 0.08 },
-                            { min: 10, mid: 32, max: 16, delay: 0.22 },
-                            { min: 6, mid: 22, max: 12, delay: 0.16 },
+                            { min: 5, mid: 18, max: 10, delay: 0.0 },
+                            { min: 7, mid: 24, max: 14, delay: 0.08 },
+                            { min: 9, mid: 28, max: 18, delay: 0.16 },
+                            { min: 10, mid: 30, max: 20, delay: 0.24 },
+                            { min: 8, mid: 25, max: 15, delay: 0.12 },
+                            { min: 6, mid: 19, max: 11, delay: 0.04 },
                           ].map((bar, i) => (
                             <span
-                              key={i}
-                              className="core-freq-bar"
+                              key={`l-${i}`}
+                              className="core-eye-bar"
                               style={{
                                 '--bar-min': `${bar.min}px`,
                                 '--bar-mid': `${bar.mid}px`,
@@ -1205,21 +1209,31 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                             />
                           ))}
                         </div>
-                        {/* Flowing harmonic audio wave SVG line across the center */}
-                        <svg className="core-freq-sine-wave" viewBox="0 0 88 20" fill="none">
-                          <path
-                            d="M 0,10 Q 11,2 22,10 T 44,10 T 66,10 T 88,10"
-                            className="core-freq-sine-path"
-                          />
-                        </svg>
+
+                        {/* Right Eye Frequency Spectrum Cluster */}
+                        <div className="core-eye-spectrum right-eye-spectrum">
+                          {[
+                            { min: 4, mid: 12, max: 7, delay: 0.06 },
+                            { min: 6, mid: 16, max: 9, delay: 0.18 },
+                            { min: 5, mid: 13, max: 8, delay: 0.1 },
+                          ].map((bar, i) => (
+                            <span
+                              key={`r-${i}`}
+                              className="core-eye-bar"
+                              style={{
+                                '--bar-min': `${bar.min}px`,
+                                '--bar-mid': `${bar.mid}px`,
+                                '--bar-max': `${bar.max}px`,
+                                '--anim-delay': `${bar.delay}s`,
+                              }}
+                            />
+                          ))}
+                        </div>
+
+                        {/* Visor Cyber Laser Horizon Filament */}
+                        <div className="core-eyes-laser-line"></div>
                       </div>
-                    ) : (
-                      <img
-                        src="/aurra_core_robot.png"
-                        alt="Aurra Robot"
-                        className="core-robot-face-img"
-                      />
-                    )}
+                    </div>
                   </div>
                   <div className="core-orb-title">
                     {isVoiceListening ? 'Listening...' : 'Ask Aurra'}

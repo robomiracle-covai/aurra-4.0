@@ -906,6 +906,18 @@
   z-index: 2;
 }
 
+/* Head container encapsulating robot image and dynamic eye wave overlay */
+.core-robot-head-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: aurraCoreFloat 3.8s ease-in-out infinite;
+  transform-origin: center bottom;
+  will-change: transform, filter;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
+}
+
 .core-robot-face-img {
   width: 86px;
   height: auto;
@@ -913,46 +925,190 @@
   object-fit: contain;
   display: block;
   pointer-events: none;
-  animation: aurraCoreFloat 3.8s ease-in-out infinite;
-  transform-origin: center bottom;
-  will-change: transform, filter;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
+  filter: drop-shadow(0 4px 12px rgba(0, 180, 255, 0.28));
 }
 
-@keyframes aurraCoreFloat {
-  0% {
-    transform: translateY(0px) rotate(0deg) scale(1);
-    filter: drop-shadow(0 4px 12px rgba(0, 180, 255, 0.28));
-  }
-  25% {
-    transform: translateY(-2.5px) rotate(0.8deg) scale(1.015);
-    filter: drop-shadow(0 6px 16px rgba(0, 210, 255, 0.42));
-  }
-  50% {
-    transform: translateY(-4.5px) rotate(0deg) scale(1.025);
-    filter: drop-shadow(0 8px 20px rgba(0, 240, 255, 0.55));
-  }
-  75% {
-    transform: translateY(-2px) rotate(-0.8deg) scale(1.015);
-    filter: drop-shadow(0 6px 16px rgba(0, 210, 255, 0.42));
-  }
-  100% {
-    transform: translateY(0px) rotate(0deg) scale(1);
-    filter: drop-shadow(0 4px 12px rgba(0, 180, 255, 0.28));
-  }
-}
-
-.constellation-core-orb:hover .core-robot-face-img {
+.constellation-core-orb:hover .core-robot-head-container {
   animation-play-state: paused;
   transform: translateY(-5px) scale(1.08);
   filter: drop-shadow(0 8px 24px rgba(0, 240, 255, 0.7));
 }
 
-.constellation-core-orb:active .core-robot-face-img {
+.constellation-core-orb:active .core-robot-head-container {
   animation-play-state: paused;
   transform: translateY(1px) scale(0.95);
   filter: drop-shadow(0 2px 8px rgba(0, 180, 255, 0.4));
   transition: transform 0.1s ease;
+}
+
+/* ==========================================================================
+   Wave Frequency Animation Inside the Robo Eyes Visor
+   ========================================================================== */
+
+.core-robot-eyes-wave-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Left Eye Spectrum Cluster */
+.core-eye-spectrum.left-eye-spectrum {
+  position: absolute;
+  left: 6%;
+  top: 44%;
+  width: 27%;
+  height: 24%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5px;
+}
+
+/* Right Eye Spectrum Cluster */
+.core-eye-spectrum.right-eye-spectrum {
+  position: absolute;
+  left: 55.5%;
+  top: 52%;
+  width: 7.5%;
+  height: 12%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+/* Individual Bar inside the Eyes */
+.core-eye-bar {
+  width: 2.2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    180deg,
+    #FFFFFF 0%,
+    #00F0FF 40%,
+    #0284C7 85%,
+    #003859 100%
+  );
+  box-shadow: 
+    0 0 5px rgba(255, 255, 255, 0.8),
+    0 0 10px rgba(0, 240, 255, 0.9);
+  transform-origin: center;
+  will-change: height, transform;
+}
+
+.core-eye-spectrum.right-eye-spectrum .core-eye-bar {
+  width: 1.6px;
+  border-radius: 1.5px;
+}
+
+/* Idle Mode: Living cyber pulse */
+.core-robot-eyes-wave-overlay.is-idle .core-eye-bar {
+  height: var(--bar-min, 5px);
+  animation: eyeBarIdle 2.4s ease-in-out infinite alternate;
+  animation-delay: var(--anim-delay, 0s);
+}
+
+@keyframes eyeBarIdle {
+  0% {
+    height: var(--bar-min, 5px);
+    opacity: 0.7;
+    filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.6));
+  }
+  50% {
+    height: calc(var(--bar-min, 5px) * 1.6);
+    opacity: 0.95;
+    filter: drop-shadow(0 0 7px rgba(0, 240, 255, 0.9));
+  }
+  100% {
+    height: var(--bar-min, 5px);
+    opacity: 0.7;
+    filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.6));
+  }
+}
+
+/* Listening Mode: Full dynamic acoustic wave frequency inside the eyes */
+.core-robot-eyes-wave-overlay.is-listening .core-eye-bar {
+  animation: eyeBarListen 1.1s ease-in-out infinite alternate;
+  animation-delay: var(--anim-delay, 0s);
+}
+
+@keyframes eyeBarListen {
+  0% {
+    height: var(--bar-min, 6px);
+    opacity: 0.75;
+    transform: scaleY(0.7);
+  }
+  50% {
+    height: var(--bar-mid, 22px);
+    opacity: 1;
+    transform: scaleY(1.05);
+    box-shadow: 
+      0 0 6px rgba(255, 255, 255, 0.95),
+      0 0 12px rgba(0, 240, 255, 1);
+  }
+  100% {
+    height: var(--bar-max, 12px);
+    opacity: 0.85;
+    transform: scaleY(0.85);
+  }
+}
+
+/* Speaking Mode: Rapid vibrant cadence */
+.core-robot-eyes-wave-overlay.is-speaking .core-eye-bar {
+  animation: eyeBarSpeak 0.6s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+  animation-delay: var(--anim-delay, 0s);
+}
+
+@keyframes eyeBarSpeak {
+  0% {
+    height: var(--bar-min, 6px);
+    opacity: 0.8;
+  }
+  50% {
+    height: calc(var(--bar-mid, 22px) * 1.15);
+    opacity: 1;
+    box-shadow: 
+      0 0 8px rgba(255, 255, 255, 1),
+      0 0 16px rgba(0, 240, 255, 1);
+  }
+  100% {
+    height: var(--bar-max, 14px);
+    opacity: 0.9;
+  }
+}
+
+/* Visor Cyber Laser Horizon Filament */
+.core-eyes-laser-line {
+  position: absolute;
+  left: 5%;
+  top: 55%;
+  width: 58%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 240, 255, 0.6) 20%,
+    rgba(255, 255, 255, 0.9) 45%,
+    rgba(0, 240, 255, 0.7) 70%,
+    transparent 100%
+  );
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.7);
+  opacity: 0.65;
+  animation: eyeLaserPulse 2.8s ease-in-out infinite alternate;
+}
+
+@keyframes eyeLaserPulse {
+  0% {
+    opacity: 0.35;
+    transform: scaleX(0.85);
+  }
+  100% {
+    opacity: 0.85;
+    transform: scaleX(1);
+  }
 }
 
 .core-mic-halo {
@@ -1051,140 +1207,6 @@
       0 0 38px rgba(0, 240, 255, 0.85),
       0 0 70px rgba(0, 180, 255, 0.45),
       inset 0 0 22px rgba(0, 220, 255, 0.35);
-  }
-}
-
-/* Container for Wave Frequency Visualizer (replaces robot face/eyes when listening) */
-.core-wave-frequency-container {
-  width: 86px;
-  height: 64px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  animation: coreFreqFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes coreFreqFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.85);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* Frequency Equalizer Bars Row */
-.core-frequency-bars {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3.5px;
-  height: 52px;
-  width: 100%;
-  position: relative;
-  z-index: 2;
-}
-
-/* Individual Vertical Frequency Bar */
-.core-freq-bar {
-  width: 4px;
-  height: var(--bar-min, 8px);
-  border-radius: 4px;
-  background: linear-gradient(
-    180deg,
-    #FFFFFF 0%,
-    #00F0FF 35%,
-    #0284C7 80%,
-    #00446A 100%
-  );
-  box-shadow: 
-    0 0 8px rgba(255, 255, 255, 0.8),
-    0 0 14px rgba(0, 240, 255, 0.7);
-  transform-origin: center;
-  will-change: height, transform;
-}
-
-/* Animated undulating frequency wave during listening */
-.core-frequency-bars.listening-mode .core-freq-bar {
-  animation: coreFreqBarWave 1.25s ease-in-out infinite alternate;
-  animation-delay: var(--anim-delay, 0s);
-}
-
-/* Faster cadence during speaking response */
-.core-frequency-bars.speaking-mode .core-freq-bar {
-  animation: coreFreqBarSpeak 0.65s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
-  animation-delay: var(--anim-delay, 0s);
-}
-
-@keyframes coreFreqBarWave {
-  0% {
-    height: var(--bar-min, 8px);
-    opacity: 0.65;
-    transform: scaleY(0.7);
-  }
-  50% {
-    height: var(--bar-mid, 44px);
-    opacity: 1;
-    transform: scaleY(1.05);
-    box-shadow: 
-      0 0 10px rgba(255, 255, 255, 0.95),
-      0 0 18px rgba(0, 240, 255, 0.85);
-  }
-  100% {
-    height: var(--bar-max, 18px);
-    opacity: 0.8;
-    transform: scaleY(0.85);
-  }
-}
-
-@keyframes coreFreqBarSpeak {
-  0% {
-    height: var(--bar-min, 10px);
-    opacity: 0.75;
-  }
-  50% {
-    height: calc(var(--bar-mid, 44px) * 1.15);
-    opacity: 1;
-  }
-  100% {
-    height: var(--bar-max, 22px);
-    opacity: 0.9;
-  }
-}
-
-/* Flowing sinusoidal soundwave filament across the frequency bars */
-.core-freq-sine-wave {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 92px;
-  height: 22px;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0.75;
-}
-
-.core-freq-sine-path {
-  stroke: #00f0ff;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  fill: none;
-  filter: drop-shadow(0 0 6px #00f0ff);
-  stroke-dasharray: 6 3;
-  animation: coreSineFlow 1.8s linear infinite;
-}
-
-@keyframes coreSineFlow {
-  from {
-    stroke-dashoffset: 0;
-  }
-  to {
-    stroke-dashoffset: -36;
   }
 }
 

@@ -1022,6 +1022,214 @@
   }
 }
 
+/* ==========================================================================
+   Constellation Core Orb - Live Audio Frequency Wave Animation
+   ========================================================================== */
+
+/* Active Listening Glowing State on Core Orb */
+.constellation-core-orb.is-listening {
+  border-color: #00ffff !important;
+  box-shadow: 
+    0 10px 30px rgba(0, 0, 0, 0.4),
+    0 0 28px rgba(0, 240, 255, 0.7),
+    0 0 55px rgba(0, 180, 255, 0.35),
+    inset 0 0 16px rgba(0, 220, 255, 0.25) !important;
+  animation: coreOrbListenGlow 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes coreOrbListenGlow {
+  0% {
+    box-shadow: 
+      0 10px 30px rgba(0, 0, 0, 0.4),
+      0 0 24px rgba(0, 240, 255, 0.6),
+      0 0 45px rgba(0, 180, 255, 0.3),
+      inset 0 0 12px rgba(0, 220, 255, 0.2);
+  }
+  100% {
+    box-shadow: 
+      0 12px 34px rgba(0, 0, 0, 0.45),
+      0 0 38px rgba(0, 240, 255, 0.85),
+      0 0 70px rgba(0, 180, 255, 0.45),
+      inset 0 0 22px rgba(0, 220, 255, 0.35);
+  }
+}
+
+/* Container for Wave Frequency Visualizer (replaces robot face/eyes when listening) */
+.core-wave-frequency-container {
+  width: 86px;
+  height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  animation: coreFreqFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes coreFreqFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Frequency Equalizer Bars Row */
+.core-frequency-bars {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3.5px;
+  height: 52px;
+  width: 100%;
+  position: relative;
+  z-index: 2;
+}
+
+/* Individual Vertical Frequency Bar */
+.core-freq-bar {
+  width: 4px;
+  height: var(--bar-min, 8px);
+  border-radius: 4px;
+  background: linear-gradient(
+    180deg,
+    #FFFFFF 0%,
+    #00F0FF 35%,
+    #0284C7 80%,
+    #00446A 100%
+  );
+  box-shadow: 
+    0 0 8px rgba(255, 255, 255, 0.8),
+    0 0 14px rgba(0, 240, 255, 0.7);
+  transform-origin: center;
+  will-change: height, transform;
+}
+
+/* Animated undulating frequency wave during listening */
+.core-frequency-bars.listening-mode .core-freq-bar {
+  animation: coreFreqBarWave 1.25s ease-in-out infinite alternate;
+  animation-delay: var(--anim-delay, 0s);
+}
+
+/* Faster cadence during speaking response */
+.core-frequency-bars.speaking-mode .core-freq-bar {
+  animation: coreFreqBarSpeak 0.65s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+  animation-delay: var(--anim-delay, 0s);
+}
+
+@keyframes coreFreqBarWave {
+  0% {
+    height: var(--bar-min, 8px);
+    opacity: 0.65;
+    transform: scaleY(0.7);
+  }
+  50% {
+    height: var(--bar-mid, 44px);
+    opacity: 1;
+    transform: scaleY(1.05);
+    box-shadow: 
+      0 0 10px rgba(255, 255, 255, 0.95),
+      0 0 18px rgba(0, 240, 255, 0.85);
+  }
+  100% {
+    height: var(--bar-max, 18px);
+    opacity: 0.8;
+    transform: scaleY(0.85);
+  }
+}
+
+@keyframes coreFreqBarSpeak {
+  0% {
+    height: var(--bar-min, 10px);
+    opacity: 0.75;
+  }
+  50% {
+    height: calc(var(--bar-mid, 44px) * 1.15);
+    opacity: 1;
+  }
+  100% {
+    height: var(--bar-max, 22px);
+    opacity: 0.9;
+  }
+}
+
+/* Flowing sinusoidal soundwave filament across the frequency bars */
+.core-freq-sine-wave {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 92px;
+  height: 22px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.75;
+}
+
+.core-freq-sine-path {
+  stroke: #00f0ff;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  fill: none;
+  filter: drop-shadow(0 0 6px #00f0ff);
+  stroke-dasharray: 6 3;
+  animation: coreSineFlow 1.8s linear infinite;
+}
+
+@keyframes coreSineFlow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -36;
+  }
+}
+
+/* Breathing Aura when in listening mode - Continuous ripple pulses */
+.core-breathing-aura.is-listening {
+  border-color: rgba(0, 240, 255, 0.85) !important;
+  animation: coreAuraListenPulse 1.8s ease-out infinite !important;
+}
+
+@keyframes coreAuraListenPulse {
+  0% {
+    transform: scale(0.98);
+    opacity: 0.9;
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.6);
+  }
+  50% {
+    transform: scale(1.22);
+    opacity: 0.4;
+    box-shadow: 0 0 25px rgba(0, 240, 255, 0.3);
+  }
+  100% {
+    transform: scale(1.38);
+    opacity: 0;
+    box-shadow: 0 0 35px rgba(0, 240, 255, 0);
+  }
+}
+
+/* Pulsing text glow when in listening state */
+.constellation-core-orb.is-listening .core-orb-title {
+  background: linear-gradient(135deg, #0284c7 0%, #00f0ff 50%, #00e5ff 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  animation: coreTitleListenPulse 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes coreTitleListenPulse {
+  0% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.6));
+  }
+}
+
 /* Orbiting Satellite Spheres (White porcelain discs with dark typography) */
 .satellite-orb-node {
   position: absolute;

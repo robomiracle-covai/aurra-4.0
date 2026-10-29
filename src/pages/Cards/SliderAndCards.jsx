@@ -356,6 +356,22 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
   // Dynamic Feature Spotlight Deck state (Always-moving feature explanation on Home Screen)
   const [spotlightIndex, setSpotlightIndex] = useState(0);
 
+  // Real-time voice listening state for Constellation Core frequency animation
+  const [isVoiceListening, setIsVoiceListening] = useState(() => Boolean(voiceNavigationService?.isListening));
+  const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
+
+  useEffect(() => {
+    const unsubVoiceState = voiceNavigationService.subscribe((vState) => {
+      if (vState.isListening !== undefined) {
+        setIsVoiceListening(Boolean(vState.isListening));
+      }
+      if (vState.isSpeaking !== undefined) {
+        setIsVoiceSpeaking(Boolean(vState.isSpeaking));
+      }
+    });
+    return () => unsubVoiceState();
+  }, []);
+
   // Explain Features Mode state (Storyboard Spec)
   const [isExplainMode, setIsExplainMode] = useState(false);
   const [explainIndex, setExplainIndex] = useState(0);
@@ -1153,22 +1169,62 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                 {/* Central Core Sphere: Ask Aurra */}
                 <div
                   ref={coreOrbRef}
-                  className="constellation-core-orb"
+                  className={`constellation-core-orb ${isVoiceListening ? 'is-listening' : ''} ${isVoiceSpeaking ? 'is-speaking' : ''}`}
                   onClick={() => {
                     window.dispatchEvent(new CustomEvent('aurra_open_fullscreen_voice'));
                     voiceNavigationService.speak('I am Aurra, how can I help you today?');
                   }}
-                  title="Ask Aurra Voice Core (Tap to Talk)"
+                  title={isVoiceListening ? "Aurra is Listening (Tap to Talk)" : "Ask Aurra Voice Core (Tap to Talk)"}
                 >
                   <div className="core-robot-face-wrapper">
-                    <img
-                      src="/aurra_core_robot.png"
-                      alt="Aurra Robot"
-                      className="core-robot-face-img"
-                    />
+                    {isVoiceListening ? (
+                      <div className="core-wave-frequency-container">
+                        <div className={`core-frequency-bars ${isVoiceSpeaking ? 'speaking-mode' : 'listening-mode'}`}>
+                          {[
+                            { min: 6, mid: 22, max: 12, delay: 0.0 },
+                            { min: 10, mid: 32, max: 16, delay: 0.12 },
+                            { min: 14, mid: 42, max: 22, delay: 0.24 },
+                            { min: 18, mid: 50, max: 28, delay: 0.18 },
+                            { min: 22, mid: 56, max: 34, delay: 0.06 },
+                            { min: 24, mid: 60, max: 38, delay: 0.28 },
+                            { min: 22, mid: 56, max: 34, delay: 0.14 },
+                            { min: 18, mid: 50, max: 28, delay: 0.2 },
+                            { min: 14, mid: 42, max: 22, delay: 0.08 },
+                            { min: 10, mid: 32, max: 16, delay: 0.22 },
+                            { min: 6, mid: 22, max: 12, delay: 0.16 },
+                          ].map((bar, i) => (
+                            <span
+                              key={i}
+                              className="core-freq-bar"
+                              style={{
+                                '--bar-min': `${bar.min}px`,
+                                '--bar-mid': `${bar.mid}px`,
+                                '--bar-max': `${bar.max}px`,
+                                '--anim-delay': `${bar.delay}s`,
+                              }}
+                            />
+                          ))}
+                        </div>
+                        {/* Flowing harmonic audio wave SVG line across the center */}
+                        <svg className="core-freq-sine-wave" viewBox="0 0 88 20" fill="none">
+                          <path
+                            d="M 0,10 Q 11,2 22,10 T 44,10 T 66,10 T 88,10"
+                            className="core-freq-sine-path"
+                          />
+                        </svg>
+                      </div>
+                    ) : (
+                      <img
+                        src="/aurra_core_robot.png"
+                        alt="Aurra Robot"
+                        className="core-robot-face-img"
+                      />
+                    )}
                   </div>
-                  <div className="core-orb-title">Ask Aurra</div>
-                  <div className="core-breathing-aura"></div>
+                  <div className="core-orb-title">
+                    {isVoiceListening ? 'Listening...' : 'Ask Aurra'}
+                  </div>
+                  <div className={`core-breathing-aura ${isVoiceListening ? 'is-listening' : ''}`}></div>
                 </div>
 
                 {/* Orbiting Satellite Glass Spheres */}

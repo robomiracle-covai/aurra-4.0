@@ -167,11 +167,12 @@ CONVERSATIONAL RULES:
 - Keep responses conversational, concise, and clear (around 20-35 words) so they can be spoken smoothly via speech synthesis.
 - Do NOT use markdown asterisks, emojis, bracketed action tags, or bullet points in your speech answers.`;
 
-const STORAGE_KEY = 'aurra_llm_config_v5';
+const STORAGE_KEY = 'aurra_llm_config_v6';
 
 export const DEFAULT_GROQ_API_KEY = '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';
 export const DEFAULT_OLLAMA_API_KEY = '160def7c98d44d4d80f21170c807fd7f.a_xwhlvPEyPS9z0EyFXcvTUN';
-export const DEFAULT_BACKUP_LLM_KEY = DEFAULT_OLLAMA_API_KEY;
+export const DEFAULT_OLLAMA_BACKUP_KEY = 'a28d5cabe3b34a8fb8b176a4401d13d3.laxGuQpgO_7jSM7vG94hrzRC';
+export const DEFAULT_BACKUP_LLM_KEY = DEFAULT_OLLAMA_BACKUP_KEY;
 export const DEFAULT_GEMINI_API_KEY = 'AQ.Ab8RN6IVrEIKjCLjNw6QjOtaIlmnH4RsvHtMn_6Ay6Tp39LxNw';
 
 export const getDefaultLlmConfig = () => ({
@@ -179,9 +180,10 @@ export const getDefaultLlmConfig = () => ({
   provider: 'ollama', // 'ollama' | 'groq' | 'gemini'
   apiUrl: 'https://ollama.com/v1',
   apiKey: import.meta.env.VITE_LLM_API_KEY || DEFAULT_OLLAMA_API_KEY,
-  backupApiKey: DEFAULT_BACKUP_LLM_KEY,
+  backupApiKey: DEFAULT_OLLAMA_BACKUP_KEY,
   model: 'gemma4:31b',
   ollamaApiKey: DEFAULT_OLLAMA_API_KEY,
+  ollamaBackupApiKey: DEFAULT_OLLAMA_BACKUP_KEY,
   ollamaModel: 'gemma4:31b',
   ollamaApiUrl: 'https://ollama.com/v1',
   geminiApiKey: DEFAULT_GEMINI_API_KEY,
@@ -212,8 +214,8 @@ class LlmService {
         if (!merged.apiKey || !merged.apiKey.trim()) {
           merged.apiKey = defaults.apiKey;
         }
-        if (!merged.backupApiKey || !merged.backupApiKey.trim()) {
-          merged.backupApiKey = DEFAULT_BACKUP_LLM_KEY;
+        if (!merged.backupApiKey || !merged.backupApiKey.trim() || merged.backupApiKey === DEFAULT_OLLAMA_API_KEY) {
+          merged.backupApiKey = DEFAULT_OLLAMA_BACKUP_KEY;
         }
         if (!merged.geminiApiKey || !merged.geminiApiKey.trim()) {
           merged.geminiApiKey = defaults.geminiApiKey;
@@ -496,145 +498,147 @@ class LlmService {
       }
     }
 
-    // ── 3B. GROQ CLOUD PROVIDER DISPATCH (DEFAULT) ──
+    // ── 3B. RESILIENT MULTI-KEY & MULTI-MODEL LLM CASCADE (OLLAMA & GROQ) ──
     const isOllama = this.config.provider === 'ollama';
-    const apiKey = (this.config.apiKey || (isOllama ? DEFAULT_OLLAMA_API_KEY : DEFAULT_GROQ_API_KEY)).trim();
-    if (!apiKey) {
-      logger.warn('LLM', 'No LLM API key configured.');
-      return { success: false, reason: 'NO_KEY' };
-    }
 
-    const defaultUrl = isOllama ? 'https://ollama.com/v1' : 'https://api.groq.com/openai/v1';
-    let rawUrl = (this.config.apiUrl || defaultUrl).trim().replace(/\/+$/, '');
-    let targetUrl = rawUrl.endsWith('/chat/completions') ? rawUrl : `${rawUrl}/chat/completions`;
+    // Candidate API Keys: Primary Key -> Configured Backup Key -> Hardcoded Active Keys
+    const candidateKeys = Array.from(new Set([
+      (this.config.apiKey || '').trim(),
+      (this.config.backupApiKey || '').trim(),
+      DEFAULT_OLLAMA_API_KEY,
+      DEFAULT_OLLAMA_BACKUP_KEY,
+      isOllama ? null : DEFAULT_GROQ_API_KEY,
+    ])).filter((k) => k && k.length > 10);
+
+    // Candidate Models: Active Model -> Auto-Failover Models (Gemma 31B -> GPT-OSS 20B -> Gemma Cloud)
+    const candidateModels = isOllama
+      ? Array.from(new Set([
+          this.config.model,
+          'gemma4:31b',
+          'gpt-oss:20b',
+          'gemma4:31b-cloud',
+        ])).filter((m) => m && !m.includes('qwen') && !m.includes('llama'))
+      : Array.from(new Set([
+          this.config.model,
+          'llama-3.3-70b-versatile',
+          'llama-3.1-8b-instant',
+          'gemma4:31b',
+          'gpt-oss:20b',
+        ])).filter(Boolean);
 
     const messages = [
       { role: 'system', content: dynamicSystemPrompt },
-      ...(conversationHistory || []).slice(-4), // Keep last 4 turns for context
+      ...(conversationHistory || []).slice(-4),
       { role: 'user', content: userQuery },
     ];
 
-    const modelName = isOllama
-      ? (!this.config.model || this.config.model.includes('qwen') || this.config.model.includes('llama') ? 'gemma4:31b' : this.config.model)
-      : (!this.config.model || this.config.model.includes('llama-3.3-70b') ? 'llama-3.3-70b-versatile' : this.config.model);
+    let lastError = null;
 
-    const body = {
-      model: modelName,
-      messages,
-      temperature: this.config.temperature || 0.6,
-      max_tokens: this.config.maxTokens || 300,
-    };
+    // Outer loop: Try candidate API keys (Failover on 401/403/429)
+    for (let kIdx = 0; kIdx < candidateKeys.length; kIdx++) {
+      const activeKey = candidateKeys[kIdx];
+      const isOllamaKey =
+        activeKey === DEFAULT_OLLAMA_API_KEY ||
+        activeKey === DEFAULT_OLLAMA_BACKUP_KEY ||
+        activeKey.startsWith('160def7c') ||
+        activeKey.startsWith('a28d5cab');
 
-    const groqController = new AbortController();
-    const groqTimeoutId = setTimeout(() => groqController.abort(), this.config.timeoutMs || 12000);
+      // Inner loop: Try candidate models (Failover on 400/404/402/500/timeout)
+      for (let mIdx = 0; mIdx < candidateModels.length; mIdx++) {
+        const activeModel = candidateModels[mIdx];
+        const isOllamaModel = activeModel.includes('gemma') || activeModel.includes('gpt-oss');
 
-    try {
-      const providerLabel = this.config.provider === 'ollama' ? 'Ollama Cloud' : 'Groq';
-      logger.speech('LLM', `Calling ${providerLabel} LLM (${body.model}) for: "${userQuery}"`);
+        const effectiveUrl = (isOllamaKey || isOllamaModel)
+          ? 'https://ollama.com/v1/chat/completions'
+          : (this.config.apiUrl || 'https://api.groq.com/openai/v1').trim().replace(/\/+$/, '').endsWith('/chat/completions')
+            ? (this.config.apiUrl || 'https://api.groq.com/openai/v1').trim().replace(/\/+$/, '')
+            : `${(this.config.apiUrl || 'https://api.groq.com/openai/v1').trim().replace(/\/+$/, '')}/chat/completions`;
 
-      const response = await fetch(targetUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-        signal: groqController.signal,
-      });
+        const requestBody = {
+          model: activeModel,
+          messages,
+          temperature: this.config.temperature || 0.6,
+          max_tokens: this.config.maxTokens || 300,
+        };
 
-      clearTimeout(groqTimeoutId);
+        const attemptController = new AbortController();
+        const attemptTimeout = setTimeout(() => attemptController.abort(), 8500);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Groq API returned HTTP ${response.status}: ${errorText.slice(0, 120)}`);
-      }
-
-      const data = await response.json();
-      const msgObj = data.choices?.[0]?.message;
-      const rawText = msgObj?.content || msgObj?.reasoning || msgObj?.reasoning_content || '';
-      const cleaned = this.cleanResponseText(rawText);
-      const latency = Date.now() - startTime;
-
-      if (!cleaned) {
-        throw new Error('Empty response received from LLM endpoint.');
-      }
-
-      logger.info('LLM', `Groq response received in ${latency}ms: "${cleaned}"`);
-      return {
-        success: true,
-        text: cleaned,
-        latencyMs: latency,
-        model: body.model,
-        provider: liveRAG
-          ? `${this.config.provider === 'ollama' ? 'Ollama' : 'Groq'} + ${liveRAG.source.toUpperCase()} RAG`
-          : (this.config.provider === 'ollama' ? 'Ollama Cloud AI' : 'Groq Cloud AI'),
-        tokens: data.usage?.total_tokens || null,
-        ragDetails: liveRAG,
-      };
-    } catch (err) {
-      clearTimeout(groqTimeoutId);
-      const latency = Date.now() - startTime;
-      const isAbort = err.name === 'AbortError';
-
-      if (isAbort) {
-        logger.warn('LLM', `Groq LLM timed out after ${this.config.timeoutMs || 12000}ms`);
-        console.warn(`[AURRA LLM TIMEOUT] Call exceeded ${this.config.timeoutMs || 12000}ms limit for: "${userQuery}"`);
-      } else {
-        logger.error('LLM', `Groq LLM call failed: ${err.message}`);
-        console.error(`[AURRA LLM ERROR] Groq API error: ${err.message}`);
-      }
-
-      // Automatic fallback to Ollama Cloud if primary provider (Groq) fails
-      if (this.config.provider !== 'ollama') {
-        logger.warn('LLM', `Primary provider failed (${err.message}). Attempting auto-fallback to Ollama Cloud...`);
         try {
-          const fallbackRes = await fetch('https://ollama.com/v1/chat/completions', {
+          const providerTag = isOllamaKey || isOllamaModel ? 'Ollama Cloud' : 'Groq';
+          logger.speech('LLM', `Calling ${providerTag} [${activeModel}, Key #${kIdx + 1}] for: "${userQuery}"`);
+
+          const response = await fetch(effectiveUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${DEFAULT_OLLAMA_API_KEY}`,
+              Authorization: `Bearer ${activeKey}`,
             },
-            body: JSON.stringify({
-              model: 'gemma4:31b',
-              messages,
-              temperature: 0.6,
-              max_tokens: 300,
-            }),
+            body: JSON.stringify(requestBody),
+            signal: attemptController.signal,
           });
-          if (fallbackRes.ok) {
-            const fbData = await fallbackRes.json();
-            const fbMsg = fbData.choices?.[0]?.message?.content || '';
-            const cleanedFb = this.cleanResponseText(fbMsg);
-            if (cleanedFb) {
-              logger.info('LLM', `Ollama Cloud auto-fallback succeeded: "${cleanedFb}"`);
-              return {
-                success: true,
-                text: cleanedFb,
-                latencyMs: Date.now() - startTime,
-                model: 'gemma4:31b (Ollama Fallback)',
-                provider: 'Ollama Cloud AI (Auto-Fallback)',
-                tokens: fbData.usage?.total_tokens || null,
-                ragDetails: liveRAG,
-              };
+
+          clearTimeout(attemptTimeout);
+
+          if (!response.ok) {
+            const errText = await response.text();
+            logger.warn('LLM', `Attempt failed (Model: ${activeModel}, Key #${kIdx + 1}, HTTP ${response.status}): ${errText.slice(0, 90)}`);
+            lastError = new Error(`HTTP ${response.status}: ${errText.slice(0, 90)}`);
+
+            // If Auth or Rate-limit error (401, 403, 429), break model loop immediately to try the next API key
+            if (response.status === 401 || response.status === 403 || response.status === 429) {
+              break;
             }
+            // If Model-specific error (404, 402, 400), try the next model with the same key
+            continue;
           }
-        } catch (fbErr) {
-          logger.error('LLM', `Ollama fallback error: ${fbErr.message}`);
+
+          const data = await response.json();
+          const msgObj = data.choices?.[0]?.message;
+          const rawText = msgObj?.content || msgObj?.reasoning || msgObj?.reasoning_content || '';
+          const cleaned = this.cleanResponseText(rawText);
+          const latency = Date.now() - startTime;
+
+          if (!cleaned) {
+            logger.warn('LLM', `Empty response from ${activeModel}, trying next model...`);
+            continue;
+          }
+
+          logger.info('LLM', `Response succeeded via ${activeModel} (Key #${kIdx + 1}) in ${latency}ms: "${cleaned}"`);
+          return {
+            success: true,
+            text: cleaned,
+            latencyMs: latency,
+            model: activeModel,
+            provider: liveRAG
+              ? `${providerTag} (${activeModel}) + ${liveRAG.source.toUpperCase()} RAG`
+              : `${providerTag} (${activeModel})`,
+            tokens: data.usage?.total_tokens || null,
+            ragDetails: liveRAG,
+          };
+        } catch (attemptErr) {
+          clearTimeout(attemptTimeout);
+          logger.warn('LLM', `Attempt error (${activeModel}, Key #${kIdx + 1}): ${attemptErr.message}`);
+          lastError = attemptErr;
         }
       }
-
-      const fallbackText = isAbort
-        ? "I am experiencing a brief cloud latency delay. How else can I assist you with RoboMiracle facilities or robot features?"
-        : "I am having trouble reaching the AI cloud service right now. Please feel free to ask about our facilities, services, or tours.";
-
-      return {
-        success: false,
-        reason: isAbort ? 'TIMEOUT' : 'ERROR',
-        text: fallbackText,
-        error: err.message,
-        latencyMs: latency,
-      };
     }
+
+    const latency = Date.now() - startTime;
+    const isAbort = lastError?.name === 'AbortError';
+    logger.error('LLM', `All cascade LLM attempts failed: ${lastError?.message}`);
+
+    const fallbackText = isAbort
+      ? "I am experiencing a brief cloud latency delay. How else can I assist you with RoboMiracle facilities or robot features?"
+      : "I am having trouble reaching the AI cloud service right now. Please feel free to ask about our facilities, services, or tours.";
+
+    return {
+      success: false,
+      reason: isAbort ? 'TIMEOUT' : 'ERROR',
+      text: fallbackText,
+      error: lastError?.message || 'All LLM endpoints and models exhausted.',
+      latencyMs: latency,
+    };
   }
 
   /**
@@ -738,77 +742,98 @@ ${docContext || 'No document excerpts available.'}`;
       }
     }
 
-    // 2. Groq Cloud API PDF Inference
-    try {
-      const apiKey = (this.config.apiKey || DEFAULT_GROQ_API_KEY).trim();
-      const body = {
-        model: this.config.model || 'qwen/qwen3.8-27b',
-        messages: [
-          { role: 'system', content: pdfSystemPrompt },
-          ...(conversationHistory || []).slice(-4).map((h) => ({
-            role: h.role === 'assistant' ? 'assistant' : 'user',
-            content: h.text || h.content || '',
-          })),
-          { role: 'user', content: userQuery },
-        ],
-        temperature: 0.3,
-        max_tokens: 350,
-      };
+    // 2. Resilient Multi-Key & Multi-Model PDF Inference
+    const candidatePdfKeys = Array.from(new Set([
+      (this.config.apiKey || '').trim(),
+      (this.config.backupApiKey || '').trim(),
+      DEFAULT_OLLAMA_API_KEY,
+      DEFAULT_OLLAMA_BACKUP_KEY,
+    ])).filter((k) => k && k.length > 10);
 
-      const response = await fetch(pdfTargetUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
+    const candidatePdfModels = ['gemma4:31b', 'gpt-oss:20b', 'gemma4:31b-cloud'];
 
-      clearTimeout(timeoutId);
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Groq HTTP ${response.status}: ${errText.slice(0, 100)}`);
+    for (let kIdx = 0; kIdx < candidatePdfKeys.length; kIdx++) {
+      const activeKey = candidatePdfKeys[kIdx];
+      for (let mIdx = 0; mIdx < candidatePdfModels.length; mIdx++) {
+        const activeModel = candidatePdfModels[mIdx];
+        const pdfController = new AbortController();
+        const pdfTimeout = setTimeout(() => pdfController.abort(), 8000);
+
+        try {
+          const body = {
+            model: activeModel,
+            messages: [
+              { role: 'system', content: pdfSystemPrompt },
+              ...(conversationHistory || []).slice(-4).map((h) => ({
+                role: h.role === 'assistant' ? 'assistant' : 'user',
+                content: h.text || h.content || '',
+              })),
+              { role: 'user', content: userQuery },
+            ],
+            temperature: 0.3,
+            max_tokens: 350,
+          };
+
+          const response = await fetch('https://ollama.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${activeKey}`,
+            },
+            body: JSON.stringify(body),
+            signal: pdfController.signal,
+          });
+
+          clearTimeout(pdfTimeout);
+
+          if (!response.ok) {
+            if (response.status === 401 || response.status === 403 || response.status === 429) {
+              break;
+            }
+            continue;
+          }
+
+          const data = await response.json();
+          const rawText = data.choices?.[0]?.message?.content || '';
+          const cleaned = this.cleanPdfResponse(rawText);
+          const latency = Date.now() - startTime;
+
+          if (cleaned) {
+            return {
+              success: true,
+              text: cleaned,
+              latencyMs: latency,
+              model: activeModel,
+              provider: `Ollama Document AI (${activeModel})`,
+              citations: this.extractCitations(cleaned, relevantChunks),
+            };
+          }
+        } catch (pdfErr) {
+          clearTimeout(pdfTimeout);
+        }
       }
+    }
 
-      const data = await response.json();
-      const rawText = data.choices?.[0]?.message?.content || '';
-      const cleaned = this.cleanPdfResponse(rawText);
-      const latency = Date.now() - startTime;
-
+    // 3. Offline Extractive Fallback
+    if (relevantChunks && relevantChunks.length > 0) {
+      const topChunk = relevantChunks[0];
+      const snippet = topChunk.text.replace(/\[Page \d+\]:\s*/, '').slice(0, 180);
       return {
         success: true,
-        text: cleaned,
-        latencyMs: latency,
-        model: body.model,
-        provider: this.config.provider === 'ollama' ? 'Ollama Document AI' : 'Groq Document AI',
-        citations: this.extractCitations(cleaned, relevantChunks),
-      };
-    } catch (err) {
-      clearTimeout(timeoutId);
-      logger.error('LLM', `PDF QA error: ${err.message}. Falling back to extractive text.`);
-
-      // 3. Offline Extractive Fallback
-      if (relevantChunks && relevantChunks.length > 0) {
-        const topChunk = relevantChunks[0];
-        const snippet = topChunk.text.replace(/\[Page \d+\]:\s*/, '').slice(0, 180);
-        return {
-          success: true,
-          text: `According to Page ${topChunk.pageNumber} of the document: ${snippet}...`,
-          latencyMs: Date.now() - startTime,
-          model: 'Offline Extractive Match',
-          provider: 'Local Document Index',
-          citations: [topChunk.pageNumber],
-        };
-      }
-
-      return {
-        success: false,
-        text: 'Unable to connect to Document AI. Please verify internet connection or API settings in Admin.',
+        text: `According to Page ${topChunk.pageNumber} of the document: ${snippet}...`,
         latencyMs: Date.now() - startTime,
-        error: err.message,
+        model: 'Offline Extractive Match',
+        provider: 'Local Document Index',
+        citations: [topChunk.pageNumber],
       };
     }
+
+    return {
+      success: false,
+      text: 'Unable to connect to Document AI. Please verify internet connection or API settings in Admin.',
+      latencyMs: Date.now() - startTime,
+      error: 'All Document AI endpoints exhausted.',
+    };
   }
 
   /**

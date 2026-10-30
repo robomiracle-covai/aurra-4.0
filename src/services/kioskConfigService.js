@@ -95,7 +95,7 @@ export const DEFAULT_KIOSK_CONFIG = {
 
   // 4. Robot Hardware & Control
   esp32Ip: '192.168.4.1',
-  raspberryPiIp: '192.168.4.2:8080',
+  raspberryPiIp: '192.168.0.10:8080',
   defaultMotorSpeed: 180, // 0 - 255
   radarObstacleThresholdCm: 25,
   defaultEyeColorHex: '#00FFFF',

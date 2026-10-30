@@ -40,6 +40,7 @@ import { voiceNavigationService } from '../../services/voiceNavigationService';
 import AdminAuthModal from '../../components/AdminAuthModal';
 import { LogViewerModal } from '../../components/LogViewerModal';
 import { esp32Service } from '../../services/esp32Service';
+import { assetUrl } from '../../utils/platform';
 import '../../components/FullscreenVoiceOverlay.css';
 import './SliderAndCards.css';
 
@@ -1309,7 +1310,11 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                       </div>
                     ) : (
                       <img
-                        src="/aurra_core_robot.png"
+                        src={assetUrl('aurra_core_robot.png')}
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = assetUrl('aurra_core_robot_bust.png');
+                        }}
                         alt="Aurra Robot"
                         className="core-robot-face-img"
                       />

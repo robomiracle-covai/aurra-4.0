@@ -917,6 +917,20 @@
   transition: transform 0.1s ease;
 }
 
+.constellation-core-orb.is-speaking .core-robot-face-img {
+  filter: drop-shadow(0 0 16px rgba(0, 240, 255, 0.85)) drop-shadow(0 0 28px rgba(0, 180, 255, 0.5));
+  animation: coreRobotSpeakPulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes coreRobotSpeakPulse {
+  0% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1.05);
+  }
+}
+
 /* ==========================================================================
    Constellation Core Orb - Live Audio Frequency Wave Animation (While Listening Only)
    ========================================================================== */

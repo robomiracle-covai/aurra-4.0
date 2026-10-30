@@ -936,7 +936,7 @@ export default function Control({ onNavigate }) {
                 <div className="pi-expr-quick-grid">
                   <span className="form-subhead">Test Live Face Reaction:</span>
                   <div className="pi-expr-btns">
-                    {['smile', 'talking', 'listening', 'thinking', 'nod', 'greeting', 'dance'].map((expr) => (
+                    {['smile', 'talking', 'angry', 'love', 'listening', 'thinking', 'nod', 'greeting', 'dance'].map((expr) => (
                       <button
                         key={expr}
                         type="button"

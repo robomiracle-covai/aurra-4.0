@@ -982,7 +982,12 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             if (body != null && !body.isEmpty()
                     && ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method))) {
                 conn.setDoOutput(true);
-                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                String trimmed = body.trim();
+                if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+                    conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                } else {
+                    conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                }
                 byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
                 conn.setFixedLengthStreamingMode(bytes.length);
                 try (OutputStream os = conn.getOutputStream()) {

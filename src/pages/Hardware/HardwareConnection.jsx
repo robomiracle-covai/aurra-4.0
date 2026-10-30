@@ -41,9 +41,15 @@ export default function HardwareConnection({ onNavigate }) {
     }
   };
 
-  const triggerExpressionTest = (exprName) => {
-    raspberryPiService.sendExpression(exprName);
-    setNotice(`Triggered expression '${exprName.toUpperCase()}' on Raspberry Pi HDMI display`);
+  const triggerExpressionTest = async (exprName) => {
+    setNotice(`Dispatching '${exprName.toUpperCase()}' to Raspberry Pi...`);
+    const res = await raspberryPiService.sendExpression(exprName, true);
+    if (res && res.success) {
+      const fallbackNote = res.wireExpression !== exprName.toLowerCase() ? ` (mapped to '${res.wireExpression}')` : '';
+      setNotice(`Triggered '${exprName.toUpperCase()}'${fallbackNote} on Raspberry Pi HDMI display ✓`);
+    } else {
+      setNotice(`Failed to trigger '${exprName.toUpperCase()}' on Raspberry Pi (${res?.status ? `HTTP ${res.status}` : 'Check connection/logs'})`);
+    }
   };
 
   const handlePingEsp32 = async () => {
@@ -115,16 +121,23 @@ export default function HardwareConnection({ onNavigate }) {
           <span className="hw-status-dot" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
             <span style={{ fontWeight: 800, fontSize: '0.7rem', letterSpacing: '0.06em' }}>
-              {espState.online 
-                ? (espState.mode === 'ap' ? 'DIRECT AP (HOTSPOT)' : 'STATION (WI-FI LAN)')
-                : 'SIMULATION MODE'}
+              {espState.online && piState.online
+                ? 'ALL HARDWARE ONLINE'
+                : piState.online
+                ? 'PI EXPRESSION ONLINE • ESP32 SIM'
+                : espState.online
+                ? (espState.mode === 'ap' ? 'ESP32 AP ONLINE • PI OFFLINE' : 'ESP32 LAN ONLINE • PI OFFLINE')
+                : 'HARDWARE SIMULATION MODE'}
             </span>
             <span style={{ fontSize: '0.58rem', opacity: 0.7 }}>
+              {piState.online 
+                ? `Pi: ${piState.activeUrl}${piState.latency ? ` (${piState.latency}ms)` : ''} • `
+                : 'Pi: Simulation • '}
               {espState.online 
                 ? (espState.mode === 'ap' 
-                    ? `"Aurra" • ${espState.ip}${espState.latency ? ` • ${espState.latency}ms` : ''}`
-                    : `${espState.ssid ? `"${espState.ssid}" • ` : ''}${espState.ip}${espState.latency ? ` • ${espState.latency}ms` : ''}`)
-                : 'Autonomous 90 FPS Simulation'}
+                    ? `ESP32 AP: ${espState.ip}${espState.latency ? ` (${espState.latency}ms)` : ''}`
+                    : `ESP32 LAN: ${espState.ip}${espState.latency ? ` (${espState.latency}ms)` : ''}`)
+                : 'ESP32: 90 FPS Simulation'}
             </span>
           </div>
         </div>
@@ -324,6 +337,7 @@ export default function HardwareConnection({ onNavigate }) {
                   type="button"
                   onClick={() => triggerExpressionTest('idle')}
                   className="hw-expr-btn smile"
+                  title="Direct GIF: smile.gif"
                 >
                   😊 Smile / Idle
                 </button>
@@ -331,13 +345,31 @@ export default function HardwareConnection({ onNavigate }) {
                   type="button"
                   onClick={() => triggerExpressionTest('speaking')}
                   className="hw-expr-btn speaking"
+                  title="Direct GIF: Speaking_Smile.gif"
                 >
                   🗣️ Speaking / Talking
                 </button>
                 <button
                   type="button"
+                  onClick={() => triggerExpressionTest('angry')}
+                  className="hw-expr-btn angry"
+                  title="Direct GIF: angry.gif"
+                >
+                  😠 Angry / Alert
+                </button>
+                <button
+                  type="button"
+                  onClick={() => triggerExpressionTest('love')}
+                  className="hw-expr-btn love"
+                  title="Direct GIF: love.gif"
+                >
+                  ❤️ Love / Heart Eyes
+                </button>
+                <button
+                  type="button"
                   onClick={() => triggerExpressionTest('listening')}
                   className="hw-expr-btn listening"
+                  title="Semantic Action: maps to smile until listening.gif is installed"
                 >
                   🎤 Listening
                 </button>
@@ -345,6 +377,7 @@ export default function HardwareConnection({ onNavigate }) {
                   type="button"
                   onClick={() => triggerExpressionTest('thinking')}
                   className="hw-expr-btn thinking"
+                  title="Semantic Action: maps to smile until thinking.gif is installed"
                 >
                   ⚡ Thinking
                 </button>
@@ -352,6 +385,7 @@ export default function HardwareConnection({ onNavigate }) {
                   type="button"
                   onClick={() => triggerExpressionTest('nod')}
                   className="hw-expr-btn nod"
+                  title="Semantic Action: maps to smile until nod.gif is installed"
                 >
                   🤖 Affirmation Nod
                 </button>
@@ -359,6 +393,7 @@ export default function HardwareConnection({ onNavigate }) {
                   type="button"
                   onClick={() => triggerExpressionTest('greeting')}
                   className="hw-expr-btn greeting"
+                  title="Semantic Action: maps to smile until greeting.gif is installed"
                 >
                   👋 Welcome Greeting
                 </button>
@@ -366,6 +401,7 @@ export default function HardwareConnection({ onNavigate }) {
                   type="button"
                   onClick={() => triggerExpressionTest('bow')}
                   className="hw-expr-btn bow"
+                  title="Semantic Action: maps to smile until bow.gif is installed"
                 >
                   🙇 Courtesy Bow
                 </button>
@@ -373,6 +409,7 @@ export default function HardwareConnection({ onNavigate }) {
                   type="button"
                   onClick={() => triggerExpressionTest('dance')}
                   className="hw-expr-btn dance"
+                  title="Semantic Action: maps to love until dance.gif is installed"
                 >
                   💃 Celebration Dance
                 </button>

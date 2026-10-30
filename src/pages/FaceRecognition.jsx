@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import * as faceapi from 'face-api.js';
-import { UserPlus, Activity, Zap, RefreshCw, Trash2, Volume2, ShieldCheck, Terminal, ArrowLeft } from 'lucide-react';
+import { UserPlus, RefreshCw, Trash2, Volume2, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { facesApi } from '../api/faces';
 import { loadFaceApiModels } from '../utils/faceApiHelper';
 import { useCamera } from '../hooks/useCamera';
@@ -31,6 +31,12 @@ const FaceRecognition = ({ onNavigate }) => {
   const lastPerfLogTimeRef = useRef(0);
   const fpsFrameCountRef = useRef(0);
   const fpsLastTimeRef = useRef(performance.now());
+  const faceAnalysisRef = useRef({
+    firstDetectedTime: null,
+    lastSeenTime: null,
+    matchHistory: [],
+    greeted: false,
+  });
 
   const { videoRef, startCamera, stopCamera, error: cameraError, isStreaming } = useCamera({ width: 640, height: 480 });
   const { speak, stop: stopSpeech } = useSpeech();
@@ -119,15 +125,34 @@ const FaceRecognition = ({ onNavigate }) => {
     return () => video.removeEventListener('play', handlePlay);
   }, [videoRef]);
 
-  // Helper to draw detection boxes
-  const drawBox = (ctx, box, label, color) => {
+  // Helper to draw detection boxes with analysis progress indicator
+  const drawBox = (ctx, box, label, color, progress = null) => {
     const { x, y, width, height } = box;
     ctx.strokeStyle = color;
     ctx.lineWidth = 2.5;
     ctx.strokeRect(x, y, width, height);
-    ctx.font = 'bold 16px Outfit, sans-serif';
+
+    // High-contrast badge for label readability
+    ctx.font = 'bold 15px Outfit, system-ui, sans-serif';
+    const textWidth = ctx.measureText(label).width;
+    const tagHeight = 22;
+    const tagY = Math.max(y - tagHeight - 2, 4);
+    ctx.fillStyle = 'rgba(3, 6, 13, 0.85)';
+    ctx.fillRect(x, tagY, textWidth + 14, tagHeight);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, tagY, textWidth + 14, tagHeight);
+
     ctx.fillStyle = color;
-    ctx.fillText(label, x + 4, Math.max(y - 8, 18));
+    ctx.fillText(label, x + 6, tagY + 16);
+
+    // If analysis progress is provided (0 to 100), render an animated bottom progress bar
+    if (progress !== null && progress >= 0 && progress <= 100) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.fillRect(x, y + height - 6, width, 6);
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y + height - 6, (width * progress) / 100, 6);
+    }
   };
 
   // Main Face Detection Loop
@@ -157,7 +182,7 @@ const FaceRecognition = ({ onNavigate }) => {
 
         let detections = [];
         if (users.length === 0) {
-          // If no registered faces exist, only compute bounding boxes (sub-20ms) with zero descriptor overhead
+          // If no registered faces exist, only compute bounding boxes with zero descriptor overhead
           detections = await faceapi.detectAllFaces(videoRef.current, detectorOptions);
         } else {
           // If registered users exist, compute landmarks & descriptors for matching
@@ -183,16 +208,48 @@ const FaceRecognition = ({ onNavigate }) => {
         ctx.clearRect(0, 0, faceCanvasRef.current.width, faceCanvasRef.current.height);
 
         if (detections.length === 0) {
+          // Reset 2-second analysis window if no face is visible for more than 650ms
+          if (faceAnalysisRef.current.lastSeenTime && (now - faceAnalysisRef.current.lastSeenTime > 650)) {
+            faceAnalysisRef.current = {
+              firstDetectedTime: null,
+              lastSeenTime: null,
+              matchHistory: [],
+              greeted: false,
+            };
+            setGreeting('');
+          }
           timeoutId = setTimeout(detectFrame, detectionInterval);
           return;
         }
 
+        // Face detected in current frame: Track 2-second analysis window
+        if (!faceAnalysisRef.current.firstDetectedTime) {
+          faceAnalysisRef.current.firstDetectedTime = now;
+          faceAnalysisRef.current.matchHistory = [];
+          faceAnalysisRef.current.greeted = false;
+        }
+        faceAnalysisRef.current.lastSeenTime = now;
+
+        const elapsedMs = now - faceAnalysisRef.current.firstDetectedTime;
+        const ANALYSIS_DURATION_MS = 2000; // Take 2 seconds to analyze and recognize face
+        const isAnalyzing = elapsedMs < ANALYSIS_DURATION_MS;
+        const progressPercent = Math.min(100, Math.round((elapsedMs / ANALYSIS_DURATION_MS) * 100));
+        const secondsRemaining = Math.max(0, ((ANALYSIS_DURATION_MS - elapsedMs) / 1000)).toFixed(1);
+
         if (users.length === 0) {
-          detections.forEach((d) => {
-            const box = d.box || d.detection?.box;
-            if (box) drawBox(ctx, box, 'Guest Visitor', '#00ffff');
-          });
-          setGreeting('Guest visitor detected. (Register face below to test personalized greeting)');
+          if (isAnalyzing) {
+            detections.forEach((d) => {
+              const box = d.box || d.detection?.box;
+              if (box) drawBox(ctx, box, `Analyzing face... ${progressPercent}%`, '#f59e0b', progressPercent);
+            });
+            setGreeting(`Scanning face... ${progressPercent}% (${secondsRemaining}s)`);
+          } else {
+            detections.forEach((d) => {
+              const box = d.box || d.detection?.box;
+              if (box) drawBox(ctx, box, 'Guest Visitor', '#00ffff');
+            });
+            setGreeting('Guest visitor detected. (Register face below to test personalized greeting)');
+          }
           timeoutId = setTimeout(detectFrame, detectionInterval);
           return;
         }
@@ -220,45 +277,93 @@ const FaceRecognition = ({ onNavigate }) => {
         const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.55);
         const results = detections.map((d) => faceMatcher.findBestMatch(d.descriptor));
 
+        // Accumulate matching descriptors during the 2-second analysis window
+        results.forEach((r) => {
+          if (r.label) {
+            faceAnalysisRef.current.matchHistory.push({
+              label: r.label,
+              distance: r.distance,
+            });
+          }
+        });
+
         const currentConfig = kioskConfigService.getConfig();
         const greetingTemplate = currentConfig.faceGreetingTemplate || 'Hello {name}! Welcome to Robomiracle Technologies.';
         const cooldownMs = (currentConfig.faceGreetingCooldownSec || 15) * 1000;
         const voiceGender = currentConfig.voiceGender || 'female';
 
-        results.forEach((result, index) => {
-          const box = detections[index].detection.box;
-          if (result.label !== 'unknown') {
-            const user = users.find((u) => u.name === result.label);
-            setGreeting(`Hello, ${result.label}! ${user?.info ? `(${user.info})` : ''}`);
+        if (isAnalyzing) {
+          // Still analyzing within the 2-second window
+          detections.forEach((d) => {
+            const box = d.detection.box;
+            drawBox(ctx, box, `Analyzing face... ${progressPercent}%`, '#f59e0b', progressPercent);
+          });
+          setGreeting(`Analyzing & recognizing face... ${progressPercent}% (${secondsRemaining}s)`);
+        } else {
+          // 2 seconds completed: Determine consensus match
+          let consensusLabel = 'unknown';
+          let consensusDistance = 1.0;
 
-            const currentTime = Date.now();
-            const lastTime = lastDetectionTimeRef.current[result.label] || 0;
-
-            // Debounced Speech Greeting (Customizable cooldown per person)
-            if (lastSpokenUserRef.current !== result.label || currentTime - lastTime > cooldownMs) {
-              const text = greetingTemplate.replace('{name}', result.label);
-              logger.ai('MATCH', `Recognized "${result.label}" (Distance: ${result.distance.toFixed(3)})`);
-              logger.speech('GREET', `Speaking greeting: "${text}"`);
-              speak(text, voiceGender);
-              lastSpokenUserRef.current = result.label;
-              lastDetectionTimeRef.current[result.label] = currentTime;
+          const labelVotes = {};
+          faceAnalysisRef.current.matchHistory.forEach((m) => {
+            if (m.label !== 'unknown') {
+              labelVotes[m.label] = (labelVotes[m.label] || 0) + 1;
             }
-            drawBox(ctx, box, result.label, '#00ffff');
-          } else {
-            setGreeting('Guest visitor detected');
-            drawBox(ctx, box, 'Guest Visitor', '#ef4444');
+          });
 
-            // Stranger greeting if enabled
-            if (currentConfig.strangerGreetingEnabled && currentConfig.strangerGreetingText) {
+          const candidates = Object.keys(labelVotes);
+          if (candidates.length > 0) {
+            candidates.sort((a, b) => labelVotes[b] - labelVotes[a]);
+            consensusLabel = candidates[0];
+            const dists = faceAnalysisRef.current.matchHistory
+              .filter((m) => m.label === consensusLabel)
+              .map((m) => m.distance);
+            consensusDistance = dists.length > 0 ? Math.min(...dists) : 0.5;
+          } else {
+            consensusLabel = results[0]?.label || 'unknown';
+          }
+
+          results.forEach((result, index) => {
+            const box = detections[index].detection.box;
+            const targetLabel = results.length === 1 ? consensusLabel : result.label;
+
+            if (targetLabel !== 'unknown') {
+              const user = users.find((u) => u.name === targetLabel);
+              setGreeting(`Hello, ${targetLabel}! ${user?.info ? `(${user.info})` : ''}`);
+
               const currentTime = Date.now();
-              const lastStrangerTime = lastDetectionTimeRef.current['__stranger__'] || 0;
-              if (currentTime - lastStrangerTime > cooldownMs * 1.5) {
-                speak(currentConfig.strangerGreetingText, voiceGender);
-                lastDetectionTimeRef.current['__stranger__'] = currentTime;
+              const lastTime = lastDetectionTimeRef.current[targetLabel] || 0;
+
+              // Speak greeting once 2-second analysis finishes, respecting cooldown
+              if (!faceAnalysisRef.current.greeted) {
+                if (lastSpokenUserRef.current !== targetLabel || currentTime - lastTime > cooldownMs) {
+                  const text = greetingTemplate.replace('{name}', targetLabel);
+                  logger.ai('MATCH', `Recognized "${targetLabel}" after 2s analysis (Distance: ${consensusDistance.toFixed(3)})`);
+                  logger.speech('GREET', `Speaking greeting: "${text}"`);
+                  speak(text, voiceGender);
+                  lastSpokenUserRef.current = targetLabel;
+                  lastDetectionTimeRef.current[targetLabel] = currentTime;
+                }
+                faceAnalysisRef.current.greeted = true;
+              }
+              drawBox(ctx, box, `${targetLabel}`, '#00ffff');
+            } else {
+              setGreeting('Guest visitor detected');
+              drawBox(ctx, box, 'Guest Visitor', '#ef4444');
+
+              // Stranger greeting if enabled
+              if (!faceAnalysisRef.current.greeted && currentConfig.strangerGreetingEnabled && currentConfig.strangerGreetingText) {
+                const currentTime = Date.now();
+                const lastStrangerTime = lastDetectionTimeRef.current['__stranger__'] || 0;
+                if (currentTime - lastStrangerTime > cooldownMs * 1.5) {
+                  speak(currentConfig.strangerGreetingText, voiceGender);
+                  lastDetectionTimeRef.current['__stranger__'] = currentTime;
+                }
+                faceAnalysisRef.current.greeted = true;
               }
             }
-          }
-        });
+          });
+        }
       } catch (err) {
         logger.error('DETECTION', `Loop error: ${err.message}`);
         console.error('Detection loop error:', err);
@@ -296,89 +401,40 @@ const FaceRecognition = ({ onNavigate }) => {
 
   return (
     <div className="face-recognition-page-wrapper">
-      {/* Outer HUD Corner Elements */}
-      <div className="hud-corner hud-top-left">&gt;&gt;&gt; AURRA_V</div>
-      <div className="hud-corner hud-top-right">DIAGNOSTIC_HUD &lt;&lt;&lt;</div>
+      {/* Outer HUD Bottom Elements */}
       <div className="hud-corner hud-bottom-left">&gt;&gt;&gt; ISOLATED_VISION</div>
       <div className="hud-corner hud-bottom-right">STATUS_ACTIVE &lt;&lt;&lt;</div>
+
+      {/* Top Left Corner: Back to Home Button */}
+      {onNavigate && (
+        <button 
+          className="fr-corner-btn fr-corner-btn-left" 
+          onClick={() => {
+            stopCamera();
+            onNavigate('/');
+          }}
+          title="Back to Home"
+        >
+          <ArrowLeft size={16} color="#0284c7" />
+          <span>Back to Home</span>
+        </button>
+      )}
+
+      {/* Top Right Corner: Register Face Button */}
+      <button 
+        className="fr-corner-btn fr-corner-btn-right" 
+        onClick={() => setIsModalOpen(true)}
+        title="Register New Face"
+      >
+        <UserPlus size={16} color="#0284c7" />
+        <span>Register Face</span>
+      </button>
 
       {/* Header */}
       <header className="header">
         <h1 className="heading">Face Greetings Diagnostic</h1>
       </header>
       <div className="subheading">Testing Camera &amp; Neural Recognition Overhead in Isolation</div>
-
-      {/* Real-Time Diagnostics & Controls Bar */}
-      <div className="diagnostics-bar">
-        {onNavigate && (
-          <button 
-            className="control-btn" 
-            onClick={() => {
-              stopCamera();
-              onNavigate('/');
-            }}
-            style={{ borderColor: '#00ffff', color: '#00ffff' }}
-          >
-            <ArrowLeft size={14} /> Back to Home
-          </button>
-        )}
-
-        {/* FPS Indicator */}
-        <div className={`metric-pill ${getFpsClass(fps)}`}>
-          <Activity size={14} /> {fps} FPS
-        </div>
-
-        {/* Inference Latency */}
-        <div className="metric-pill">
-          <Zap size={14} /> Latency: {detectionLatency}ms
-        </div>
-
-        {/* Detector Model Selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Model:</span>
-          <select
-            className="control-select"
-            value={selectedDetector}
-            onChange={(e) => setSelectedDetector(e.target.value)}
-          >
-            <option value="ssdMobilenetv1">SSD MobileNet V1 (Aurra 1.0)</option>
-            <option value="tinyFace">TinyFaceDetector (Fast 5x)</option>
-          </select>
-        </div>
-
-        {/* Detection Throttle Interval */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Loop:</span>
-          <select
-            className="control-select"
-            value={detectionInterval}
-            onChange={(e) => setDetectionInterval(Number(e.target.value))}
-          >
-            <option value={150}>150ms (Aurra 1.0 default)</option>
-            <option value={500}>500ms (Moderate)</option>
-            <option value={1200}>1200ms (Throttled)</option>
-          </select>
-        </div>
-
-        {/* Register Face Button */}
-        <button className="control-btn" onClick={() => setIsModalOpen(true)}>
-          <UserPlus size={14} /> Register Face
-        </button>
-
-        {/* View Diagnostic Logs Button */}
-        <button className="control-btn" onClick={() => setIsLogModalOpen(true)}>
-          <Terminal size={14} /> View Logs
-        </button>
-
-        {/* Toggle Detection Button */}
-        <button
-          className="control-btn"
-          onClick={() => setIsDetecting(!isDetecting)}
-          style={{ borderColor: isDetecting ? '#22c55e' : '#ef4444', color: isDetecting ? '#22c55e' : '#ef4444' }}
-        >
-          {isDetecting ? 'Pause AI' : 'Resume AI'}
-        </button>
-      </div>
 
       {/* Main Video & Canvas Container */}
       <div className="contain">

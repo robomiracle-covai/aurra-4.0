@@ -29,9 +29,11 @@ import {
   Volume2,
   Pause,
   Cpu,
-  LayoutGrid
+  LayoutGrid,
+  MessageSquare
 } from 'lucide-react';
-import { offlineCardService, offlineSliderService, offlineBrandingService } from '../../db/offlineServices';
+import { offlineCardService, offlineSliderService, offlineBrandingService, offlineQaService } from '../../db/offlineServices';
+import { DEFAULT_QA_QUESTIONS } from '../../data/defaultQuestions';
 import { logger } from '../../services/logger';
 import { devSettingsService } from '../../services/devSettingsService';
 import { voiceNavigationService } from '../../services/voiceNavigationService';
@@ -403,6 +405,49 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
     };
   }, []);
 
+  // 6 Quick FAQs from 'I have a question' (3 on Left, 3 on Right)
+  const [qaQuestions, setQaQuestions] = useState(() => DEFAULT_QA_QUESTIONS.slice(0, 6));
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadQuickQuestions = async () => {
+      try {
+        const qList = await offlineQaService.getQuestions();
+        if (isMounted && qList && qList.length >= 6) {
+          setQaQuestions(qList.slice(0, 6));
+        }
+      } catch (err) {
+        console.error('Failed to load quick questions for home page:', err);
+      }
+    };
+    loadQuickQuestions();
+    return () => { isMounted = false; };
+  }, []);
+
+  const handleSelectQuickQuestion = (q) => {
+    if (!q) return;
+    logger.info('QA', `Quick question tapped on home page: "${q.question}"`);
+
+    setVoiceLatestReply({
+      query: q.question,
+      reply: q.answer,
+      timestamp: Date.now(),
+    });
+
+    voiceNavigationService.speak(q.answer);
+
+    if (q.actionRoute) {
+      window.dispatchEvent(new CustomEvent('aurra:qa-answered', {
+        detail: {
+          query: q.question,
+          match: { answer: q.answer, actionRoute: q.actionRoute, category: q.category },
+          reply: q.answer,
+          source: 'quick-faq'
+        }
+      }));
+    }
+  };
+
   // Explain Features Mode state (Storyboard Spec)
   const [isExplainMode, setIsExplainMode] = useState(false);
   const [explainIndex, setExplainIndex] = useState(0);
@@ -453,7 +498,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
     };
   }, []);
 
-  // ── Auto-return to Ads Card / Slideshow after 1 minute of inactivity on the main page ──
+  // ── Auto-return to Ads Card / Slideshow after 30 seconds of inactivity on the main page ──
   useEffect(() => {
     // Only track idle inactivity when on the main cards view (not already on the ads card)
     if (showSlider) {
@@ -464,7 +509,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
       return;
     }
 
-    const IDLE_TIMEOUT_MS = 60 * 1000; // 1 minute (60,000ms)
+    const IDLE_TIMEOUT_MS = 30 * 1000; // 30 seconds (30,000ms)
 
     const resetIdleTimer = () => {
       if (idleTimerRef.current) {
@@ -483,7 +528,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
           return;
         }
 
-        logger.info('IDLE', 'No interaction for 1 minute on main page; showing ads card automatically.');
+        logger.info('IDLE', 'No interaction for 30 seconds on main page; showing ads card automatically.');
         if (isExplainMode) {
           setIsExplainMode(false);
         }
@@ -492,7 +537,7 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
       }, IDLE_TIMEOUT_MS);
     };
 
-    // Arm the 1-minute timer immediately upon viewing cards
+    // Arm the 30-second timer immediately upon viewing cards
     resetIdleTimer();
 
     // Throttled user activity listener (tap, click, mousemove, keydown, wheel)
@@ -1190,6 +1235,24 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
         ) : (
           /* AURRA 4.0 ORBITAL CONSTELLATION VIEW */
           <div ref={orbitalLayoutRef} className="orbital-home-layout">
+            {/* Left Side: 3 Questions from 'I have a question' */}
+            <div className="home-quick-questions-col left-col">
+              <div className="quick-col-header">
+                <MessageSquare size={13} className="quick-col-icon" />
+                <span>FREQUENT QUESTIONS</span>
+              </div>
+              {qaQuestions.slice(0, 3).map((q, idx) => (
+                <div
+                  key={q.id || `left-q-${idx}`}
+                  className="home-quick-q-card"
+                  onClick={() => handleSelectQuickQuestion(q)}
+                  title="Tap to ask Aurra"
+                >
+                  <div className="quick-q-text">{q.question}</div>
+                </div>
+              ))}
+            </div>
+
             {/* Planetary Orbital Constellation (Centered) */}
             <div className="constellation-column">
               <div className="constellation-canvas">
@@ -1315,6 +1378,24 @@ export default function SliderAndCards({ onNavigate, onOpenAdmin, isAdminOpen, s
                   );
                 })}
               </div>
+            </div>
+
+            {/* Right Side: 3 Questions from 'I have a question' */}
+            <div className="home-quick-questions-col right-col">
+              <div className="quick-col-header">
+                <Sparkles size={13} className="quick-col-icon" />
+                <span>ASK AURRA</span>
+              </div>
+              {qaQuestions.slice(3, 6).map((q, idx) => (
+                <div
+                  key={q.id || `right-q-${idx}`}
+                  className="home-quick-q-card"
+                  onClick={() => handleSelectQuickQuestion(q)}
+                  title="Tap to ask Aurra"
+                >
+                  <div className="quick-q-text">{q.question}</div>
+                </div>
+              ))}
             </div>
           </div>
         )}

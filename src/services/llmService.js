@@ -167,19 +167,23 @@ CONVERSATIONAL RULES:
 - Keep responses conversational, concise, and clear (around 20-35 words) so they can be spoken smoothly via speech synthesis.
 - Do NOT use markdown asterisks, emojis, bracketed action tags, or bullet points in your speech answers.`;
 
-const STORAGE_KEY = 'aurra_llm_config_v4';
+const STORAGE_KEY = 'aurra_llm_config_v5';
 
 export const DEFAULT_GROQ_API_KEY = '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';
-export const DEFAULT_BACKUP_LLM_KEY = '160def7c98d44d4d80f21170c807fd7f.a_xwhlvPEyPS9z0EyFXcvTUN';
+export const DEFAULT_OLLAMA_API_KEY = '160def7c98d44d4d80f21170c807fd7f.a_xwhlvPEyPS9z0EyFXcvTUN';
+export const DEFAULT_BACKUP_LLM_KEY = DEFAULT_OLLAMA_API_KEY;
 export const DEFAULT_GEMINI_API_KEY = 'AQ.Ab8RN6IVrEIKjCLjNw6QjOtaIlmnH4RsvHtMn_6Ay6Tp39LxNw';
 
 export const getDefaultLlmConfig = () => ({
   enabled: true,
-  provider: 'groq', // 'groq' | 'gemini'
-  apiUrl: 'https://api.groq.com/openai/v1',
-  apiKey: import.meta.env.VITE_LLM_API_KEY || DEFAULT_GROQ_API_KEY,
+  provider: 'ollama', // 'ollama' | 'groq' | 'gemini'
+  apiUrl: 'https://ollama.com/v1',
+  apiKey: import.meta.env.VITE_LLM_API_KEY || DEFAULT_OLLAMA_API_KEY,
   backupApiKey: DEFAULT_BACKUP_LLM_KEY,
-  model: 'qwen/qwen3.8-27b',
+  model: 'gemma4:31b',
+  ollamaApiKey: DEFAULT_OLLAMA_API_KEY,
+  ollamaModel: 'gemma4:31b',
+  ollamaApiUrl: 'https://ollama.com/v1',
   geminiApiKey: DEFAULT_GEMINI_API_KEY,
   geminiModel: 'gemini-1.5-flash',
   geminiApiUrl: 'https://generativelanguage.googleapis.com/v1beta',
@@ -215,9 +219,25 @@ class LlmService {
           merged.geminiApiKey = defaults.geminiApiKey;
         }
         if (!merged.provider) {
-          merged.provider = 'groq';
+          merged.provider = 'ollama';
         }
-        if (!merged.model || merged.model.includes('llama-3.3-70b')) {
+        // Auto-heal expired Groq key and non-functional defaults
+        if (
+          !merged.apiKey ||
+          merged.apiKey === DEFAULT_GROQ_API_KEY ||
+          merged.apiKey.startsWith('gsk_Tly') ||
+          (merged.apiUrl && merged.apiUrl.includes('api.groq.com') && (!merged.apiKey || merged.apiKey.startsWith('gsk_')))
+        ) {
+          merged.provider = 'ollama';
+          merged.apiKey = DEFAULT_OLLAMA_API_KEY;
+          merged.apiUrl = 'https://ollama.com/v1';
+          merged.model = 'gemma4:31b';
+        }
+        if (merged.provider === 'ollama') {
+          if (!merged.model || merged.model.includes('qwen') || merged.model.includes('llama')) {
+            merged.model = 'gemma4:31b';
+          }
+        } else if (!merged.model || merged.model.includes('llama-3.3-70b')) {
           merged.model = 'qwen/qwen3.8-27b';
         }
         if (!merged.geminiModel) {
@@ -275,7 +295,7 @@ class LlmService {
     if (this.config.provider === 'gemini') {
       return Boolean((this.config.geminiApiKey || DEFAULT_GEMINI_API_KEY).trim());
     }
-    const key = (this.config.apiKey || DEFAULT_GROQ_API_KEY).trim();
+    const key = (this.config.apiKey || DEFAULT_OLLAMA_API_KEY).trim();
     return Boolean(key);
   }
 
@@ -477,14 +497,15 @@ class LlmService {
     }
 
     // ── 3B. GROQ CLOUD PROVIDER DISPATCH (DEFAULT) ──
-    const apiKey = (this.config.apiKey || DEFAULT_GROQ_API_KEY).trim();
+    const isOllama = this.config.provider === 'ollama';
+    const apiKey = (this.config.apiKey || (isOllama ? DEFAULT_OLLAMA_API_KEY : DEFAULT_GROQ_API_KEY)).trim();
     if (!apiKey) {
-      logger.warn('LLM', 'No Groq API key configured.');
-      clearTimeout(timeoutId);
+      logger.warn('LLM', 'No LLM API key configured.');
       return { success: false, reason: 'NO_KEY' };
     }
 
-    let rawUrl = (this.config.apiUrl || 'https://api.groq.com/openai/v1').trim().replace(/\/+$/, '');
+    const defaultUrl = isOllama ? 'https://ollama.com/v1' : 'https://api.groq.com/openai/v1';
+    let rawUrl = (this.config.apiUrl || defaultUrl).trim().replace(/\/+$/, '');
     let targetUrl = rawUrl.endsWith('/chat/completions') ? rawUrl : `${rawUrl}/chat/completions`;
 
     const messages = [
@@ -493,9 +514,9 @@ class LlmService {
       { role: 'user', content: userQuery },
     ];
 
-    const modelName = (!this.config.model || this.config.model.includes('llama-3.3-70b'))
-      ? 'qwen/qwen3.8-27b'
-      : this.config.model;
+    const modelName = isOllama
+      ? (!this.config.model || this.config.model.includes('qwen') || this.config.model.includes('llama') ? 'gemma4:31b' : this.config.model)
+      : (!this.config.model || this.config.model.includes('llama-3.3-70b') ? 'llama-3.3-70b-versatile' : this.config.model);
 
     const body = {
       model: modelName,
@@ -508,7 +529,8 @@ class LlmService {
     const groqTimeoutId = setTimeout(() => groqController.abort(), this.config.timeoutMs || 12000);
 
     try {
-      logger.speech('LLM', `Calling Groq LLM (${body.model}) for: "${userQuery}"`);
+      const providerLabel = this.config.provider === 'ollama' ? 'Ollama Cloud' : 'Groq';
+      logger.speech('LLM', `Calling ${providerLabel} LLM (${body.model}) for: "${userQuery}"`);
 
       const response = await fetch(targetUrl, {
         method: 'POST',
@@ -543,7 +565,9 @@ class LlmService {
         text: cleaned,
         latencyMs: latency,
         model: body.model,
-        provider: liveRAG ? `Groq + ${liveRAG.source.toUpperCase()} RAG` : 'Groq Cloud AI',
+        provider: liveRAG
+          ? `${this.config.provider === 'ollama' ? 'Ollama' : 'Groq'} + ${liveRAG.source.toUpperCase()} RAG`
+          : (this.config.provider === 'ollama' ? 'Ollama Cloud AI' : 'Groq Cloud AI'),
         tokens: data.usage?.total_tokens || null,
         ragDetails: liveRAG,
       };
@@ -558,6 +582,45 @@ class LlmService {
       } else {
         logger.error('LLM', `Groq LLM call failed: ${err.message}`);
         console.error(`[AURRA LLM ERROR] Groq API error: ${err.message}`);
+      }
+
+      // Automatic fallback to Ollama Cloud if primary provider (Groq) fails
+      if (this.config.provider !== 'ollama') {
+        logger.warn('LLM', `Primary provider failed (${err.message}). Attempting auto-fallback to Ollama Cloud...`);
+        try {
+          const fallbackRes = await fetch('https://ollama.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${DEFAULT_OLLAMA_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: 'gemma4:31b',
+              messages,
+              temperature: 0.6,
+              max_tokens: 300,
+            }),
+          });
+          if (fallbackRes.ok) {
+            const fbData = await fallbackRes.json();
+            const fbMsg = fbData.choices?.[0]?.message?.content || '';
+            const cleanedFb = this.cleanResponseText(fbMsg);
+            if (cleanedFb) {
+              logger.info('LLM', `Ollama Cloud auto-fallback succeeded: "${cleanedFb}"`);
+              return {
+                success: true,
+                text: cleanedFb,
+                latencyMs: Date.now() - startTime,
+                model: 'gemma4:31b (Ollama Fallback)',
+                provider: 'Ollama Cloud AI (Auto-Fallback)',
+                tokens: fbData.usage?.total_tokens || null,
+                ragDetails: liveRAG,
+              };
+            }
+          }
+        } catch (fbErr) {
+          logger.error('LLM', `Ollama fallback error: ${fbErr.message}`);
+        }
       }
 
       const fallbackText = isAbort
@@ -692,7 +755,7 @@ ${docContext || 'No document excerpts available.'}`;
         max_tokens: 350,
       };
 
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const response = await fetch(pdfTargetUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -718,7 +781,7 @@ ${docContext || 'No document excerpts available.'}`;
         text: cleaned,
         latencyMs: latency,
         model: body.model,
-        provider: 'Groq Document AI',
+        provider: this.config.provider === 'ollama' ? 'Ollama Document AI' : 'Groq Document AI',
         citations: this.extractCitations(cleaned, relevantChunks),
       };
     } catch (err) {
